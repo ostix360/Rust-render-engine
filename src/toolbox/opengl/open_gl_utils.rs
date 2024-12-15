@@ -1,6 +1,6 @@
 
 
-mod OpenGlUtils {
+mod open_gl_utils {
     use crate::toolbox::logging::LOGGER;
 
     pub fn clear_gl() {

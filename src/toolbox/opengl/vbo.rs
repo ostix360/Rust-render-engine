@@ -1,6 +1,6 @@
-use gl::{BindBuffer, BufferData, DeleteBuffers, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FALSE, FLOAT, STATIC_DRAW};
-use gl::types::{GLboolean, GLint, GLuint};
 use bytemuck;
+use gl::types::{GLint, GLuint};
+use gl::{BindBuffer, BufferData, DeleteBuffers, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FALSE, FLOAT, STATIC_DRAW};
 
 pub struct VBO {
     id: GLuint,

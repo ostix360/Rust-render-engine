@@ -1,10 +1,9 @@
-use std::fmt::format;
+use crate::toolbox::logging::LogLevel::*;
+use chrono;
+use lazy_static::lazy_static;
 use std::io::Write;
 use std::thread;
 use std::thread::ThreadId;
-use chrono;
-use lazy_static::lazy_static;
-use crate::toolbox::logging::LogLevel::*;
 
 #[derive(Debug)]
 #[derive(PartialEq)]

@@ -1,6 +1,5 @@
-use std::mem;
-use gl::types::GLuint;
 use crate::toolbox::opengl::vbo::VBO;
+use gl::types::GLuint;
 
 pub struct VAO {
     pub id: GLuint,
