@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::toolbox::logging::LogLevel::*;
 use chrono;
 use lazy_static::lazy_static;
@@ -22,7 +24,7 @@ pub struct Logger {
     level: Vec<LogLevel>,
     log_file: String,
 }
-
+// const LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string()); 
 lazy_static! {
     pub static ref LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
 }

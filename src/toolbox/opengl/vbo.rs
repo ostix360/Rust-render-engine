@@ -1,6 +1,7 @@
 use bytemuck;
 use gl::types::{GLint, GLuint};
 use gl::{BindBuffer, BufferData, DeleteBuffers, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FALSE, FLOAT, STATIC_DRAW};
+use crate::{TriIndexes, Vertex};
 
 pub struct VBO {
     id: GLuint,
@@ -25,7 +26,7 @@ impl VBO {
         Ok(VBO::new(id))
     }
 
-    pub fn store_indices(&mut self, indices: &Vec<u32>) {
+    pub fn store_indices(&self, indices: &Vec<TriIndexes>) {
         let buffer: &[u8] = bytemuck::cast_slice(indices);
         unsafe {
             BindBuffer(ELEMENT_ARRAY_BUFFER, self.id);
@@ -33,7 +34,9 @@ impl VBO {
         }
     }
     
-    pub fn store_data(&self, attrib: GLuint, data_size: GLint, data: &Vec<f32>) {
+    
+    
+    pub fn store_data(&self, attrib: GLuint, data_size: GLint, data: &Vec<Vertex>) {
         let buffer: &[u8] = bytemuck::cast_slice(data);
         unsafe { 
             BindBuffer(ARRAY_BUFFER, self.id);

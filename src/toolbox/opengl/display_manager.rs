@@ -1,6 +1,8 @@
+#![allow(unused)]
 use glfw::ffi::*;
 use glfw::{Action, Context, Key, PWindow};
 use std::ffi::c_int;
+use crate::toolbox::logging::LOGGER;
 
 pub struct DisplayManager {
     width: u32,
@@ -60,7 +62,7 @@ impl DisplayManager {
             version
         };
 
-        println!("OpenGL version {}", version);
+        LOGGER.debug(format!("OpenGL version {}", version).as_str());
         unsafe {
             gl::Viewport(0, 0, self.width as i32, self.height as i32);
         }
@@ -97,7 +99,7 @@ impl DisplayManager {
     }
     pub fn update_display(&mut self) {
         self.handle_window_events();
-        // self.size_handler();
+        self.size_handler();
         let current_time = self.get_current_time();
         self.delta = (current_time - self.last_frame_time) / 1000.0;
         self.last_frame_time = current_time;

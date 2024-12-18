@@ -1,11 +1,15 @@
+#![allow(unused)]
 use crate::toolbox::opengl::vbo::VBO;
-use gl::types::GLuint;
+use gl::types::{GLint, GLuint};
+use crate::toolbox::logging::LOGGER;
+use gl::{BindVertexArray, DisableVertexAttribArray, EnableVertexAttribArray};
+use crate::{TriIndexes, Vertex};
 
 pub struct VAO {
     pub id: GLuint,
     vbos: Vec<VBO>,
     vertex_count: usize,
-    indices: Option<Vec<u32>>,
+    indices: Option<Vec<TriIndexes>>,
 }
 
 impl VAO {
@@ -28,16 +32,52 @@ impl VAO {
         }
         Ok(VAO::new(id))
     }
+
+    pub fn store_data(&mut self, attrib: GLuint, data_size: GLint, position: Vec<Vertex>) -> () {
+        unsafe { self.bind(); }
+        let vbo = VBO::create_vbo().expect("Error creating VBO");
+        vbo.store_data(attrib, data_size, &position);
+        self.vbos.push(vbo);
+        unsafe { self.unbind(); }
+    }
     
-    pub fn store_indices(&mut self, indices: Vec<u32>) {
-        let mut vbo =  match VBO::create_vbo(){
-            Ok(vbo) => vbo,
-            Err(err) => panic!("Error creating VBO: {}", err)
-        };
+    pub fn store_indices(&mut self, indices: Vec<TriIndexes>) -> () {
+        unsafe { self.bind(); }
+        let vbo =  VBO::create_vbo().expect("Error creating VBO");
         vbo.store_indices(&indices);
         self.vbos.push(vbo);
         self.vertex_count = indices.len();
         self.indices = Some(indices);
+        unsafe { self.unbind(); }
+    }
+
+    pub fn binds(&self, attributes: &[u32]) -> () {
+        unsafe { self.bind() }
+        for i in attributes{
+            unsafe { EnableVertexAttribArray(*i)}
+            LOGGER.gl_debug("Error while binding attrib")
+        }
+    }
+    
+    pub fn unbinds(&self, attributes: &[u32]) -> () {
+        unsafe { self.unbind() }
+        for i in attributes{
+            unsafe { DisableVertexAttribArray(*i)}
+            LOGGER.gl_debug("Error while binding attrib")
+        }
+    }
+
+    pub fn get_vertex_count(&self) -> usize {
+        self.vertex_count
+    }
+
+    unsafe fn bind(&self) -> () {
+        BindVertexArray(self.id);
+        LOGGER.gl_debug("Error while binding VAO")
+    }
+
+    unsafe fn unbind(&self) -> () {
+        BindVertexArray(0)
     }
 }
 
