@@ -11,5 +11,15 @@ imagine = "0.5.1"
 chrono = "0.4.39"
 lazy_static = "1.5.0"
 include_dir = "0.7.4"
+meval = { version = "0.2", features = ["serde"] }
+serde_derive = "1"
+serde = "1.0.216"
+toml = "0.4.5"
+exmex = { version = "0.20.3", features = ["partial", "serde", "value"] }
+nalgebra = "0.33.2"
+
+[dependencies.pyo3]
+version = "0.23.3"
+features = ["auto-initialize"]
 
 [dev-dependencies]

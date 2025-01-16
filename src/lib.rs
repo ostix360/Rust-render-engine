@@ -1,5 +1,6 @@
 pub mod toolbox;
 mod render;
+mod maths;
 
 use include_dir::{include_dir, Dir};
 pub use crate::toolbox::logging::LOGGER;

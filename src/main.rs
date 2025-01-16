@@ -1,8 +1,10 @@
 extern crate gl;
 extern crate glfw;
+extern crate meval;
 // mod app;
 mod toolbox;
 mod render;
+mod maths;
 
 use crate::render::classic_shader::classic_shader::CLASSIC_SHADER;
 use crate::toolbox::opengl::display_manager;
@@ -10,6 +12,9 @@ use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, cle
 use crate::toolbox::opengl::vao::VAO;
 use gl::{ClearColor, DrawElements, TRIANGLES, UNSIGNED_INT};
 use include_dir::{include_dir, Dir};
+use pyo3::ffi::c_str;
+use pyo3::prelude::PyModule;
+use pyo3::Python;
 use render_engine::toolbox::color::Color;
 
 const RESOURCES: Dir = include_dir!("src/res");
@@ -36,7 +41,7 @@ fn render(vao: &VAO) -> () {
 fn main() {
     
     let mut display_manager = display_manager::DisplayManager::new(1420, 920, "Test Window");
-
+    
     display_manager.create_display();
     add_opengl_debug();
     {
@@ -45,12 +50,11 @@ fn main() {
     let mut vao = VAO::create_vao().expect("Unable to create VAO");
     vao.store_data(0, 3, Vec::from(&VERTICES));
     vao.store_indices(Vec::from(&INDICES));
-
+    
     while !display_manager.is_close_requested() {
         clear_gl();
         render(&vao);
         display_manager.update_display();
     };
-
 
 }
