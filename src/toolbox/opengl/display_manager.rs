@@ -2,6 +2,7 @@
 use glfw::ffi::*;
 use glfw::{Action, Context, Key, PWindow};
 use std::ffi::c_int;
+use crate::toolbox::input::Input;
 use crate::toolbox::logging::LOGGER;
 
 pub struct DisplayManager {
@@ -12,7 +13,8 @@ pub struct DisplayManager {
     last_frame_time : f32,
     window: Option<PWindow>,
     glfw: Option<glfw::Glfw>,
-    events: Option<glfw::GlfwReceiver<(f64, glfw::WindowEvent)>>
+    events: Option<glfw::GlfwReceiver<(f64, glfw::WindowEvent)>>,
+    input: Input,
 }
 
 impl DisplayManager {
@@ -26,6 +28,7 @@ impl DisplayManager {
             window: None,
             glfw: None,
             events: None,
+            input: Input::new(),
         }
     }
 
@@ -43,6 +46,7 @@ impl DisplayManager {
         self.glfw = Some(glfw);
         self.window = Some(window);
         self.events = Some(events);
+
         let window = self.window.as_mut().unwrap();
 
         window.set_key_polling(true);
@@ -88,6 +92,15 @@ impl DisplayManager {
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     self.window.as_mut().unwrap().set_should_close(true)
+                }
+                glfw::WindowEvent::Key(key, _, action, _) => {
+                    self.input.key_handler(action, key);
+                }
+                glfw::WindowEvent::CursorPos(x, y) => {
+                    self.input.set_mouse_pos(x, y);
+                }
+                glfw::WindowEvent::MouseButton(button, action, _) => {
+                    self.input.mouse_button_handler(action, button);
                 }
                 _ => {}
             }

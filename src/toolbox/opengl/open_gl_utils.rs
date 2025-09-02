@@ -27,14 +27,33 @@ pub mod open_gl_utils {
         }else{
             ""
         };
+        let level = match level {
+            gl::DEBUG_TYPE_ERROR => "ERROR",
+            gl::DEBUG_TYPE_DEPRECATED_BEHAVIOR => "DEPRECATED_BEHAVIOR",
+            gl::DEBUG_TYPE_UNDEFINED_BEHAVIOR => "UNDEFINED_BEHAVIOR",
+            gl::DEBUG_TYPE_PORTABILITY => "PORTABILITY",
+            gl::DEBUG_TYPE_PERFORMANCE => "PERFORMANCE",
+            gl::DEBUG_TYPE_MARKER => "MARKER",
+            gl::DEBUG_TYPE_PUSH_GROUP => "PUSH_GROUP",
+            gl::DEBUG_TYPE_POP_GROUP => "POP_GROUP",
+            gl::DEBUG_TYPE_OTHER => "OTHER",
+            _ => "UNKNOWN"
+        };
+        let severity = match severity {
+            gl::DEBUG_SEVERITY_HIGH => "HIGH",
+            gl::DEBUG_SEVERITY_MEDIUM => "MEDIUM",
+            gl::DEBUG_SEVERITY_LOW => "LOW",
+            gl::DEBUG_SEVERITY_NOTIFICATION => "NOTIFICATION",
+            _ => "UNKNOWN"
+        };
         let message = format!(
-            "GL CALLBACK: {} type = 0x{}, severity = 0x{}, message = {}\n",
+            "GL CALLBACK: {} type = {}, severity = {}, message = {}\n",
             err,
             level,
             severity,
             unsafe { std::ffi::CStr::from_ptr(message).to_string_lossy() }
         );
-        LOGGER.error(&message);
+        LOGGER.debug(&message);
     }
     
     pub fn add_opengl_debug() {

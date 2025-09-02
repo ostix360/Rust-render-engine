@@ -12,9 +12,6 @@ use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, cle
 use crate::toolbox::opengl::vao::VAO;
 use gl::{ClearColor, DrawElements, TRIANGLES, UNSIGNED_INT};
 use include_dir::{include_dir, Dir};
-use pyo3::ffi::c_str;
-use pyo3::prelude::PyModule;
-use pyo3::Python;
 use render_engine::toolbox::color::Color;
 
 const RESOURCES: Dir = include_dir!("src/res");
