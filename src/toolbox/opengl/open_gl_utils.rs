@@ -8,7 +8,7 @@ pub mod open_gl_utils {
 
     pub fn clear_gl() {
         unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
         LOGGER.gl_debug("Error clearing GL color buffer");
     }

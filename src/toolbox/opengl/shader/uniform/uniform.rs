@@ -3,13 +3,13 @@ use crate::toolbox::logging::LOGGER;
 use gl::types::{GLint, GLuint};
 use gl::GetUniformLocation;
 
-pub struct Uniform<'a>{
-    name: &'a str,
+pub struct Uniform{
+    pub name: &'static str,
     location: Option<GLint>,
 }
 
-impl Uniform<'_> {
-    pub fn new(name: &str) -> Uniform{
+impl Uniform {
+    pub fn new(name: &'static str) -> Uniform{
         Uniform {
             name,
             location: None,
