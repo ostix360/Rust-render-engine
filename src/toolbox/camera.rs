@@ -64,9 +64,6 @@ impl Camera {
 
     pub fn get_view_matrix(&self) -> Matrix4<f64>{
         let translation = Translation3::from(-self.position);
-        println!("Camera position: {:?}", self.position);
-        println!("Camera pitch: {}, yaw: {}", -self.quat.euler_angles().0.to_degrees(), self.quat.euler_angles().1.to_degrees());
-        // let result = Matrix4::from_euler_angles(self.pitch, self.yaw, self.roll).append_translation(&-self.position);
         let result = self.quat.inverse().to_homogeneous() * translation.to_homogeneous();
         result
     }
