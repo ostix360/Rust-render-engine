@@ -7,6 +7,12 @@ use gl::types::{GLuint};
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::uniform::uniform::Uniform;
 
+pub trait Shader {
+    fn bind(&self);
+    fn unbind(&self);
+    fn store_all_uniforms(&mut self);
+}
+
 pub struct ShaderProgram {
     id: GLuint,
 }
@@ -74,7 +80,7 @@ impl ShaderProgram{
         (vertex_id, fragment_id)
     }
 
-    fn process_program(vertex: GLuint, fragment: GLuint, bind_att: fn(sp: GLuint)) -> GLuint {
+    fn process_program(vertex: GLuint, fragment: GLuint) -> GLuint {
         let program = {
             unsafe {
                 CreateProgram()
@@ -86,9 +92,6 @@ impl ShaderProgram{
             AttachShader(program, fragment);
             LinkProgram(program);
         };
-
-        bind_att(program);
-        
         unsafe {
             let mut success = 0;
             GetProgramiv(program, LINK_STATUS, &mut success);
@@ -116,12 +119,12 @@ impl ShaderProgram{
         program
     }
 
-    pub fn new(name: &str, bind_attrib: fn(sp: GLuint)) -> ShaderProgram {
+    pub fn new(name: &str) -> ShaderProgram {
         let shaders = Self::load_shader(name);
         let vertex_shader = shaders.0;
         let fragment_shader = shaders.1;
 
-        let id = Self::process_program(vertex_shader, fragment_shader, bind_attrib);
+        let id = Self::process_program(vertex_shader, fragment_shader);
         ShaderProgram{
             id,
         }
@@ -132,8 +135,8 @@ impl ShaderProgram{
         LOGGER.gl_debug(format!("Error while binding shader program {}", self.id).as_str())
     }
     
-    pub fn bind_attrib(id: GLuint, attrib: u32, variable_name: &str){
-        unsafe {BindAttribLocation(id, attrib, variable_name.as_ptr().cast())}
+    pub fn bind_attrib(&self, attrib: u32, variable_name: &str){
+        unsafe {BindAttribLocation(self.id, attrib, variable_name.as_ptr().cast())}
         LOGGER.gl_debug("Error while binding attribute")
     }
     
@@ -141,18 +144,19 @@ impl ShaderProgram{
         unsafe { UseProgram(0) }
     }
 
-    pub fn store_all_uniforms(&self, uniforms: &mut Box<[Uniform]>){
+    pub fn store_all_uniforms(&self, uniforms: &mut Box<[&mut Uniform]>){
         for uniform in uniforms.iter_mut() {
-            uniform.store_uniform(self.id)
+            uniform.store_uniform(self.id.clone())
         }
         self.validate_program()
     }
     
     fn validate_program(&self) {
         unsafe {
-            ValidateProgram(self.id);
+            ValidateProgram(self.id as GLuint);
+            LOGGER.gl_debug("Error while validating shader program");
             let mut success = 0;
-            GetShaderiv(self.id, VALIDATE_STATUS, &mut success);
+            GetProgramiv(self.id, VALIDATE_STATUS, &mut success);
             if success == 0 {
                 let mut v: Vec<u8> = Vec::with_capacity(1024);
                 let mut log_len = 0_i32;

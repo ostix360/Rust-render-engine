@@ -6,13 +6,20 @@ mod toolbox;
 mod render;
 mod maths;
 
-use crate::render::classic_shader::classic_shader::CLASSIC_SHADER;
+mod graphics;
+
+
+use crate::graphics::model::Model;
+use crate::render::classic_shader::ClassicShader;
+use crate::render::renderer::Renderer;
+use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::display_manager;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, clear_gl};
+use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
 use crate::toolbox::opengl::vao::VAO;
-use gl::{ClearColor, DrawElements, TRIANGLES, UNSIGNED_INT};
 use include_dir::{include_dir, Dir};
-use render_engine::toolbox::color::Color;
+use nalgebra::{vector, Orthographic3, Perspective3, Vector3};
+use rustc_hash::FxHashMap;
 
 const RESOURCES: Dir = include_dir!("src/res");
 
@@ -71,38 +78,52 @@ const INDICES: [TriIndexes; 12] = [
     [23,21,22,],
 ];
 
-fn render(vao: &VAO) -> () {
-    let color = &Color::new(0.2,0.3,0.2,1.0);
-    unsafe {ClearColor(color.red(), color.green(), color.blue(), color.alpha())}
-    CLASSIC_SHADER.bind();
-    vao.binds(&[0]);
-    unsafe {
-        DrawElements(TRIANGLES, 6, UNSIGNED_INT, 0 as *const _);
-    }
-    vao.unbinds(&[0]);
-    CLASSIC_SHADER.unbind();
-}
+// fn render(vao: &VAO) -> () {
+//     let color = &Color::new(0.2,0.3,0.2,1.0);
+//     unsafe {ClearColor(color.red(), color.green(), color.blue(), color.alpha())}
+//     CLASSIC_SHADER.bind();
+//     vao.binds(&[0]);
+//     unsafe {
+//         DrawElements(TRIANGLES, 6, UNSIGNED_INT, 0 as *const _);
+//     }
+//     vao.unbinds(&[0]);
+//     CLASSIC_SHADER.unbind();
+// }
 
 fn main() {
+    const WIDTH: u32 = 1420;
+    const HEIGHT: u32 = 920;
+
+    const NEAR: f64 = 0.1;
+    const FAR: f64 = 500.0;
     
     let mut display_manager = display_manager::DisplayManager::new(1420, 920, "Test Window");
     
     display_manager.create_display();
     add_opengl_debug();
-    {
-        let _ = &*CLASSIC_SHADER;
-    }
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
     }
     let mut vao = VAO::create_vao().expect("Unable to create VAO");
     vao.store_data(0, 3, Vec::from(&VERTICES));
     vao.store_indices(Vec::from(&INDICES));
+    let model = Model::new(vao, Vector3::new(0., 0., -1.), Vector3::new(0.,0.,0.5), 0.1, 0.1);
+    let shader_program = ShaderProgram::new("classic");
+    let classic_shader = ClassicShader::new(shader_program);
+
+    let mut camera = Camera::new(vector![0.,0.,0.],);
+    let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
+    let projection = Perspective3::new(aspect_ratio, 1.5, NEAR, FAR);
+    let mut renderer = Renderer::new(classic_shader, projection.to_homogeneous());
+    let mut map = FxHashMap::default();
+    map.insert(model.get_vao(), vec![&model]);
     
     while !display_manager.is_close_requested() {
+        camera.update(display_manager.get_input());
+
         clear_gl();
-        render(&vao);
+        renderer.render(&map, &camera);
         display_manager.update_display();
     };
-
+    println!("Exiting...")
 }

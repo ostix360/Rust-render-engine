@@ -1,5 +1,6 @@
 pub mod opengl;
 pub mod logging;
 pub mod color;
-mod camera;
-mod input;
+pub mod camera;
+pub mod input;
+mod maths;

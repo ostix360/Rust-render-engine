@@ -1,2 +1,2 @@
 pub mod uniform;
-mod matrix4uniform;
+pub mod matrix4uniform;

@@ -5,6 +5,7 @@ use crate::toolbox::logging::LOGGER;
 use gl::{BindVertexArray, DisableVertexAttribArray, EnableVertexAttribArray};
 use crate::{TriIndexes, Vertex};
 
+#[derive(Eq, Hash, PartialEq)]
 pub struct VAO {
     pub id: GLuint,
     vbos: Vec<VBO>,
@@ -46,7 +47,7 @@ impl VAO {
         let vbo =  VBO::create_vbo().expect("Error creating VBO");
         vbo.store_indices(&indices);
         self.vbos.push(vbo);
-        self.vertex_count = indices.len();
+        self.vertex_count = indices.len() * 3;
         self.indices = Some(indices);
         unsafe { self.unbind(); }
     }

@@ -17,6 +17,7 @@ serde = "1.0.216"
 toml = "0.4.5"
 exmex = { version = "0.20.3", features = ["partial", "serde", "value"] }
 nalgebra = "0.33.2"
+rustc-hash = "2.1.1"
 
 [dependencies.pyo3]
 version = "0.23.3"

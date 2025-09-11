@@ -1,27 +1,21 @@
-
-use nalgebra::{Isometry3, Matrix4, MatrixView4, Perspective3, Rotation3, SimdComplexField, Translation3, UnitQuaternion, Vector3};
+use std::f64::consts::PI;
+use nalgebra::{Isometry3, Matrix4, MatrixView4, Perspective3, Rotation3, SimdComplexField, Translation3, Unit, UnitQuaternion, Vector, Vector3};
 use crate::toolbox::input::Input;
 use glfw::{Key, MouseButton};
 
-const CAMERA_SPEED: f64 = 10.0;
-const CAMERA_ROTATION_SPEED: f64 = 0.01;
+const CAMERA_SPEED: f64 = 0.1;
+const CAMERA_ROTATION_SPEED: f64 = 0.001;
 
 pub struct Camera {
     pub position: Vector3<f64>,
-    pub yaw: f64,   // Angle in the local plane Ox, Oy (in radians)
-    pub pitch: f64, // Angle in the local plane Ox, Oz (in radians)
-    pub roll: f64,  // Angle in the local plane Oy, Oz (in radians)
-    pub fov: f64,
+    pub quat: UnitQuaternion<f64>
 }
 
 impl Camera {
-    pub fn new(position: Vector3<f64>, yaw: f64, pitch: f64, roll: f64, fov: f64) -> Camera {
+    pub fn new(position: Vector3<f64>) -> Camera {
         Camera {
             position,
-            yaw,
-            pitch,
-            roll,
-            fov,
+            quat: UnitQuaternion::<f64>::from_axis_angle(&Vector3::y_axis(), 0.),
         }
     }
 
@@ -33,38 +27,47 @@ impl Camera {
     #[inline]
     fn update_angles(&mut self, input: &Input) {
         if input.is_mouse_button_pressed(MouseButton::Left) {
-            self.yaw += -(input.d_mouse_pos.0 as f64) * CAMERA_ROTATION_SPEED;
-            self.pitch += -(input.d_mouse_pos.1 as f64) * CAMERA_ROTATION_SPEED
+            let vec_dir = Vector3::new(input.d_mouse_pos.1, input.d_mouse_pos.0, 0.0);
+            let norm = vec_dir.norm();
+            let d_quat = if norm != 0.0 {;
+                UnitQuaternion::from_axis_angle(&Unit::new_normalize(vec_dir), norm * CAMERA_ROTATION_SPEED)
+            } else {
+                UnitQuaternion::identity()
+            };
+            self.quat = self.quat * d_quat;
         }
+
     }
 
     #[inline]
-    fn get_dp(&self, input: &Input) -> Vector3<f64> {
-        let mut dp: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+    fn get_dp(&self, input: &Input) -> Vector3<f64> { // Use quaternion to remember previous rotation
+        let front = self.quat.transform_vector(&Vector3::z_axis()).normalize();
+        let up = self.quat.transform_vector(&Vector3::y_axis()).normalize();
+        let right = self.quat.transform_vector(&Vector3::x_axis()).normalize();
+
         if input.is_key_pressed(Key::W) || input.is_key_pressed(Key::S) {
-            let incr = if input.is_key_pressed(Key::W) { 1.0 } else { -1.0 };
-            dp += Vector3::new(incr, 0., 0.) * self.yaw.cos() * self.pitch.cos();
-            dp += Vector3::new(0., incr, 0.) * self.yaw.sin() * self.pitch.cos();
-            dp += Vector3::new(0., 0., incr) * self.pitch.sin();
-        };
-        if input.is_key_pressed(Key::A) || input.is_key_pressed(Key::D) {
-            let incr = if input.is_key_pressed(Key::A) { 1.0 } else { -1.0 };
-            dp += Vector3::new(incr, 0., 0.) * -self.yaw.sin();
-            dp += Vector3::new(0., incr, 0.) * self.yaw.cos();
-            dp += Vector3::new(0., 0., incr) * -self.yaw.sin() * self.pitch.sin();
-        }
-        if input.is_key_pressed(Key::LeftShift) || input.is_key_pressed(Key::Space) {
+            let incr = if input.is_key_pressed(Key::W) { -1.0 } else { 1.0 };
+            let dp = front * incr;
+            dp
+        } else if input.is_key_pressed(Key::A) || input.is_key_pressed(Key::D) {
+            let incr = if input.is_key_pressed(Key::A) { -1.0 } else { 1.0 };
+            let dp = right * incr;
+            dp
+        }else if input.is_key_pressed(Key::LeftShift) || input.is_key_pressed(Key::Space) {
             let incr = if input.is_key_pressed(Key::LeftShift) { -1.0 } else { 1.0 };
-            dp += Vector3::new(incr, 0., 0.) * self.yaw.cos() * -self.pitch.sin();
-            dp += Vector3::new(0., incr, 0.) * self.yaw.sin() * -self.pitch.sin();
-            dp += Vector3::new(0., 0., incr) * self.pitch.cos();
+            let dp = up * incr;
+            dp
+        }else {
+            Vector3::zeros()
         }
-        dp
     }
 
     pub fn get_view_matrix(&self) -> Matrix4<f64>{
-        let rotation = Rotation3::from_euler_angles(self.roll, self.pitch, self.yaw);
-        let translation = Translation3::from(self.position);
-        Isometry3::from_parts(translation, <UnitQuaternion<f64>>::from(rotation)).to_homogeneous()
+        let translation = Translation3::from(-self.position);
+        println!("Camera position: {:?}", self.position);
+        println!("Camera pitch: {}, yaw: {}", -self.quat.euler_angles().0.to_degrees(), self.quat.euler_angles().1.to_degrees());
+        // let result = Matrix4::from_euler_angles(self.pitch, self.yaw, self.roll).append_translation(&-self.position);
+        let result = self.quat.inverse().to_homogeneous() * translation.to_homogeneous();
+        result
     }
 }

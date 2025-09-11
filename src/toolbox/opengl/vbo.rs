@@ -3,6 +3,7 @@ use gl::types::{GLint, GLuint};
 use gl::{BindBuffer, BufferData, DeleteBuffers, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FALSE, FLOAT, STATIC_DRAW};
 use crate::{TriIndexes, Vertex};
 
+#[derive(Eq, Hash, PartialEq)]
 pub struct VBO {
     id: GLuint,
 

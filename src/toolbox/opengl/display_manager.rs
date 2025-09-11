@@ -50,6 +50,8 @@ impl DisplayManager {
         let window = self.window.as_mut().unwrap();
 
         window.set_key_polling(true);
+        window.set_cursor_pos_polling(true);
+        window.set_mouse_button_polling(true);
         window.set_framebuffer_size_polling(true);
         let win = window.window_ptr();
         unsafe {
@@ -88,6 +90,8 @@ impl DisplayManager {
 
     fn handle_window_events(&mut self) {
         self.glfw.as_mut().unwrap().poll_events();
+        let (x, y) = self.window.as_ref().unwrap().get_cursor_pos();
+        self.input.set_mouse_pos(x, y);
         for (_, event) in glfw::flush_messages(self.events.as_ref().unwrap()) {
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
@@ -95,9 +99,6 @@ impl DisplayManager {
                 }
                 glfw::WindowEvent::Key(key, _, action, _) => {
                     self.input.key_handler(action, key);
-                }
-                glfw::WindowEvent::CursorPos(x, y) => {
-                    self.input.set_mouse_pos(x, y);
                 }
                 glfw::WindowEvent::MouseButton(button, action, _) => {
                     self.input.mouse_button_handler(action, button);
@@ -147,6 +148,10 @@ impl DisplayManager {
     
     pub fn get_height(&self) -> u32 {
         self.height
+    }
+    
+    pub fn get_input(&self) -> &Input {
+        &self.input
     }
     
     pub fn get_window(&self) -> &PWindow {

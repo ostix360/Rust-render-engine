@@ -14,8 +14,9 @@ impl Matrix4Uniform {
     }
 
     pub fn load_matrix_to_uniform(&self, m:Matrix4<f64>) {
+        let m32 = m.cast::<f32>();
         unsafe {
-            gl::UniformMatrix4fv(self.uniform.get_location(), 1, gl::FALSE, m.as_ptr().cast());
+            gl::UniformMatrix4fv(self.uniform.get_location(), 1, gl::FALSE, m32.as_ptr());
         }
         LOGGER.gl_debug(format!("Error while loading matrix \"{}\" to uniform", self.uniform.name).as_str());
     }
