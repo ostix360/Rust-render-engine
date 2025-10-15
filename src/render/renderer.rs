@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::graphics::model::Model;
 use crate::render::classic_shader::ClassicShader;
 use crate::toolbox::camera::Camera;
+use crate::toolbox::opengl::open_gl_utils::open_gl_utils::set_wireframe_mode;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 use crate::toolbox::opengl::vao::VAO;
 
@@ -29,11 +30,12 @@ impl Renderer {
     pub fn render(&mut self, models: &FxHashMap<&VAO, Vec<&Model>>, cam: &Camera) {
         self.prepare(cam);
         self.time.add_assign(0.01);
+        set_wireframe_mode(true);
         for vao in models.keys() {
             vao.binds(&[0, 1, 2]);
             if let Some(models) = models.get(vao) {
                 for model in models {
-                    self.shader.load_transformation_matrix(model.get_transformation_matrix(self.time));
+                    self.shader.load_transformation_matrix(model.get_transformation_matrix(0.));
                     unsafe {
                         DrawElements(TRIANGLES, vao.get_vertex_count() as GLsizei, UNSIGNED_INT, 0 as *const _);
                     }

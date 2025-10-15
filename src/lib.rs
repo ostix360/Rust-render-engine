@@ -2,8 +2,7 @@ pub mod toolbox;
 pub mod render;
 pub mod maths;
 pub mod graphics;
-
-
+pub mod app;
 
 use include_dir::{include_dir, Dir};
 pub use crate::toolbox::logging::LOGGER;

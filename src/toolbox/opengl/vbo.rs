@@ -35,6 +35,14 @@ impl VBO {
         }
     }
     
+    pub fn store_indices_line(&self, indices: &Vec<[u32; 2]>) {
+        let buffer: &[u8] = bytemuck::cast_slice(indices);
+        unsafe {
+            BindBuffer(ELEMENT_ARRAY_BUFFER, self.id);
+            BufferData(ELEMENT_ARRAY_BUFFER, buffer.len().try_into().unwrap(), buffer.as_ptr().cast(), STATIC_DRAW)
+        }
+    }
+    
     
     
     pub fn store_data(&self, attrib: GLuint, data_size: GLint, data: &Vec<Vertex>) {

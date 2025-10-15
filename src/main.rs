@@ -95,7 +95,7 @@ fn main() {
     const HEIGHT: u32 = 920;
 
     const NEAR: f64 = 0.1;
-    const FAR: f64 = 500.0;
+    const FAR: f64 = 1250.0;
     
     let mut display_manager = display_manager::DisplayManager::new(1420, 920, "Test Window");
     
@@ -113,7 +113,7 @@ fn main() {
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
-    let projection = Perspective3::new(aspect_ratio, 1.5, NEAR, FAR);
+    let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
     let mut renderer = Renderer::new(classic_shader, projection.to_homogeneous());
     let mut map = FxHashMap::default();
     map.insert(model.get_vao(), vec![&model]);

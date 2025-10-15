@@ -12,6 +12,17 @@ pub mod open_gl_utils {
         }
         LOGGER.gl_debug("Error clearing GL color buffer");
     }
+
+    pub fn set_wireframe_mode(wireframe: bool) {
+        unsafe {
+            if wireframe {
+                gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
+            } else {
+                gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
+            }
+        }
+        LOGGER.gl_debug("Error setting wireframe mode");
+    }
     
     
     extern "system" fn gl_message_callback(

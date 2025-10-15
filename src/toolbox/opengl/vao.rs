@@ -52,6 +52,15 @@ impl VAO {
         unsafe { self.unbind(); }
     }
 
+    pub fn store_indices_line(&mut self, indices: Vec<[u32; 2]>) -> (){
+        unsafe { self.bind(); }
+        let vbo =  VBO::create_vbo().expect("Error creating VBO");
+        vbo.store_indices_line(&indices);
+        self.vbos.push(vbo);
+        self.vertex_count = indices.len() * 2;
+        unsafe { self.unbind(); }
+    }
+
     pub fn binds(&self, attributes: &[u32]) -> () {
         unsafe { self.bind() }
         for i in attributes{
@@ -67,7 +76,7 @@ impl VAO {
             LOGGER.gl_debug("Error while binding attrib")
         }
     }
-
+    
     pub fn get_vertex_count(&self) -> usize {
         self.vertex_count
     }
