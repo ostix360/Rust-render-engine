@@ -27,16 +27,37 @@ impl Camera {
     #[inline]
     fn update_angles(&mut self, input: &Input) {
         if input.is_mouse_button_pressed(MouseButton::Left) {
-            let vec_dir = Vector3::new(input.d_mouse_pos.1, input.d_mouse_pos.0, 0.0);
-            let norm = vec_dir.norm();
-            let d_quat = if norm != 0.0 {;
-                UnitQuaternion::from_axis_angle(&Unit::new_normalize(vec_dir), norm * CAMERA_ROTATION_SPEED)
-            } else {
-                UnitQuaternion::identity()
-            };
-            self.quat = self.quat * d_quat;
+            let dx = input.d_mouse_pos.0;
+            let dy = input.d_mouse_pos.1;
+            if dx != 0.0 || dy != 0.0 {
+                self.rotate_yaw_pitch(dx, dy);
+            }
         }
+    }
 
+    fn rotate_yaw_pitch(&mut self, dx: f64, dy: f64) {
+        let yaw = dx * CAMERA_ROTATION_SPEED;
+        let pitch = dy * CAMERA_ROTATION_SPEED;
+
+        // Apply yaw in world space (pre‑multiply).
+        self.quat = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), yaw) * self.quat;
+
+        // Recompute camera right in updated orientation, then pitch around it.
+        let right = self.quat.transform_vector(&Vector3::x_axis());
+        let right = Unit::new_normalize(right);
+        self.quat = UnitQuaternion::from_axis_angle(&right, pitch) * self.quat;
+
+        println!("New rotation quaternion: {:?}", self.quat.euler_angles());
+        // Keep unit length to avoid drift.
+        self.quat.renormalize();
+    }
+
+
+    pub fn increase_rotation(&mut self, dir: &Unit<Vector3<f64>>, angle: f64) {
+        let rot_quat = UnitQuaternion::from_axis_angle(dir, angle);
+        println!("Rotating around axis {:?} by angle {:.4} radians", dir, angle);
+        self.quat = self.quat * rot_quat;
+        let _ = self.quat.normalize();
     }
 
     #[inline]

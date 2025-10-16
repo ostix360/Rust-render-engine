@@ -91,13 +91,13 @@ const INDICES: [TriIndexes; 12] = [
 // }
 
 fn main() {
-    const WIDTH: u32 = 1420;
-    const HEIGHT: u32 = 920;
+    const WIDTH: u32 = 1080;
+    const HEIGHT: u32 = 720;
 
-    const NEAR: f64 = 0.1;
-    const FAR: f64 = 1250.0;
+    const NEAR: f64 = 1.;
+    const FAR: f64 = 750.0;
     
-    let mut display_manager = display_manager::DisplayManager::new(1420, 920, "Test Window");
+    let mut display_manager = display_manager::DisplayManager::new(WIDTH, HEIGHT, "Test Window");
     
     display_manager.create_display();
     add_opengl_debug();
@@ -107,7 +107,7 @@ fn main() {
     let mut vao = VAO::create_vao().expect("Unable to create VAO");
     vao.store_data(0, 3, Vec::from(&VERTICES));
     vao.store_indices(Vec::from(&INDICES));
-    let model = Model::new(vao, Vector3::new(0., 0., -1.), Vector3::new(0.,0.,0.5), 0.1, 0.1);
+    // let model = Model::new(&vao, Vector3::new(0., 0., -5.), Vector3::new(0.,0.25,0.5), 1., 1.);
     let shader_program = ShaderProgram::new("classic");
     let classic_shader = ClassicShader::new(shader_program);
 
@@ -116,11 +116,27 @@ fn main() {
     let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
     let mut renderer = Renderer::new(classic_shader, projection.to_homogeneous());
     let mut map = FxHashMap::default();
-    map.insert(model.get_vao(), vec![&model]);
-    
+    // map.insert(*model.get_vao(), vec![&model]);
+    let mut instances: Vec<Model> = Vec::new();
+    let radius: i32 = 5;
+    for x in -radius..=radius {
+        for y in -radius..=radius {
+            for z in -radius..=radius {
+                if x == 0 && z == 0 { continue; }
+                let pos = Vector3::new(x as f64, y as f64, z as f64);
+                let new_model = Model::new(&vao, pos, Vector3::new(0., 0., 0.), 0.5, 0.5);
+                instances.push(new_model);
+            }
+        }
+    }
+    let mut ref_instance = Vec::new();
+    for inst in instances.iter() {
+        ref_instance.push(inst);
+    }
+    map.insert(&vao, ref_instance);
     while !display_manager.is_close_requested() {
         camera.update(display_manager.get_input());
-
+        // println!("{:?}", camera.position);
         clear_gl();
         renderer.render(&map, &camera);
         display_manager.update_display();

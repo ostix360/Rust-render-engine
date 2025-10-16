@@ -2,16 +2,16 @@ use nalgebra::{Matrix3, Matrix4, Rotation3, Translation3, Vector3, Vector4};
 use crate::toolbox::opengl::vao::VAO;
 
 #[derive(PartialEq)]
-pub struct Model {
-    vao: VAO,
+pub struct Model<'a> {
+    vao: &'a VAO,
     position: Vector3<f64>,
     rotation: Vector3<f64>,
     scale: f64,
     thickness: f64,
 }
 
-impl Model {
-    pub fn new(vao: VAO, position: Vector3<f64>, rotation: Vector3<f64>, scale: f64, thickness: f64) -> Self {
+impl<'a> Model<'a> {
+    pub fn new(vao: &'a VAO, position: Vector3<f64>, rotation: Vector3<f64>, scale: f64, thickness: f64) -> Self {
         Self {
             vao,
             position,
@@ -27,7 +27,7 @@ impl Model {
         self.rotation.z += z;
     }
 
-    pub fn get_vao(&self) -> &VAO {
+    pub fn get_vao(&self) -> &&VAO {
         &self.vao
     }
 
