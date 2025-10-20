@@ -7,19 +7,20 @@ mod render;
 mod maths;
 
 mod graphics;
+mod app;
 
 
-use crate::graphics::model::Model;
-use crate::render::classic_shader::ClassicShader;
-use crate::render::renderer::Renderer;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::display_manager;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, clear_gl};
-use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
-use crate::toolbox::opengl::vao::VAO;
 use include_dir::{include_dir, Dir};
-use nalgebra::{vector, Orthographic3, Perspective3, Vector3};
-use rustc_hash::FxHashMap;
+use nalgebra::{vector, Perspective3};
+use symbolica::parse;
+use crate::render::grid_shader::GridShader;
+use crate::app::coords_sys::CoordsSys;
+use crate::app::grid::Grid;
+use crate::render::grid_renderer::GridRenderer;
+use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
 
 const RESOURCES: Dir = include_dir!("src/res");
 
@@ -104,41 +105,26 @@ fn main() {
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
     }
-    let mut vao = VAO::create_vao().expect("Unable to create VAO");
-    vao.store_data(0, 3, Vec::from(&VERTICES));
-    vao.store_indices(Vec::from(&INDICES));
-    // let model = Model::new(&vao, Vector3::new(0., 0., -5.), Vector3::new(0.,0.25,0.5), 1., 1.);
-    let shader_program = ShaderProgram::new("classic");
-    let classic_shader = ClassicShader::new(shader_program);
+
+    let x_eq = parse!("x");
+    let y_eq = parse!("y");
+    let z_eq = parse!("z");
+    let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
+    let mut grid = Grid::new(sys_coord);
+    grid.generate_grid((0., 0., 0.), 10);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
     let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
-    let mut renderer = Renderer::new(classic_shader, projection.to_homogeneous());
-    let mut map = FxHashMap::default();
-    // map.insert(*model.get_vao(), vec![&model]);
-    let mut instances: Vec<Model> = Vec::new();
-    let radius: i32 = 5;
-    for x in -radius..=radius {
-        for y in -radius..=radius {
-            for z in -radius..=radius {
-                if x == 0 && z == 0 { continue; }
-                let pos = Vector3::new(x as f64, y as f64, z as f64);
-                let new_model = Model::new(&vao, pos, Vector3::new(0., 0., 0.), 0.5, 0.5);
-                instances.push(new_model);
-            }
-        }
-    }
-    let mut ref_instance = Vec::new();
-    for inst in instances.iter() {
-        ref_instance.push(inst);
-    }
-    map.insert(&vao, ref_instance);
+    let grid_shader_prog = ShaderProgram::new("classic");
+    let grid_shader = GridShader::new(grid_shader_prog);
+    let mut grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
+    
     while !display_manager.is_close_requested() {
         camera.update(display_manager.get_input());
         // println!("{:?}", camera.position);
         clear_gl();
-        renderer.render(&map, &camera);
+        grid_renderer.render(&grid,&camera);
         display_manager.update_display();
     };
     println!("Exiting...")

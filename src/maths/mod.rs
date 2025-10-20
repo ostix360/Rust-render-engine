@@ -22,6 +22,7 @@ pub fn integrate1d(f: &Atom, interval: (f64, f64)) -> f64 {
     let func = |x: f64| -> f64 {
         let mut const_map = HashMap::default();
         const_map.insert(Atom::var(symbol!("x")), x * len + a);
+        println!("{}", f);
         f.evaluate(|r| r.to_f64(), &const_map, &HashMap::default()).unwrap()
     };
 

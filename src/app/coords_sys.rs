@@ -28,6 +28,7 @@ impl CoordsSys {
             let ddx_2 = y_eq.derivative(var).derivative(var).npow(2.);
             let ddx_3 = z_eq.derivative(var).derivative(var).npow(2.);
             let ddx = (ddx_1 + ddx_2 + ddx_3).sqrt();
+            println!("{}: {}", x_i, ddx); // TODO: when dd_xi is null, ddx becomes a sqrt of any variable which is understand as the sqrt func
             curvature.push(ddx);
         }
         let [a, b, c] = curvature.try_into().expect("COORD must have 3 elements");
