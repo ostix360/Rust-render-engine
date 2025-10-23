@@ -21,5 +21,6 @@ rustc-hash = "2.1.1"
 symbolica = "0.18.0"
 pyo3 = "0.26.0"
 typed_floats = "1.0.7"
+rand = "0.9.2"
 
 [dev-dependencies]

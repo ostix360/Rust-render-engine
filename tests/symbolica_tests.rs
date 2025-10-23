@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use symbolica::{atom::AtomCore, parse, symbol, LicenseManager};
 use symbolica::atom::Atom;
+use symbolica::evaluate::{FunctionMap, OptimizationSettings};
 use symbolica::numerical_integration::{ContinuousGrid, DiscreteGrid, Grid, MonteCarloRng, Sample};
+use symbolica::printer::PrintOptions;
 
 #[test]
 fn tests_symbolica() {
@@ -11,9 +13,18 @@ fn tests_symbolica() {
     let d_input = input.derivative(symbol!("x"));
     println!("{}", d_input);
 
-    let f = parse!("cos(x)+sin(2x)");
+    let f = parse!("0");
 
     // int de 0 à 1 to -2 à 2
+    let fn_map = FunctionMap::new();
+    let params = parse!("x");
+    let optimization_settings = OptimizationSettings::default();
+    let mut evaluator = f.evaluator(
+        &fn_map, &[params], optimization_settings
+    ).unwrap().map_coeff(&|x| {
+        x.to_real().unwrap().to_f64()
+    });
+    println!("{}", evaluator.evaluate_single(&[2.]));
 
     let func = |x: f64| -> f64 {
         let mut const_map = HashMap::default();
@@ -48,5 +59,12 @@ fn tests_symbolica() {
         grid.update(1.5);
         println!("it: {}, integral: {}, error {}, chi_sq {}", it, grid.accumulator.avg, grid.accumulator.err, grid.accumulator.chi_sq);
     }
+}
 
+#[test]
+fn random_test() {
+    let expr = parse!("x^2 + 2*x + 1");
+    let d_expr = expr.derivative(symbol!("x"));
+    println!("{}", d_expr);
+    println!("{:?}", d_expr)
 }

@@ -82,7 +82,7 @@ impl Grid {
                 return;
             }
             let mid = (p0 + p1) * 0.5;
-            // let curvature = self.coordinates.get_curvature(mid, 1.);
+            let curvature = self.coordinates.get_curvature(mid, 1.);
             // let vao = self.build_curved_vao(curvature);
 
             let ex = Unit::new_normalize(Vector3::new(1.0, 0.0, 0.0));

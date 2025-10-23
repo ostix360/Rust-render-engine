@@ -116,7 +116,7 @@ fn main() {
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
     let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
-    let grid_shader_prog = ShaderProgram::new("classic");
+    let grid_shader_prog = ShaderProgram::new("grid");
     let grid_shader = GridShader::new(grid_shader_prog);
     let mut grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
     

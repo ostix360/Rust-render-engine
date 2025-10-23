@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use exmex::Express;
 use nalgebra::Vector3;
 use symbolica::atom::{Atom, AtomCore};
-use symbolica::symbol;
+use symbolica::domains::SelfRing;
+use symbolica::printer::PrintOptions;
+use symbolica::{parse, symbol};
 use crate::maths::{integrate1d, Expr, COORD};
 
 pub struct CoordsSys {
@@ -22,13 +24,13 @@ impl CoordsSys {
 
     fn calculate_curvature(x_eq: &Atom, y_eq: &Atom, z_eq: &Atom) -> (Atom, Atom, Atom){
         let mut curvature = Vec::new();
+        let two = parse!("2");
         for x_i in COORD {
             let var = symbol!(x_i);
-            let ddx_1 = x_eq.derivative(var).derivative(var).npow(2.);
-            let ddx_2 = y_eq.derivative(var).derivative(var).npow(2.);
-            let ddx_3 = z_eq.derivative(var).derivative(var).npow(2.);
+            let ddx_1 = x_eq.derivative(var).derivative(var).pow(&two);
+            let ddx_2 = y_eq.derivative(var).derivative(var).pow(&two);
+            let ddx_3 = z_eq.derivative(var).derivative(var).pow(&two);
             let ddx = (ddx_1 + ddx_2 + ddx_3).sqrt();
-            println!("{}: {}", x_i, ddx); // TODO: when dd_xi is null, ddx becomes a sqrt of any variable which is understand as the sqrt func
             curvature.push(ddx);
         }
         let [a, b, c] = curvature.try_into().expect("COORD must have 3 elements");

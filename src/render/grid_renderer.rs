@@ -27,6 +27,7 @@ impl GridRenderer {
             key.1.binds(&[0]);
             for transform in transforms {
                 self.shader.load_transformation_matrix(*transform);
+                self.shader.load_rng_color();
                 unsafe {
                     gl::DrawElements(gl::LINES, 2, gl::UNSIGNED_INT, null())
                 }
