@@ -15,13 +15,15 @@ pub trait Shader {
 
 pub struct ShaderProgram {
     id: GLuint,
+    vert_src: String,
+    frag_id: GLuint,
 }
 
 impl ShaderProgram{
 
-    fn read_shader<'b>(file: String) -> &'b str {
+    fn read_shader<'b>(file: String) -> String {
         let file = RESOURCES.get_file("shader/".to_string() + file.as_str()).expect("Shader not found");
-        file.contents_utf8().expect("Unable to read shader file")
+        file.contents_utf8().expect("Unable to read shader file").to_string()
     }
 
     fn process_shader(shader_id: GLuint, source: &str) {
@@ -55,7 +57,7 @@ impl ShaderProgram{
         };
     }
 
-    fn load_shader(shader_name: &str) -> (GLuint, GLuint){
+    fn load_shader(shader_name: &str) -> (GLuint, GLuint, String){
         let vertex_src = {
             let name= shader_name.to_string() + ".vert";
             Self::read_shader(name)
@@ -70,14 +72,14 @@ impl ShaderProgram{
         if vertex_id == 0 {
             LOGGER.gl_debug("Error while creating Vertex shader")
         }
-        Self::process_shader(vertex_id, vertex_src);
+        Self::process_shader(vertex_id, &vertex_src);
         let fragment_id;
         unsafe {fragment_id = CreateShader(FRAGMENT_SHADER)};
         if fragment_id == 0 {
             LOGGER.gl_debug("Error while creating Fragment shader")
         }
-        Self::process_shader(fragment_id, fragment_src);
-        (vertex_id, fragment_id)
+        Self::process_shader(fragment_id, &fragment_src);
+        (vertex_id, fragment_id, vertex_src)
     }
 
     fn process_program(vertex: GLuint, fragment: GLuint) -> GLuint {
@@ -114,7 +116,6 @@ impl ShaderProgram{
             DetachShader(program, vertex);
             DetachShader(program, fragment);
             DeleteShader(vertex);
-            DeleteShader(fragment);
         }
         program
     }
@@ -127,6 +128,8 @@ impl ShaderProgram{
         let id = Self::process_program(vertex_shader, fragment_shader);
         ShaderProgram{
             id,
+            vert_src: shaders.2,
+            frag_id: fragment_shader,
         }
     }
     

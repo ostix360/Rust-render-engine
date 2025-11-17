@@ -6,7 +6,7 @@ fn tests() {
     let expr = exmex::parse::<f32>(to_parsed).unwrap();
     assert_eq!(expr.eval(&[2.]).unwrap(), 4.);
     
-    use exmex::{DeepEx, prelude::*};
+    use exmex::{DeepEx};
     {
         let deep_cos_x = DeepEx::<f64>::parse("cos(x)").unwrap();
         let deep_identity = deep_cos_x.operate_unary("acos").unwrap();
@@ -30,6 +30,13 @@ fn tests() {
         let one = FlatEx::<f32>::parse("1").unwrap();
         let flat_identity = deep_identity.operate_binary(one, "*").unwrap();
         println!("{}", flat_identity.eval(&[3.0]).unwrap())
+    }
+    {
+        let mut expr = exmex::parse::<f32>("2*x + 3*x + 0*x + 0*y + 0*z").unwrap();
+        println!("{:?}", expr.var_names());
+        // let mut dx = expr.partial(0).unwrap();
+        expr.compile();
+        println!("{}", expr.eval(&[2., 3., 4.]).unwrap())
     }
     
 }

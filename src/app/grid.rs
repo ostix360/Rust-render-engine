@@ -7,7 +7,7 @@ use crate::{TriIndexes, Vertex};
 use crate::maths::to_nn_vec;
 use crate::toolbox::opengl::vao::VAO;
 
-type Edge = ([Vector3<NonNaN<f32>>; 2], [[u32; 2]; 1]);
+type Edge = ([Vector3<NonNaN<f32>>; 6], [[u32; 2]; 5]);
 
 
 pub struct Grid {
@@ -21,17 +21,6 @@ impl Grid {
             coordinates,
             data: FxHashMap::default()
         }
-    }
-
-    fn build_curved_vao(&self, curvature: (f64, f64, f64)) -> Result<(Edge, VAO), String> {
-        let mut vao = match VAO::create_vao() {
-            Ok(v) => v,
-            Err(_) => {
-                exerr!("Error creating VAO");
-                return Err("Error creating VAO".to_string());
-            }
-        };
-        todo!()
     }
 
     pub fn generate_grid(&mut self, center: (f64, f64, f64), size: u32) -> () {
@@ -50,16 +39,24 @@ impl Grid {
             }
         };
 
-        const VERTICES: [Vertex; 2] = [
+        const VERTICES: [Vertex; 6] = [
             [0., 0., 0.],
+            [0.2, 0., 0.],
+            [0.4, 0., 0.],
+            [0.6, 0., 0.],
+            [0.8, 0., 0.],
             [1., 0., 0.],
         ];
 
-        const INDICES: [[u32; 2]; 1] = [
+        const INDICES: [[u32; 2]; 5] = [
             [0, 1],
+            [1, 2],
+            [2, 3],
+            [3, 4],
+            [4, 5],
         ];
 
-        let mut verts = [Vector3::new(NonNaN::zero(), NonNaN::zero(), NonNaN::zero()); 2];
+        let mut verts = [Vector3::new(NonNaN::zero(), NonNaN::zero(), NonNaN::zero()); 6];
         for i in 0..VERTICES.len() {
             verts[i] = to_nn_vec(VERTICES[i]).expect("invalid vertex");
         }
@@ -82,8 +79,7 @@ impl Grid {
                 return;
             }
             let mid = (p0 + p1) * 0.5;
-            let curvature = self.coordinates.get_curvature(mid, 1.);
-            // let vao = self.build_curved_vao(curvature);
+            let curvature = self.coordinates.get_curvature(dir, 1.);
 
             let ex = Unit::new_normalize(Vector3::new(1.0, 0.0, 0.0));
             let dir_u = Unit::new_normalize(dir);
@@ -110,10 +106,8 @@ impl Grid {
                 let u = ui as f64;
                 let v0 = vj as f64;
                 let v1 = (vj + 1) as f64;
-                let (x0, y0, z0) = self.coordinates.eval(u, v0, w);
-                let (x1, y1, z1) = self.coordinates.eval(u, v1, w);
-                let p0 = Vector3::new(x0, y0, z0);
-                let p1 = Vector3::new(x1, y1, z1);
+                let p0 = Vector3::new(u, v0, w);
+                let p1 = Vector3::new(u, v1, w);
                 push_segment(p0, p1);
             }
         }
@@ -124,10 +118,8 @@ impl Grid {
                 let v = vj as f64;
                 let u0 = ui as f64;
                 let u1 = (ui + 1) as f64;
-                let (x0, y0, z0) = self.coordinates.eval(u0, v, w);
-                let (x1, y1, z1) = self.coordinates.eval(u1, v, w);
-                let p0 = Vector3::new(x0, y0, z0);
-                let p1 = Vector3::new(x1, y1, z1);
+                let p0 = Vector3::new(u0, v, w);
+                let p1 = Vector3::new(u1, v, w);
                 push_segment(p0, p1);
             }
         }

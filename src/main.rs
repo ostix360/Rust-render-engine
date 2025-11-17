@@ -9,7 +9,7 @@ mod maths;
 mod graphics;
 mod app;
 
-
+use exmex::parse;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::display_manager;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, clear_gl};
@@ -106,9 +106,9 @@ fn main() {
         gl::Enable(gl::DEPTH_TEST);
     }
 
-    let x_eq = parse!("x");
-    let y_eq = parse!("y");
-    let z_eq = parse!("z");
+    let x_eq = parse("x*cos(y)").unwrap();
+    let y_eq = parse("x*sin(y)").unwrap();
+    let z_eq = parse("z").unwrap();
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let mut grid = Grid::new(sys_coord);
     grid.generate_grid((0., 0., 0.), 10);
