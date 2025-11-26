@@ -8,7 +8,8 @@ const CAMERA_ROTATION_SPEED: f64 = 0.001;
 
 pub struct Camera {
     pub position: Vector3<f64>,
-    pub quat: UnitQuaternion<f64>
+    pub quat: UnitQuaternion<f64>,
+    pub pitch: f64,
 }
 
 impl Camera {
@@ -16,6 +17,7 @@ impl Camera {
         Camera {
             position,
             quat: UnitQuaternion::<f64>::from_axis_angle(&Vector3::x_axis(), -PI/2.),
+            pitch: 0.,
         }
     }
 
@@ -31,7 +33,7 @@ impl Camera {
             let dy = input.d_mouse_pos.1;
             if dx != 0.0 || dy != 0.0 {
                 self.rotate_yaw_pitch(dx, dy);
-                // let vec_dir = Vector3::new(input.d_mouse_pos.1, input.d_mouse_pos.0, 0.0);
+                // let vec_dir = Vector3::new(-input.d_mouse_pos.1, input.d_mouse_pos.0, 0.0);
                 // let norm = vec_dir.norm();
                 // self.increase_rotation(&Unit::new_normalize(vec_dir), -norm * CAMERA_ROTATION_SPEED);
             }
@@ -40,7 +42,16 @@ impl Camera {
 
     fn rotate_yaw_pitch(&mut self, dx: f64, dy: f64) {
         let yaw = dx * CAMERA_ROTATION_SPEED;
-        let pitch = dy * CAMERA_ROTATION_SPEED;
+        let mut pitch = dy * CAMERA_ROTATION_SPEED;
+        self.pitch += pitch;
+        if self.pitch > PI/2. {
+            self.pitch = PI/2.;
+            pitch = 0.;
+        }
+        if self.pitch < -PI/2. {
+            self.pitch = -PI/2.;
+            pitch = 0.;
+        }
 
         // Apply yaw in world space (pre‑multiply).
         self.quat = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), -yaw) * self.quat;
@@ -66,9 +77,12 @@ impl Camera {
 
     #[inline]
     fn get_dp(&self, input: &Input) -> Vector3<f64> { // Use quaternion to remember previous rotation
-        let front = self.quat.transform_vector(&Vector3::z_axis()).normalize();
-        let up = self.quat.transform_vector(&Vector3::y_axis()).normalize();
-        let right = self.quat.transform_vector(&Vector3::x_axis()).normalize();
+        let mut front = self.quat.transform_vector(&Vector3::z_axis()).normalize();
+        let mut right = self.quat.transform_vector(&Vector3::x_axis()).normalize();
+        front.z = 0.;
+        right.z = 0.;
+        let front = front.normalize();
+        let right = right.normalize();
 
         if input.is_key_pressed(Key::W) || input.is_key_pressed(Key::S) {
             let incr = if input.is_key_pressed(Key::W) { -1.0 } else { 1.0 };
@@ -79,8 +93,8 @@ impl Camera {
             let dp = right * incr;
             dp
         }else if input.is_key_pressed(Key::LeftShift) || input.is_key_pressed(Key::Space) {
-            let incr = if input.is_key_pressed(Key::LeftShift) { -1.0 } else { 1.0 };
-            let dp = up * incr;
+            let incr = if input.is_key_pressed(Key::LeftShift) { 1.0 } else { -1.0 };
+            let dp = Vector3::new(0., 0., 1.) * incr;
             dp
         }else {
             Vector3::zeros()

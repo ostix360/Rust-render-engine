@@ -211,7 +211,7 @@ impl Grid {
             }
         }
 
-        let u_min = (cx.floor() as i64) - size; // Specific for polar coordinates
+        let u_min = (cx.floor() as i64) - size;
         let u_max = (cx.ceil() as i64) + size;
         let v_min = (cy.floor() as i64) - size;
         let v_max = (cy.ceil() as i64) + size + 1;
