@@ -211,17 +211,22 @@ impl Grid {
             }
         }
 
+        let u_min = (cx.floor() as i64) - size; // Specific for polar coordinates
+        let u_max = (cx.ceil() as i64) + size;
+        let v_min = (cy.floor() as i64) - size;
+        let v_max = (cy.ceil() as i64) + size + 1;
+        let w = cz;
         // Horizontal segments: fixed v, varying u
-        // for vj in v_min..=v_max {
-        //     for ui in u_min..u_max { // segment between ui and ui+1
-        //         let v = vj as f64;
-        //         let u0 = ui as f64;
-        //         let u1 = (ui + 1) as f64;
-        //         let p0 = Vector3::new(u0, v, w);
-        //         let p1 = Vector3::new(u1, v, w);
-        //         push_segment(p0, p1);
-        //     }
-        // }
+        for vj in v_min..=v_max {
+            for ui in (u_min-1)..u_max { // segment between ui and ui+1
+                let v = vj as f64;
+                let u0 = ui as f64;
+                let u1 = (ui + 1) as f64;
+                let p0 = Vector3::new(u0, v, w);
+                let p1 = Vector3::new(u1, v, w);
+                push_segment(p0, p1, 0);
+            }
+        }
         for k_v in self.render_data.iter_mut(){
             let key = k_v.0;
             let values = k_v.1;
