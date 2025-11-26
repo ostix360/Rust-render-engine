@@ -95,7 +95,7 @@ fn main() {
     const WIDTH: u32 = 1080;
     const HEIGHT: u32 = 720;
 
-    const NEAR: f64 = 1.;
+    const NEAR: f64 = 0.01;
     const FAR: f64 = 750.0;
     
     let mut display_manager = display_manager::DisplayManager::new(WIDTH, HEIGHT, "Test Window");

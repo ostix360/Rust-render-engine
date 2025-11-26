@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::toolbox::opengl::vbo::VBO;
 use gl::types::{GLint, GLuint};
 use crate::toolbox::logging::LOGGER;

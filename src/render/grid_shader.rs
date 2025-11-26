@@ -32,8 +32,8 @@ impl GridShader {
     pub fn load_view_matrix(&self, matrix: Matrix4<f64>) {
         self.view_matrix.load_matrix_to_uniform(matrix);
     }
-    pub fn load_color(&self, color: nalgebra::Vector3<f64>) {
-        self.color.load_vector_to_uniform(color);
+    pub fn load_color(&self, color: Vector3<f64>) {
+        // self.color.load_vector_to_uniform(color);
     }
 
     pub fn load_rng_color(&self) {
@@ -60,7 +60,7 @@ impl Shader for GridShader {
             &mut self.projection_matrix.uniform,
             &mut self.transformation_matrix.uniform,
             &mut self.view_matrix.uniform,
-            &mut self.color.uniform,
+            // &mut self.color.uniform,
         ]);
         self.shader_program.store_all_uniforms(&mut uniforms);
     }

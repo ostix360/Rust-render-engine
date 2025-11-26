@@ -1,4 +1,5 @@
 use std::ptr::null;
+use gl::types::GLsizei;
 use nalgebra::Matrix4;
 use crate::app::grid::Grid;
 use crate::render::grid_shader::GridShader;
@@ -24,15 +25,15 @@ impl GridRenderer {
         self.prepare(cam);
         let data = grid.get_data();
         for (key, transforms) in data.iter(){
-            key.1.binds(&[0]);
+            key.get_vao().expect("You should create the vao before rendering the edge").binds(&[0]);
             for transform in transforms {
                 self.shader.load_transformation_matrix(*transform);
                 self.shader.load_rng_color();
                 unsafe {
-                    gl::DrawElements(gl::LINES, 2, gl::UNSIGNED_INT, null())
+                    gl::DrawElements(gl::LINES, (key.get_vao().unwrap().get_vertex_count()-1) as GLsizei, gl::UNSIGNED_INT, null())
                 }
             }
-            key.1.unbinds(&[0]);
+            key.get_vao().unwrap().unbinds(&[0]);
         }
         self.unprepare();
     }

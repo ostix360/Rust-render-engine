@@ -73,6 +73,7 @@ impl Logger {
 
     pub fn error(&self, message: &str) {
         self.log(Error, message);
+        panic!("Error: {}", message)
     }
 
     pub fn gl_debug(&self, message: &str) {

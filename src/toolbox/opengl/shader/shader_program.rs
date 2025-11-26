@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::RESOURCES;
 use std::ops::Deref;
 use std::process;
