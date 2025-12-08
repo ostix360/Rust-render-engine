@@ -1,14 +1,8 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-use exmex::{Calculate, Differentiate, Express, ExResult, ExError};
+use crate::maths::{expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d, COORD};
+use exmex::{Calculate, Differentiate, ExError, ExResult, Express};
 use integrate::prelude::trapezoidal_rule;
 use nalgebra::Vector3;
-use symbolica::atom::{Atom, AtomCore};
-use symbolica::domains::SelfRing;
-use symbolica::printer::PrintOptions;
-use symbolica::evaluate::{FunctionMap, OptimizationSettings, Expression};
-use crate::maths::{expr_to_fastexpr1d, expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr1d, FastExpr2dto1d, FastExpr3d, COORD};
+use std::ops::Deref;
 
 pub struct CoordsSys {
     x_eq: Expr,

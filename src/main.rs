@@ -111,17 +111,19 @@ fn main() {
     let z_eq = parse("z").unwrap();
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let mut grid = Grid::new(sys_coord);
-    grid.generate_grid((0., 0., 0.), 10);
+    grid.generate_grid((0., 0., 0.), 30);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
     let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
     let grid_shader_prog = ShaderProgram::new("grid");
     let grid_shader = GridShader::new(grid_shader_prog);
-    let mut grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
+    let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
     
     while !display_manager.is_close_requested() {
         camera.update(display_manager.get_input());
+        let pos = ((&camera.position).x, (&camera.position).y, 0.);
+        grid.generate_grid(pos, 30);
         // println!("{:?}", camera.position);
         clear_gl();
         grid_renderer.render(&grid,&camera);
