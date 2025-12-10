@@ -45,18 +45,10 @@ impl CoordsSys {
                         }
                     },
                     [x, y] => {
-                        if x == COORD[x_i] {
-                            if x_i == 1 {       // coord[1] = y => dy
-                                Ok(expr.clone().partial_nth(1, 2)?.operate_binary(two.clone(), "^")?)
-                            }else {             // x_i = 0 => coord[0] = x => dx
-                                Ok(expr.clone().partial_nth(0, 2)?.operate_binary(two.clone(), "^")?)
-                            }
+                        if x == COORD[x_i] {    // coord[1] = y => dy
+                            Ok(expr.clone().partial_nth(0, 2)?.operate_binary(two.clone(), "^")?)
                         } else if y == COORD[x_i] {
-                            if x_i == 1 {       // coord[1] = y => dy
-                                Ok(expr.clone().partial_nth(1, 2)?.operate_binary(two.clone(), "^")?)
-                            }else {             // x_i = 2 => coord[2] = z => dz
-                                Ok(expr.clone().partial_nth(2, 2)?.operate_binary(two.clone(), "^")?)
-                            }
+                            Ok(expr.clone().partial_nth(1, 2)?.operate_binary(two.clone(), "^")?)
                         }else {
                             Ok(Expr::from_num(0f64))
                         }

@@ -6,13 +6,16 @@ uniform mat4 projection_matrix;
 uniform mat4 view_matrix;
 
 float f(vec3 pos) {
-    return pos.x * cos(pos.y);
+//    return pos.x;
+    return pos.x * cos(pos.y) * sin(pos.z);
 }
 float g(vec3 pos) {
-    return pos.x * sin(pos.y);
+//    return pos.y;
+    return pos.x * sin(pos.y) * sin(pos.z);
 }
 float h(vec3 pos) {
-    return pos.z;
+//    return pos.z;
+    return pos.x * cos(pos.z);
 }
 
 vec3 coordinate_transform(vec3 pos) {

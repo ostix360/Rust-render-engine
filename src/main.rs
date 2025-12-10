@@ -106,12 +106,12 @@ fn main() {
         gl::Enable(gl::DEPTH_TEST);
     }
 
-    let x_eq = parse("x*cos(y)").unwrap();
-    let y_eq = parse("x*sin(y)").unwrap();
-    let z_eq = parse("z").unwrap();
+    let x_eq = parse("x*cos(y) * sin(z)").unwrap();
+    let y_eq = parse("x*sin(y) * sin(z)").unwrap();
+    let z_eq = parse("x * cos(z)").unwrap();
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let mut grid = Grid::new(sys_coord);
-    grid.generate_grid((0., 0., 0.), 30);
+    grid.generate_grid((0., 0., 0.), 10);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
@@ -123,7 +123,7 @@ fn main() {
     while !display_manager.is_close_requested() {
         camera.update(display_manager.get_input());
         let pos = ((&camera.position).x, (&camera.position).y, 0.);
-        grid.generate_grid(pos, 30);
+        // grid.generate_grid(pos, 30);
         // println!("{:?}", camera.position);
         clear_gl();
         grid_renderer.render(&grid,&camera);

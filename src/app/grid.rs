@@ -4,6 +4,7 @@ use crate::toolbox::opengl::vao::VAO;
 use crate::Vertex;
 use exmex::NeutralElts;
 use nalgebra::{Matrix4, Rotation3, Translation3, Unit, Vector3};
+use ndarray::Array;
 use rustc_hash::{FxHashMap, FxHashSet};
 use typed_floats::NonNaN;
 
@@ -79,36 +80,43 @@ fn curvature_to_vertices(cu: f64) -> usize {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum SegmentDir {
-    U, // varying u (horizontal in (u,v))
-    V, // varying v (vertical in (u,v))
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum SegmentDir {
+    #[default]
+    U, // u=x
+    V, // v=y
+    W, // w=z
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct SegmentKey {
     dir: SegmentDir,
-    u: i64,
-    v: i64,
-    w_bits: u64, // store w (f64) as raw bits so it’s hashable
+    u: NonNaN<f64>,
+    v: NonNaN<f64>,
+    w: NonNaN<f64>,
+    len: NonNaN<f64>,
 }
 
 // Optional: cache integer ranges used to build the grid, to early-out
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct GridIndices {
     u_min: i64,
     u_max: i64,
     v_min: i64,
     v_max: i64,
-    w_bits: u64,
+    w_min: i64,
+    w_max: i64,
+    nb_u: f64,
+    nb_v: f64,
+    nb_w: f64,
 }
 
 
 pub struct Grid {
     coordinates: CoordsSys,
-    segments: FxHashMap<SegmentKey, (usize, Matrix4<f64>)>,
+    segments: FxHashMap<SegmentKey, (usize, Matrix4<f64>, SegmentDir)>,
     last_indices: Option<GridIndices>,
-    render_data: FxHashMap<Edge, Vec<Matrix4<f64>>>
+    render_data: FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>>
 }
 
 impl Grid {
@@ -125,78 +133,102 @@ impl Grid {
     fn compute_indices(center: (f64, f64, f64), size: u32) -> GridIndices {
         let (cx, cy, cz) = center;
         let size_i = size as i64;
-        let w_bits = cz.to_bits();
 
         let u_min = cx.floor() as i64;                 // TODO need to be dynamic
         let u_max = (cx.ceil() as i64) + size_i;
         let v_min = cy.floor() as i64;
         let v_max = (cy.ceil() as i64) + 7;
+        let w_min = cz.floor() as i64 ;
+        let w_max = cz.ceil() as i64 + 10;
+        let nb_u = 0.5 * (u_max - u_min) as f64;
+        let nb_v = 1. * (v_max - v_min) as f64;
+        let nb_w = 1. * (w_max - w_min) as f64;
 
         GridIndices {
             u_min,
             u_max,
             v_min,
             v_max,
-            w_bits,
+            w_min,
+            w_max,
+            nb_u,
+            nb_v,
+            nb_w,
         }
     }
 
     #[inline]
     fn build_keys_for_indices(indices: GridIndices) -> FxHashSet<SegmentKey> {
         let mut keys = FxHashSet::default();
-        let w_bits = indices.w_bits;
-
-        // Vertical segments: fixed u, varying v (vj -> vj+1)
-        for ui in indices.u_min..=indices.u_max {
-            for vj in indices.v_min..indices.v_max {
-                keys.insert(SegmentKey {
-                    dir: SegmentDir::V,
-                    u: ui,
-                    v: vj,
-                    w_bits,
-                });
+        let us = Array::<f64, _>::linspace(indices.u_min as f64, indices.u_max as f64, indices.nb_u as usize + 1);
+        let vs = Array::<f64, _>::linspace(indices.v_min as f64, indices.v_max as f64, indices.nb_v as usize + 1);
+        let ws = Array::<f64, _>::linspace(indices.w_min as f64, indices.w_max as f64, indices.nb_w as usize + 1);
+        for ui in us.iter() {
+            for vj in vs.iter() {
+                for wk in ws.iter(){
+                    keys.insert(SegmentKey {
+                        dir: SegmentDir::U,
+                        u: NonNaN::<f64>::new(*ui).unwrap(),
+                        v: NonNaN::<f64>::new(*vj).unwrap(),
+                        w: NonNaN::<f64>::new(*wk).unwrap(),
+                        len: NonNaN::<f64>::new((indices.u_max-indices.u_min) as f64 / indices.nb_u).unwrap(),
+                    });
+                    keys.insert(SegmentKey {
+                        dir: SegmentDir::V,
+                        u: NonNaN::<f64>::new(*ui).unwrap(),
+                        v: NonNaN::<f64>::new(*vj).unwrap(),
+                        w: NonNaN::<f64>::new(*wk).unwrap(),
+                        len: NonNaN::<f64>::new((indices.v_max-indices.v_min) as f64 / indices.nb_v).unwrap(),
+                    });
+                    keys.insert(SegmentKey {
+                        dir: SegmentDir::W,
+                        u: NonNaN::<f64>::new(*ui).unwrap(),
+                        v: NonNaN::<f64>::new(*vj).unwrap(),
+                        w: NonNaN::<f64>::new(*wk).unwrap(),
+                        len: NonNaN::<f64>::new((indices.w_max-indices.w_min) as f64 / indices.nb_w).unwrap(),
+                    });
+                }
             }
         }
-
-        // Horizontal segments: fixed v, varying u (ui -> ui+1)
-        for vj in indices.v_min..=indices.v_max {
-            for ui in (indices.u_min - 1)..indices.u_max {
-                keys.insert(SegmentKey {
-                    dir: SegmentDir::U,
-                    u: ui,
-                    v: vj,
-                    w_bits,
-                });
-            }
-        }
-
         keys
     }
 
     #[inline]
-    fn build_segment(&self, key: SegmentKey) -> Option<(usize, Matrix4<f64>)> {
+    fn build_segment(&self, key: SegmentKey) -> Option<(usize, Matrix4<f64>, SegmentDir)> {
         const THICKNESS: f64 = 0.02;
 
-        let w = f64::from_bits(key.w_bits);
         let (p0, p1, coord_index) = match key.dir {
-            SegmentDir::V => {
-                let u = key.u as f64;
-                let v0 = key.v as f64;
-                let v1 = (key.v + 1) as f64;
-                (
-                    Vector3::new(u, v0, w),
-                    Vector3::new(u, v1, w),
-                    1usize, // your original "coord" value
-                )
-            }
             SegmentDir::U => {
-                let v = key.v as f64;
-                let u0 = key.u as f64;
-                let u1 = (key.u + 1) as f64;
+                let u0 = key.u.get();
+                let v = key.v.get();
+                let w = key.w.get();
+                let u1 = key.u.get() + 1. * key.len.get();
                 (
                     Vector3::new(u0, v, w),
                     Vector3::new(u1, v, w),
                     0usize,
+                )
+            }
+            SegmentDir::V => {
+                let u = key.u.get();
+                let v0 = key.v.get();
+                let w = key.w.get();
+                let v1 = key.v.get() + 1. * key.len.get();
+                (
+                    Vector3::new(u, v0, w),
+                    Vector3::new(u, v1, w),
+                    1usize,
+                )
+            }
+            SegmentDir::W => {
+                let u = key.u.get();
+                let v = key.v.get();
+                let w0 = key.w.get();
+                let w1 = key.w.get() + 1. * key.len.get();
+                (
+                    Vector3::new(u, v, w0),
+                    Vector3::new(u, v, w1),
+                    2usize,
                 )
             }
         };
@@ -209,17 +241,17 @@ impl Grid {
 
         let mid = (p0 + p1) * 0.5;
         let curvature = self.coordinates.get_curvature(mid, 1.0);
-        let cu = match coord_index {
-            0 => curvature.0,
+        let (cu, sd) = match coord_index {
+            0 => (curvature.0, SegmentDir::U),
             1 => {
                 if mid.x != 0.0 {
-                    curvature.1 / mid.x.abs() // specific for polar coordinates
+                    (curvature.1 / mid.x.abs(), SegmentDir::V) // specific for polar coordinates
                 } else {
-                    curvature.1
+                    (curvature.1, SegmentDir::V)
                 }
             }
-            2 => curvature.2,
-            _ => 0.0,
+            2 => (curvature.2, SegmentDir::W),
+            _ => (0.0, SegmentDir::U),
         };
 
         let ex = Unit::new_normalize(Vector3::new(1.0, 0.0, 0.0));
@@ -233,20 +265,20 @@ impl Grid {
 
         let edge_key = curvature_to_vertices(cu);
 
-        Some((edge_key, transform))
+        Some((edge_key, transform, sd))
     }
 
     #[inline]
     fn rebuild_render_data(&mut self) {
-        let mut by_edge: FxHashMap<usize, Vec<Matrix4<f64>>> = FxHashMap::default();
-        for (_, (edge_key, transform)) in self.segments.iter() {
+        let mut by_edge: FxHashMap<usize, Vec<(Matrix4<f64>, SegmentDir)>> = FxHashMap::default();
+        for (_, (edge_key, transform, segment_dir)) in self.segments.iter() {
             by_edge
                 .entry(*edge_key)
                 .or_default()
-                .push(transform.clone());
+                .push((transform.clone(), segment_dir.clone()));
         }
 
-        let mut new_render_data: FxHashMap<Edge, Vec<Matrix4<f64>>> = FxHashMap::default();
+        let mut new_render_data: FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>> = FxHashMap::default();
 
         for (edge, mut mats_old) in self.render_data.drain() {
             let edge_key = edge.get_nb_vertices();
@@ -307,7 +339,7 @@ impl Grid {
         self.last_indices = Some(indices);
     }
 
-    pub fn get_data(&self) -> &FxHashMap<Edge, Vec<Matrix4<f64>>> {
+    pub fn get_data(&self) -> &FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>> {
         &self.render_data
     }
 }

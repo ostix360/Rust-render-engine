@@ -24,11 +24,12 @@ impl GridRenderer {
     pub fn render(&self, grid: &Grid, cam: &Camera) {
         self.prepare(cam);
         let data = grid.get_data();
-        for (key, transforms) in data.iter(){
+        for (key, values) in data.iter(){
             key.get_vao().expect("You should create the vao before rendering the edge").binds(&[0]);
-            for transform in transforms {
-                self.shader.load_transformation_matrix(*transform);
-                self.shader.load_rng_color();
+            for value in values {
+                let transform = value.0;
+                self.shader.load_transformation_matrix(transform);
+                self.shader.load_color(value.1);
                 unsafe {
                     gl::DrawElements(gl::LINES, (key.get_vao().unwrap().get_vertex_count()-1) as GLsizei, gl::UNSIGNED_INT, null())
                 }
