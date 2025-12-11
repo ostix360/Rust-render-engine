@@ -9,18 +9,18 @@ mod maths;
 mod graphics;
 mod app;
 
-use exmex::parse;
+use crate::app::coords_sys::CoordsSys;
+use crate::app::grid::Grid;
+use crate::app::grid::GridConfig;
+use crate::render::grid_renderer::GridRenderer;
+use crate::render::grid_shader::GridShader;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::display_manager;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, clear_gl};
+use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
+use exmex::parse;
 use include_dir::{include_dir, Dir};
 use nalgebra::{vector, Perspective3};
-use symbolica::parse;
-use crate::render::grid_shader::GridShader;
-use crate::app::coords_sys::CoordsSys;
-use crate::app::grid::Grid;
-use crate::render::grid_renderer::GridRenderer;
-use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
 
 const RESOURCES: Dir = include_dir!("src/res");
 
@@ -110,7 +110,8 @@ fn main() {
     let y_eq = parse("x*sin(y) * sin(z)").unwrap();
     let z_eq = parse("x * cos(z)").unwrap();
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
-    let mut grid = Grid::new(sys_coord);
+    let config = GridConfig::default();
+    let mut grid = Grid::new(sys_coord, config);
     grid.generate_grid((0., 0., 0.), 10);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);

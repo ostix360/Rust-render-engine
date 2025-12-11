@@ -35,9 +35,9 @@ impl GridShader {
     }
     pub fn load_color(&self, color: SegmentDir) {
         let color_vec = match color {
-            SegmentDir::U => Vector3::new(1.0, 0.0, 0.0),
-            SegmentDir::V => Vector3::new(0.3, 0.3, 0.8),
-            SegmentDir::W => Vector3::new(0.0, 0.8, 0.0),
+            SegmentDir::X => Vector3::new(1.0, 0.0, 0.0),
+            SegmentDir::Y => Vector3::new(0.3, 0.3, 0.8),
+            SegmentDir::Z => Vector3::new(0.0, 0.8, 0.0),
         };
         self.color.load_vector_to_uniform(color_vec);
     }
