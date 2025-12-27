@@ -9,7 +9,7 @@ pub struct DisplayManager {
     height: u32,
     title: &'static str,
     delta: f32,
-    last_frame_time : f32,
+    last_frame_time: f32,
     window: Option<PWindow>,
     glfw: Option<glfw::Glfw>,
     events: Option<glfw::GlfwReceiver<(f64, glfw::WindowEvent)>>,
@@ -153,12 +153,20 @@ impl DisplayManager {
         &self.input
     }
     
-    pub fn get_window(&self) -> &PWindow {
-        self.window.as_ref().unwrap()
+    pub fn get_window(&mut self) -> &mut PWindow {
+        self.window.as_mut().unwrap()
+    }
+
+    pub fn get_window_mut(&mut self) -> &mut PWindow {
+        self.window.as_mut().unwrap()
     }
     
     pub fn get_glfw(&self) -> &glfw::Glfw {
         self.glfw.as_ref().unwrap()
+    }
+
+    pub fn get_glfw_mut(&mut self) -> &mut glfw::Glfw {
+        self.glfw.as_mut().unwrap()
     }
 }
 

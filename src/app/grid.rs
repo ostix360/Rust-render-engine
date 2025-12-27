@@ -146,9 +146,9 @@ impl GridConfig {
 
 impl Default for GridConfig {
     fn default() -> Self {
-        Self::new(-1.6, 15.0, 5.0,
-                  0.0, 7.0, 5.0,
-                  0.0, 7.0, 5.0
+        Self::new(-1.6, 15.0, 2.0,
+                  0.0, 7.0, 2.0,
+                  0.0, 7.0, 2.0
         )
     }
 }

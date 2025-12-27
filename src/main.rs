@@ -9,6 +9,7 @@ mod maths;
 mod graphics;
 mod app;
 
+use crate::app::ui::{spawn_control_window, GridUiState};
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::Grid;
 use crate::app::grid::GridConfig;
@@ -21,6 +22,7 @@ use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
 use exmex::parse;
 use include_dir::{include_dir, Dir};
 use nalgebra::{vector, Perspective3};
+use std::sync::{Arc, Mutex};
 
 const RESOURCES: Dir = include_dir!("src/res");
 
@@ -106,9 +108,13 @@ fn main() {
         gl::Enable(gl::DEPTH_TEST);
     }
 
-    let x_eq = parse("x*cos(y) * sin(z)").unwrap();
-    let y_eq = parse("x*sin(y) * sin(z)").unwrap();
-    let z_eq = parse("x * cos(z)").unwrap();
+    let ui_state = Arc::new(Mutex::new(GridUiState::default()));
+    spawn_control_window(ui_state.clone());
+
+    let initial_state = ui_state.lock().unwrap().clone();
+    let x_eq = parse(&initial_state.eq_x).unwrap_or_else(|_| parse("x").unwrap());
+    let y_eq = parse(&initial_state.eq_y).unwrap_or_else(|_| parse("y").unwrap());
+    let z_eq = parse(&initial_state.eq_z).unwrap_or_else(|_| parse("z").unwrap());
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let config = GridConfig::default();
     let mut grid = Grid::new(sys_coord, config);
@@ -122,12 +128,17 @@ fn main() {
     let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
     
     while !display_manager.is_close_requested() {
+
+        // let ui_snapshot = ui_state.lock().unwrap().clone();
+
         camera.update(display_manager.get_input());
         let pos = ((&camera.position).x, (&camera.position).y, 0.);
         // grid.generate_grid(pos, 30);
         // println!("{:?}", camera.position);
         clear_gl();
-        grid_renderer.render(&grid,&camera);
+        // if ui_snapshot.render_3d {
+            grid_renderer.render(&grid,&camera);
+        // }
         display_manager.update_display();
     };
     println!("Exiting...")
