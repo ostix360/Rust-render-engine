@@ -117,8 +117,8 @@ fn main() {
     let z_eq = parse(&initial_state.eq_z).unwrap_or_else(|_| parse("z").unwrap());
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let config = GridConfig::default();
-    let mut grid = Grid::new(sys_coord, config);
-    grid.generate_grid((0., 0., 0.), 10);
+    let mut grid = Grid::new(sys_coord);
+    grid.update_config(config);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
@@ -126,19 +126,23 @@ fn main() {
     let grid_shader_prog = ShaderProgram::new("grid");
     let grid_shader = GridShader::new(grid_shader_prog);
     let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
-    
-    while !display_manager.is_close_requested() {
 
-        // let ui_snapshot = ui_state.lock().unwrap().clone();
+    let mut last_counter = initial_state.apply_counter;
+    while !display_manager.is_close_requested() {
+        let sharded = ui_state.lock().unwrap().clone();
+        if last_counter != sharded.apply_counter {
+            println!("Applying new config");
+            grid.update_config(sharded.to_grid_config());
+            last_counter = sharded.apply_counter;
+        }
 
         camera.update(display_manager.get_input());
         let pos = ((&camera.position).x, (&camera.position).y, 0.);
         // grid.generate_grid(pos, 30);
         // println!("{:?}", camera.position);
         clear_gl();
-        // if ui_snapshot.render_3d {
-            grid_renderer.render(&grid,&camera);
-        // }
+        grid_renderer.render(&grid,&camera);
+
         display_manager.update_display();
     };
     println!("Exiting...")

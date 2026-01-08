@@ -14,13 +14,12 @@ pub trait Shader {
 
 pub struct ShaderProgram {
     id: GLuint,
-    vert_src: String,
     frag_id: GLuint,
 }
 
 impl ShaderProgram{
 
-    fn read_shader<'b>(file: String) -> String {
+    pub fn read_shader<'b>(file: String) -> String {
         let file = RESOURCES.get_file("shader/".to_string() + file.as_str()).expect("Shader not found");
         file.contents_utf8().expect("Unable to read shader file").to_string()
     }
@@ -56,7 +55,7 @@ impl ShaderProgram{
         };
     }
 
-    fn load_shader(shader_name: &str) -> (GLuint, GLuint, String){
+    fn load_shader(shader_name: &str) -> (GLuint, GLuint){
         let vertex_src = {
             let name= shader_name.to_string() + ".vert";
             Self::read_shader(name)
@@ -78,7 +77,7 @@ impl ShaderProgram{
             LOGGER.gl_debug("Error while creating Fragment shader")
         }
         Self::process_shader(fragment_id, &fragment_src);
-        (vertex_id, fragment_id, vertex_src)
+        (vertex_id, fragment_id)
     }
 
     fn process_program(vertex: GLuint, fragment: GLuint) -> GLuint {
@@ -127,9 +126,19 @@ impl ShaderProgram{
         let id = Self::process_program(vertex_shader, fragment_shader);
         ShaderProgram{
             id,
-            vert_src: shaders.2,
             frag_id: fragment_shader,
         }
+    }
+
+    pub fn edit_vert_src(&mut self, new_src: String) {
+        let vertex_id;
+        unsafe {vertex_id = CreateShader(VERTEX_SHADER)};
+        if vertex_id == 0 {
+            LOGGER.gl_debug("Error while creating Vertex shader")
+        }
+        Self::process_shader(vertex_id, &new_src);
+        let id = Self::process_program(vertex_id, self.frag_id);
+        self.id = id;
     }
     
     pub fn bind(&self) {

@@ -1,4 +1,4 @@
-
+use std::f64::consts::PI;
 use eframe::egui::{self, Color32, RichText, Stroke};
 use eframe::epaint::{CornerRadius, Margin};
 use std::sync::{Arc, Mutex};
@@ -6,6 +6,7 @@ use std::thread;
 use exmex::{parse, Express};
 use winit::event_loop::EventLoop;
 use winit::platform::x11::EventLoopBuilderExtX11;
+use crate::app::grid::GridConfig;
 use crate::maths::Expr;
 
 const RASPBERRY: Color32 = Color32::from_rgb(0xB0, 0x18, 0xA2);
@@ -29,12 +30,44 @@ pub struct GridUiState {
     pub eq_x: String,
     pub eq_y: String,
     pub eq_z: String,
-    pub density_x: f32,
-    pub density_y: f32,
-    pub density_z: f32,
-    pub bounds_x: (f32, f32),
-    pub bounds_y: (f32, f32),
-    pub bounds_z: (f32, f32),
+    pub nb_x: f64,
+    pub nb_y: f64,
+    pub nb_z: f64,
+    pub bounds_x: (f64, f64),
+    pub bounds_y: (f64,  f64),
+    pub bounds_z: (f64, f64),
+    pub apply_counter: usize,
+}
+
+impl GridUiState {
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn approximate_grid_config(&self) -> GridConfig {
+        let app = |v: f64| -> f64{
+            match v {
+                v if v == 3.14 => PI,
+                v if v == 6.28 => 2.0 * PI,
+                _ => v.round(),
+            }
+        };
+        GridConfig::new(
+            app(self.bounds_x.0),
+            app(self.bounds_x.1),
+            self.nb_x.round(),
+            app(self.bounds_y.0),
+            app(self.bounds_y.1),
+            self.nb_y.round(),
+            app(self.bounds_z.0),
+            app(self.bounds_z.1),
+            self.nb_z.round(),
+        )
+    }
+    
+    pub fn to_grid_config(&self) -> GridConfig {
+        self.approximate_grid_config()
+    }
 }
 
 impl Default for GridUiState {
@@ -44,12 +77,13 @@ impl Default for GridUiState {
             eq_x: "x*cos(y) * sin(z)".to_string(),
             eq_y: "x*sin(y) * sin(z)".to_string(),
             eq_z: "x * cos(z)".to_string(),
-            density_x: 5.0,
-            density_y: 5.0,
-            density_z: 5.0,
+            nb_x: 5.0,
+            nb_y: 5.0,
+            nb_z: 5.0,
             bounds_x: (-1.6, 15.0),
             bounds_y: (0.0, 7.0),
             bounds_z: (0.0, 7.0),
+            apply_counter: 0,
         }
     }
 }
@@ -143,7 +177,7 @@ impl ControlApp {
         });
     }
 
-    fn bounds_row(ui: &mut egui::Ui, label: &str, bounds: &mut (f32, f32)) {
+    fn bounds_row(ui: &mut egui::Ui, label: &str, bounds: &mut (f64, f64)) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(label).color(TEXT));
             ui.add(
@@ -196,22 +230,22 @@ impl eframe::App for ControlApp {
             egui::CollapsingHeader::new(Self::section_heading("Grid settings"))
                 .default_open(true)
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Line density").color(MUTED));
+                    ui.label(RichText::new("Number line").color(MUTED));
                     ui.add(
-                        egui::Slider::new(&mut data.density_x, 0.1..=10.0)
-                            .logarithmic(true)
+                        egui::Slider::new(&mut data.nb_x, 0.0..=20.0)
+                            .logarithmic(false)
                             .text("x")
                             .trailing_fill(true),
                     );
                     ui.add(
-                        egui::Slider::new(&mut data.density_y, 0.1..=10.0)
-                            .logarithmic(true)
+                        egui::Slider::new(&mut data.nb_y, 0.0..=20.0)
+                            .logarithmic(false)
                             .text("y")
                             .trailing_fill(true),
                     );
                     ui.add(
-                        egui::Slider::new(&mut data.density_z, 0.1..=10.0)
-                            .logarithmic(true)
+                        egui::Slider::new(&mut data.nb_z, 0.0..=20.0)
+                            .logarithmic(false)
                             .text("z")
                             .trailing_fill(true),
                     );
@@ -244,7 +278,7 @@ impl eframe::App for ControlApp {
                     let res_y = check_eq_validity(&data.eq_y);
                     let res_z = check_eq_validity(&data.eq_z);
                     if res_x.is_ok() && res_y.is_ok() && res_z.is_ok() {
-                        // apply changes to the grid and reinit it
+                        data.apply_counter += 1;
                     }else {
                         let msg = format!("Error in equation(s): \
                         \nEquation x: {} \nEquation y: {}\nEquation z: {}",

@@ -1,5 +1,7 @@
+use std::fmt::format;
 use nalgebra::{Matrix4, Vector3};
 use crate::app::grid::SegmentDir;
+use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::vec3uniform::Vec3Uniform;
@@ -9,19 +11,30 @@ pub struct GridShader {
     projection_matrix: Matrix4Uniform,
     transformation_matrix: Matrix4Uniform,
     view_matrix: Matrix4Uniform,
+    vertex_editable_src: String,
     color: Vec3Uniform,
 }
 
 impl GridShader {
     pub fn new(program: ShaderProgram) -> GridShader {
         program.bind_attrib(0, "position");
+        let vertex_editable_src = ShaderProgram::read_shader("grid_edit.vert".to_string());
         GridShader{
             shader_program: program,
             projection_matrix: Matrix4Uniform::new("projection_matrix"),
             transformation_matrix: Matrix4Uniform::new("transformation_matrix"),
             view_matrix: Matrix4Uniform::new("view_matrix"),
+            vertex_editable_src,
             color: Vec3Uniform::new("segment_color"),
         }
+    }
+
+    pub fn edit_eqs(&mut self, new_eqs: [String; 3]){
+        let src = self.vertex_editable_src.replace("{{x}}", &new_eqs[0])
+            .replace("{{y}}", &new_eqs[1])
+            .replace("{{z}}", &new_eqs[2]);
+        LOGGER.debug(src.as_str());
+        self.shader_program.edit_vert_src(src);
     }
 
     pub fn load_projection_matrix(&self, matrix: Matrix4<f64>) {
