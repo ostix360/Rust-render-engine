@@ -30,6 +30,9 @@ pub struct GridUiState {
     pub eq_x: String,
     pub eq_y: String,
     pub eq_z: String,
+    pub expr_eqx: Option<Expr>,
+    pub expr_eqy: Option<Expr>,
+    pub expr_eqz: Option<Expr>,
     pub nb_x: f64,
     pub nb_y: f64,
     pub nb_z: f64,
@@ -77,6 +80,9 @@ impl Default for GridUiState {
             eq_x: "x*cos(y) * sin(z)".to_string(),
             eq_y: "x*sin(y) * sin(z)".to_string(),
             eq_z: "x * cos(z)".to_string(),
+            expr_eqx: None,
+            expr_eqy: None,
+            expr_eqz: None,
             nb_x: 5.0,
             nb_y: 5.0,
             nb_z: 5.0,
@@ -230,7 +236,7 @@ impl eframe::App for ControlApp {
             egui::CollapsingHeader::new(Self::section_heading("Grid settings"))
                 .default_open(true)
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Number line").color(MUTED));
+                    ui.label(RichText::new("Line per coordinate").color(MUTED));
                     ui.add(
                         egui::Slider::new(&mut data.nb_x, 0.0..=20.0)
                             .logarithmic(false)
@@ -278,6 +284,9 @@ impl eframe::App for ControlApp {
                     let res_y = check_eq_validity(&data.eq_y);
                     let res_z = check_eq_validity(&data.eq_z);
                     if res_x.is_ok() && res_y.is_ok() && res_z.is_ok() {
+                        data.expr_eqx = Some(res_x.unwrap());
+                        data.expr_eqy = Some(res_y.unwrap());
+                        data.expr_eqz = Some(res_z.unwrap());
                         data.apply_counter += 1;
                     }else {
                         let msg = format!("Error in equation(s): \

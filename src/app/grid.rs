@@ -182,22 +182,22 @@ impl Grid {
         let vs = Array::<f64, _>::linspace(indices.v_min, indices.v_max, indices.nb_v as usize);
         let ws = Array::<f64, _>::linspace(indices.w_min, indices.w_max, indices.nb_w as usize);
 
-        let len_u = NonNaN::<f64>::new((indices.u_max - indices.u_min) / indices.nb_u).unwrap();
-        let len_v = NonNaN::<f64>::new((indices.v_max - indices.v_min) / indices.nb_v).unwrap();
-        let len_w = NonNaN::<f64>::new((indices.w_max - indices.w_min) / indices.nb_w).unwrap();
-
         for ui in total_u.iter() {
             let u = NonNaN::<f64>::new(*ui).unwrap();
             for vj in vs.iter() {
                 let v = NonNaN::<f64>::new(*vj).unwrap();
                 for wk in ws.iter() {
                     let w = NonNaN::<f64>::new(*wk).unwrap();
+                    let mut len = NonNaN::<f64>::new(1.0).unwrap();
+                    if ui == &indices.u_max.floor() {
+                        len = NonNaN::<f64>::new(indices.u_max - ui).unwrap();
+                    }
                     keys.insert(SegmentKey {
                         dir: SegmentDir::X,
                         u,
                         v,
                         w,
-                        len: len_u,
+                        len,
                     });
                 }
             }
@@ -208,28 +208,36 @@ impl Grid {
                 let w = NonNaN::<f64>::new(*wk).unwrap();
                 for uk in us.iter() {
                     let u = NonNaN::<f64>::new(*uk).unwrap();
+                    let mut len = NonNaN::<f64>::new(1.0).unwrap();
+                    if vi == &indices.v_max.floor() {
+                        len = NonNaN::<f64>::new(indices.v_max - vi).unwrap();
+                    }
                     keys.insert(SegmentKey {
                         dir: SegmentDir::Y,
                         u,
                         v,
                         w,
-                        len: len_v,
+                        len,
                     });
                 }
             }
         }
-        for wk in total_w.iter() {
-            let w = NonNaN::<f64>::new(*wk).unwrap();
+        for wi in total_w.iter() {
+            let w = NonNaN::<f64>::new(*wi).unwrap();
             for ui in us.iter() {
                 let u = NonNaN::<f64>::new(*ui).unwrap();
                 for vj in vs.iter() {
                     let v = NonNaN::<f64>::new(*vj).unwrap();
+                    let mut len = NonNaN::<f64>::new(1.0).unwrap();
+                    if wi == &indices.w_max.floor() {
+                        len = NonNaN::<f64>::new(indices.w_max - wi).unwrap();
+                    }
                     keys.insert(SegmentKey {
                         dir: SegmentDir::Z,
                         u,
                         v,
                         w,
-                        len: len_w,
+                        len,
                     });
                 }
             }
@@ -246,21 +254,21 @@ impl Grid {
                 let u0 = key.u.get();
                 let v = key.v.get();
                 let w = key.w.get();
-                let u1 = u0 + 1.;
+                let u1 = u0 + key.len.get();
                 (Vector3::new(u0, v, w), Vector3::new(u1, v, w), 0usize)
             }
             SegmentDir::Y => {
                 let u = key.u.get();
                 let v0 = key.v.get();
                 let w = key.w.get();
-                let v1 = v0 + 1.;
+                let v1 = v0 + key.len.get();
                 (Vector3::new(u, v0, w), Vector3::new(u, v1, w), 1usize)
             }
             SegmentDir::Z => {
                 let u = key.u.get();
                 let v = key.v.get();
                 let w0 = key.w.get();
-                let w1 = w0 + 1.;
+                let w1 = w0 + key.len.get();
                 (Vector3::new(u, v, w0), Vector3::new(u, v, w1), 2usize)
             }
         };
@@ -364,9 +372,16 @@ impl Grid {
 
     pub fn update_config(&mut self, new_config: &GridConfig) {
         let new_keys = Grid::build_keys_for_indices(&new_config);
-        println!("New config!!");
         self.update_segments_from_keys(&new_keys);
-        println!("New config done!!");
+    }
+
+    pub fn set_coordinates(&mut self, coordinates: CoordsSys) {
+        self.coordinates = coordinates;
+        self.segments.clear();
+    }
+
+    pub fn get_coords(&self) -> &CoordsSys {
+        &self.coordinates
     }
 
     pub fn get_data(&self) -> &FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>> {

@@ -133,8 +133,12 @@ fn main() {
         if last_counter != sharded.apply_counter {
             println!("Applying new config");
             let conf = sharded.to_grid_config();
-            grid.update_config(&conf);
             let eqs = [sharded.eq_x, sharded.eq_y, sharded.eq_z];
+            if !grid.get_coords().is_equivalent(&eqs) {
+                let coord_sys = CoordsSys::new(sharded.expr_eqx.unwrap(), sharded.expr_eqy.unwrap(), sharded.expr_eqz.unwrap());
+                grid.set_coordinates(coord_sys);
+            }
+            grid.update_config(&conf);
             grid_renderer.update_shader_eqs(eqs);
             last_counter = sharded.apply_counter;
         }

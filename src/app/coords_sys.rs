@@ -85,4 +85,9 @@ impl CoordsSys {
         let z = (self.fast_z_eq)(x_tild, y_tild, z_tild);
         (x, y, z)
     }
+
+    pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {
+        println!("{:?}", self.x_eq.to_string());
+        eqs[0] == self.x_eq.to_string() && eqs[1] == self.y_eq.to_string() && eqs[2] == self.z_eq.to_string()
+    }
 }
