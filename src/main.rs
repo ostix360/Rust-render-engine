@@ -118,21 +118,24 @@ fn main() {
     let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
     let config = GridConfig::default();
     let mut grid = Grid::new(sys_coord);
-    grid.update_config(config);
+    grid.update_config(&config);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
     let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
     let grid_shader_prog = ShaderProgram::new("grid");
     let grid_shader = GridShader::new(grid_shader_prog);
-    let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
+    let mut grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
 
     let mut last_counter = initial_state.apply_counter;
     while !display_manager.is_close_requested() {
         let sharded = ui_state.lock().unwrap().clone();
         if last_counter != sharded.apply_counter {
             println!("Applying new config");
-            grid.update_config(sharded.to_grid_config());
+            let conf = sharded.to_grid_config();
+            grid.update_config(&conf);
+            let eqs = [sharded.eq_x, sharded.eq_y, sharded.eq_z];
+            grid_renderer.update_shader_eqs(eqs);
             last_counter = sharded.apply_counter;
         }
 

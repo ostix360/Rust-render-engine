@@ -35,6 +35,9 @@ impl GridShader {
             .replace("{{z}}", &new_eqs[2]);
         LOGGER.debug(src.as_str());
         self.shader_program.edit_vert_src(src);
+        self.shader_program.bind_attrib(0, "position");
+        self.store_all_uniforms();
+        LOGGER.gl_debug("Shader edited");
     }
 
     pub fn load_projection_matrix(&self, matrix: Matrix4<f64>) {

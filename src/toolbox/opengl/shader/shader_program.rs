@@ -114,6 +114,7 @@ impl ShaderProgram{
             DetachShader(program, vertex);
             DetachShader(program, fragment);
             DeleteShader(vertex);
+            LOGGER.gl_debug("Shader detached");
         }
         program
     }

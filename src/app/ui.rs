@@ -80,9 +80,9 @@ impl Default for GridUiState {
             nb_x: 5.0,
             nb_y: 5.0,
             nb_z: 5.0,
-            bounds_x: (-1.6, 15.0),
-            bounds_y: (0.0, 7.0),
-            bounds_z: (0.0, 7.0),
+            bounds_x: (-0.1, 15.0),
+            bounds_y: (0.0, 6.28),
+            bounds_z: (0.0, 3.14),
             apply_counter: 0,
         }
     }

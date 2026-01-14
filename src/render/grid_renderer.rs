@@ -7,7 +7,8 @@ use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 
 pub struct GridRenderer {
-    shader: GridShader
+    shader: GridShader,
+    projection: Matrix4<f64>,
 }
 
 impl GridRenderer {
@@ -18,6 +19,7 @@ impl GridRenderer {
         shader.unbind();
         GridRenderer{
             shader,
+            projection,
         }
     }
 
@@ -37,6 +39,13 @@ impl GridRenderer {
             key.get_vao().unwrap().unbinds(&[0]);
         }
         self.unprepare();
+    }
+
+    pub fn update_shader_eqs(&mut self, new_eqs: [String; 3]){
+        self.shader.edit_eqs(new_eqs);
+        self.shader.bind();
+        self.shader.load_projection_matrix(self.projection);
+        self.shader.unbind();
     }
 
     fn prepare(&self, cam: &Camera) {

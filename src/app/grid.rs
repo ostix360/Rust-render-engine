@@ -171,7 +171,7 @@ impl Grid {
 
 
     #[inline]
-    fn build_keys_for_indices(indices: GridConfig) -> FxHashSet<SegmentKey> {
+    fn build_keys_for_indices(indices: &GridConfig) -> FxHashSet<SegmentKey> {
         let mut keys = FxHashSet::default();
 
         let total_u =  Array::<f64, _>::range(indices.u_min, indices.u_max, 1.);
@@ -362,8 +362,8 @@ impl Grid {
         self.rebuild_render_data();
     }
 
-    pub fn update_config(&mut self, new_config: GridConfig) {
-        let new_keys = Grid::build_keys_for_indices(new_config);
+    pub fn update_config(&mut self, new_config: &GridConfig) {
+        let new_keys = Grid::build_keys_for_indices(&new_config);
         println!("New config!!");
         self.update_segments_from_keys(&new_keys);
         println!("New config done!!");
