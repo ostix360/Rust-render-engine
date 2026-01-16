@@ -81,6 +81,10 @@ impl Edge {
         self.nb_vertices
     }
 
+    pub fn get_vertices(&self) -> &[Vector3<NonNaN<f64>>] {
+        &self.vertices
+    }
+
     pub fn get_vao(&self) -> Option<&VAO> {
         self.vao.as_ref()
     }

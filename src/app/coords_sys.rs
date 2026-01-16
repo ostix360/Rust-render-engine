@@ -79,11 +79,11 @@ impl CoordsSys {
         (cx, cy, cz)
     }
 
-    pub fn eval(&self, x_tild: f64, y_tild: f64, z_tild: f64) -> (f64, f64, f64) {
-        let x = (self.fast_x_eq)(x_tild, y_tild, z_tild);
-        let y = (self.fast_y_eq)(x_tild, y_tild, z_tild);
-        let z = (self.fast_z_eq)(x_tild, y_tild, z_tild);
-        (x, y, z)
+    pub fn eval(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+        let x_ = (self.fast_x_eq)(x, y, z);
+        let y_ = (self.fast_y_eq)(x, y, z);
+        let z_ = (self.fast_z_eq)(x, y, z);
+        (x_, y_, z_)
     }
 
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {

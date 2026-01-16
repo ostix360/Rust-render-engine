@@ -28,5 +28,6 @@ ndarray = "0.17.1"
 egui = "0.33.3"
 eframe = { version = "0.33.3", features = ["glow"] }
 winit = "0.30.12"
+kd-tree = { version="0.6.2", features = ["rayon"] }
 
 [dev-dependencies]
