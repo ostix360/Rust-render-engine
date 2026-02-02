@@ -1,9 +1,11 @@
 #version 330 core
 
-uniform mat4 transformation_matrix;
+uniform vec4 color;
 
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(0.8, 0.5, 0.6, 1.0);
+//    vec2 p = gl_PointCoord * 2.0 - 1.0; // [-1,1]
+//    if (dot(p,p) > 1.0) discard;
+    FragColor = color;
 }

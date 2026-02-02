@@ -9,13 +9,17 @@ mod maths;
 mod graphics;
 mod app;
 
-use crate::app::ui::{spawn_control_window, GridUiState};
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::Grid;
 use crate::app::grid::GridConfig;
+use crate::app::grid_world::GridWorld;
+use crate::app::ui::{spawn_control_window, GridUiState};
+use crate::graphics::model::Sphere;
 use crate::render::grid_renderer::GridRenderer;
 use crate::render::grid_shader::GridShader;
+use crate::render::renderer::Renderer;
 use crate::toolbox::camera::Camera;
+use crate::toolbox::color::WHITE;
 use crate::toolbox::opengl::display_manager;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::{add_opengl_debug, clear_gl};
 use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
@@ -119,6 +123,7 @@ fn main() {
     let config = GridConfig::default();
     let mut grid = Grid::new(sys_coord);
     grid.update_config(&config);
+    let mut grid_world = GridWorld::new(&grid);
 
     let mut camera = Camera::new(vector![0.,0.,0.],);
     let aspect_ratio = WIDTH as f64 / HEIGHT as f64;
@@ -126,6 +131,9 @@ fn main() {
     let grid_shader_prog = ShaderProgram::new("grid");
     let grid_shader = GridShader::new(grid_shader_prog);
     let mut grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
+    let classic_shader_prog = ShaderProgram::new("classic");
+    let classic_shader = render::classic_shader::ClassicShader::new(classic_shader_prog);
+    let mut point_renderer = Renderer::new(classic_shader, projection.to_homogeneous());
 
     let mut last_counter = initial_state.apply_counter;
     while !display_manager.is_close_requested() {
@@ -140,15 +148,31 @@ fn main() {
             }
             grid.update_config(&conf);
             grid_renderer.update_shader_eqs(eqs);
+            grid_world.update_data(&grid);
             last_counter = sharded.apply_counter;
         }
+        let mouse_info = camera.mouse_pos_to_world_pos(&display_manager, projection.to_homogeneous());
+        let nearest_point = grid_world.ray_cast(&mouse_info.0, &mouse_info.1, 0.45, 200.);
+        // println!("Mouse dir: {}", mouse_info.1);
+
+
 
         camera.update(display_manager.get_input());
-        let pos = ((&camera.position).x, (&camera.position).y, 0.);
-        // grid.generate_grid(pos, 30);
-        // println!("{:?}", camera.position);
+        // let nearest = grid_world.found_nearest(&[camera.position.x, camera.position.y, camera.position.z]);
+        // println!("Nearest point: {:?}", nearest);
         clear_gl();
         grid_renderer.render(&grid,&camera);
+
+        /// DEBUG
+        // let dir_pos = camera.position + mouse_info.1 * 10.;
+        // let point = Sphere::new(dir_pos, WHITE, 0.1);
+        // point_renderer.draw_point(vec![point], &camera);
+
+        if let Some(point) = nearest_point {
+            println!("Nearest point at: x: {}, y: {}, z: {}", point.0, point.1, point.2);
+            let point = Sphere::new(vector![point.0, point.1, point.2], WHITE, 0.1);
+            point_renderer.draw_point(vec![point], &camera);
+        }
 
         display_manager.update_display();
     };

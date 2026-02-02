@@ -1,7 +1,8 @@
-use std::f64::consts::PI;
-use nalgebra::{Isometry3, Matrix4, MatrixView4, Perspective3, Rotation3, SimdComplexField, Translation3, Unit, UnitQuaternion, Vector, Vector3};
 use crate::toolbox::input::Input;
 use glfw::{Key, MouseButton};
+use nalgebra::{Matrix4, Translation3, Unit, UnitQuaternion, Vector3, Vector4};
+use std::f64::consts::PI;
+use crate::toolbox::opengl::display_manager::DisplayManager;
 
 const CAMERA_SPEED: f64 = 0.1;
 const CAMERA_ROTATION_SPEED: f64 = 0.001;
@@ -26,9 +27,23 @@ impl Camera {
         self.position += self.get_dp(input) * CAMERA_SPEED;
     }
 
+    pub fn mouse_pos_to_world_pos(&self, dp: &DisplayManager, projection: Matrix4<f64>) -> (Vector3<f64>, Vector3<f64>) {
+        let input = dp.get_input();
+        let x = input.mouse_pos.0/ dp.get_width() as f64 * 2.0 - 1.0;
+        let y = 1.0 - input.mouse_pos.1/ dp.get_height() as f64 * 2.0;
+
+        let inv_vp = (projection * self.get_view_matrix()).try_inverse().unwrap();
+
+        let far_clip = Vector4::new(x, y, 1.0, 1.0);
+        let far_clip_world = inv_vp * far_clip;
+        let mouse_world_pos = far_clip_world.xyz() / far_clip_world.w;
+        let dir = (mouse_world_pos - self.position).normalize();
+        (self.position, dir)
+    }
+
     #[inline]
     fn update_angles(&mut self, input: &Input) {
-        if input.is_mouse_button_pressed(MouseButton::Left) {
+        if input.is_mouse_button_pressed(MouseButton::Button1) {
             let dx = input.d_mouse_pos.0;
             let dy = input.d_mouse_pos.1;
             if dx != 0.0 || dy != 0.0 {

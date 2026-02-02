@@ -45,4 +45,8 @@ impl Color {
     pub fn alpha(&self) -> f32 {
         self.alpha
     }
+
+    pub fn to_vector4(&self) -> nalgebra::Vector4<f64> {
+        nalgebra::Vector4::new(self.red as f64, self.green as f64, self.blue as f64, self.alpha as f64)
+    }
 }

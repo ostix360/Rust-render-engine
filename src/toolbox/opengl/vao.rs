@@ -3,6 +3,7 @@ use gl::types::{GLint, GLuint};
 use crate::toolbox::logging::LOGGER;
 use gl::{BindVertexArray, DisableVertexAttribArray, EnableVertexAttribArray};
 use crate::{TriIndexes, Vertex};
+use crate::toolbox::obj_loader::load_obj;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct VAO {
@@ -88,15 +89,28 @@ impl VAO {
     unsafe fn unbind(&self) -> () {
         BindVertexArray(0)
     }
+
+    pub fn create_point() -> VAO {
+        let mut vao = Self::create_vao().expect("Error creating VAO");
+        vao.store_data(0, 3, vec![[0.0, 0.0, 0.0]]);
+        vao
+    }
+    pub fn create_sphere() -> VAO {
+        let model = load_obj("sphere.obj");
+        let mut vao = Self::create_vao().expect("Error creating VAO");
+        vao.store_data(0, 3, model.0);
+        vao.store_indices(model.1);
+        vao
+    }
 }
 
 impl Drop for VAO {
     fn drop(&mut self) {
-        unsafe {
-            gl::DeleteVertexArrays(1, &self.id)
-        }
         for vbo in self.vbos.iter() {
             vbo.delete();
+        }
+        unsafe {
+            gl::DeleteVertexArrays(1, &self.id)
         }
     }
 }

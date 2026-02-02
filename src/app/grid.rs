@@ -2,6 +2,7 @@ use crate::app::coords_sys::CoordsSys;
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::vao::VAO;
 use crate::Vertex;
+use crate::app::grid_world::GridWorld;
 
 use exmex::NeutralElts;
 use nalgebra::{Matrix4, Rotation3, Translation3, Unit, Vector3};
@@ -161,7 +162,7 @@ impl Default for GridConfig {
 pub struct Grid {
     coordinates: CoordsSys,
     segments: FxHashMap<SegmentKey, (usize, Matrix4<f64>, SegmentDir)>,
-    render_data: FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>>
+    render_data: FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>>,
 }
 
 impl Grid {
