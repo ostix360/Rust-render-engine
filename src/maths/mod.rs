@@ -4,7 +4,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use exmex::{Express, FlatEx, FloatOpsFactory};
+use egui::TextBuffer;
+use exmex::{Differentiate, Express, FlatEx, FloatOpsFactory};
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use nalgebra::Vector3;
@@ -14,6 +15,7 @@ use symbolica::numerical_integration::{ContinuousGrid, MonteCarloRng, Sample};
 use symbolica::{parse, symbol};
 use symbolica::printer::PrintOptions;
 use typed_floats::NonNaN;
+use crate::maths::space::Metric;
 
 mod differential;
 mod space;
@@ -120,6 +122,28 @@ pub fn expr_to_fastexpr3d(mut expr: Expr) -> FastExpr3d {
     Arc::new(eval)
 }
 
+pub fn derivate(expr: Expr, variable_name: &String) -> Expr {
+    if variable_name == "x" && expr.var_names().contains(variable_name) {
+        expr.partial(0).unwrap()
+    }else if variable_name == "y" && expr.var_names().contains(variable_name) {
+        if !expr.var_names().contains(&"x".to_string()) {
+            expr.partial(0).unwrap()
+        } else {
+            expr.partial(1).unwrap()
+        }
+    }else if variable_name == "z" && expr.var_names().contains(variable_name) {
+        if !expr.var_names().contains(&"x".to_string()) && !expr.var_names().contains(&"y".to_string()) {
+            expr.partial(0).unwrap()
+        } else if !expr.var_names().contains(&"y".to_string()) {
+            expr.partial(1).unwrap()
+        } else {
+            expr.partial(2).unwrap()
+        }
+    }else {
+        panic!("Variable {} not found in expression", variable_name);
+    }
+}
+
 pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
     Ok(Vector3::new(
         NonNaN::<f32>::new(v[0]).ok().ok_or("NaN in vertex")?,
@@ -129,7 +153,7 @@ pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
 }
 
 trait Hodge {
-    fn hodge_star(&self) -> Self;
+    fn hodge_star(&self, metric: Metric) -> Self;
 }
 
 trait ExternalDerivative {

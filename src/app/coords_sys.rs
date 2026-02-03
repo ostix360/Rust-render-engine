@@ -17,7 +17,7 @@ pub struct CoordsSys {
 }
 
 impl CoordsSys {
-    pub fn new(mut x_eq: Expr, mut y_eq: Expr, mut z_eq: Expr) -> Self {
+    pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Self {
         let (x_curvature, y_curvature, z_curvature) = Self::calculate_curvature(&x_eq, &y_eq, &z_eq).unwrap();
         let fast_x_eq = expr_to_fastexpr3d(x_eq.clone());
         let fast_y_eq = expr_to_fastexpr3d(y_eq.clone());
