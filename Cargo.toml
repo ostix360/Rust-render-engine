@@ -19,7 +19,6 @@ exmex = { version = "0.20.3", features = ["partial", "serde", "value"] }
 nalgebra = "0.33.2"
 rustc-hash = "2.1.1"
 symbolica = { version = "0.19.0" }
-pyo3 = "0.26.0"
 typed_floats = "1.0.7"
 rand = "0.9.2"
 once_cell = "1.21.3"
@@ -29,5 +28,9 @@ egui = "0.33.3"
 eframe = { version = "0.33.3", features = ["glow"] }
 winit = "0.30.12"
 kd-tree = { version="0.6.2", features = ["rayon"] }
+
+[profile.test]
+opt-level = 3
+debug = 1
 
 [dev-dependencies]
