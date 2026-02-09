@@ -163,10 +163,6 @@ fn main() {
         clear_gl();
         grid_renderer.render(&grid,&camera);
 
-        /// DEBUG
-        // let dir_pos = camera.position + mouse_info.1 * 10.;
-        // let point = Sphere::new(dir_pos, WHITE, 0.1);
-        // point_renderer.draw_point(vec![point], &camera);
 
         if let Some(point) = nearest_point {
             println!("Nearest point at: x: {}, y: {}, z: {}", point.0, point.1, point.2);

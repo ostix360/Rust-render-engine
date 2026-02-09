@@ -1,3 +1,4 @@
+#![allow(unused)]
 use glfw::ffi::*;
 use glfw::{Action, Context, Key, PWindow};
 use std::ffi::c_int;

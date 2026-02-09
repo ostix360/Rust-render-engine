@@ -1,4 +1,3 @@
-use nalgebra::Vector3;
 use crate::{TriIndexes, Vertex, RESOURCES};
 
 pub fn load_obj(name: &str) -> (Vec<Vertex>, Vec<TriIndexes>) {

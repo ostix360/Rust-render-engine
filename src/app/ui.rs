@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::f64::consts::PI;
 use eframe::egui::{self, Color32, RichText, Stroke};
 use eframe::epaint::{CornerRadius, Margin};
@@ -43,10 +44,6 @@ pub struct GridUiState {
 }
 
 impl GridUiState {
-    pub fn reset(&mut self) {
-        *self = Self::default();
-    }
-
     pub fn approximate_grid_config(&self) -> GridConfig {
         let app = |v: f64| -> f64{
             match v {

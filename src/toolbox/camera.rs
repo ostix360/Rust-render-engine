@@ -81,7 +81,7 @@ impl Camera {
         self.quat.renormalize();
     }
 
-
+    #[allow(unused)]
     pub fn increase_rotation(&mut self, dir: &Unit<Vector3<f64>>, angle: f64) {
         let rot_quat = UnitQuaternion::from_axis_angle(dir, angle);
         println!("Rotating around axis {:?} by angle {:.4} radians", dir, angle);

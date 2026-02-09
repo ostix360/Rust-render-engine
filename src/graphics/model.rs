@@ -1,6 +1,6 @@
-use nalgebra::{Matrix3, Matrix4, Rotation3, Translation3, Vector3, Vector4};
 use crate::toolbox::color::Color;
 use crate::toolbox::opengl::vao::VAO;
+use nalgebra::{Matrix4, Rotation3, Translation3, Vector3, Vector4};
 
 #[derive(PartialEq)]
 pub struct Model<'a> {
@@ -11,6 +11,7 @@ pub struct Model<'a> {
     thickness: f64,
 }
 
+#[allow(dead_code)]
 impl<'a> Model<'a> {
     pub fn new(vao: &'a VAO, position: Vector3<f64>, rotation: Vector3<f64>, scale: f64, thickness: f64) -> Self {
         Self {
@@ -37,7 +38,7 @@ impl<'a> Model<'a> {
     }
 
     pub fn get_transformation_matrix(&self, time: f64) -> Matrix4<f64> {
-        let mut translation = Translation3::from(self.position);
+        let translation = Translation3::from(self.position);
         let rotation = Rotation3::from_euler_angles(self.rotation.x + time * 0.3, self.rotation.y, self.rotation.z);
         let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(self.scale, self.thickness, self.thickness));
         let result = translation.to_homogeneous() * rotation.to_homogeneous() * scale;
@@ -64,10 +65,6 @@ impl Sphere {
 
     pub fn get_color(&self) -> Vector4<f64> {
         self.color.to_vector4()
-    }
-
-    pub fn get_size(&self) -> f64 {
-        self.size
     }
 }
 

@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 
 pub mod open_gl_utils {
     use crate::toolbox::logging::LOGGER;
@@ -23,7 +24,7 @@ pub mod open_gl_utils {
         LOGGER.gl_debug("Error setting wireframe mode");
     }
     
-    
+    #[allow(unused)]
     extern "system" fn gl_message_callback(
                            source: GLenum,
                            level: GLenum,
@@ -38,7 +39,7 @@ pub mod open_gl_utils {
             ""
         };
         let level = match level {
-            gl::DEBUG_TYPE_ERROR => "ERROR",
+            DEBUG_TYPE_ERROR => "ERROR",
             gl::DEBUG_TYPE_DEPRECATED_BEHAVIOR => "DEPRECATED_BEHAVIOR",
             gl::DEBUG_TYPE_UNDEFINED_BEHAVIOR => "UNDEFINED_BEHAVIOR",
             gl::DEBUG_TYPE_PORTABILITY => "PORTABILITY",

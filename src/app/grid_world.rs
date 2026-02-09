@@ -1,4 +1,3 @@
-use std::f64::MAX;
 use crate::app::grid::Grid;
 use kd_tree::KdTree;
 use nalgebra::{Vector3, Vector4};
@@ -40,6 +39,7 @@ impl GridWorld {
         self.data = KdTree::par_build_by_ordered_float(data);
     }
 
+    #[allow(dead_code)]
     pub fn found_nearest(&self, pos: &[f64; 3]) -> Option<(f64, f64, f64)>  {
         let coords = self.data.nearest(pos)?.item;
         Some((coords[0], coords[1], coords[2]))

@@ -1,10 +1,9 @@
-use std::fmt::format;
-use nalgebra::{Matrix4, Vector3};
 use crate::app::grid::SegmentDir;
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::vec3uniform::Vec3Uniform;
+use nalgebra::{Matrix4, Vector3};
 
 pub struct GridShader {
     shader_program: ShaderProgram,
@@ -58,6 +57,7 @@ impl GridShader {
         self.color.load_vector_to_uniform(color_vec);
     }
 
+    #[allow(unused)]
     pub fn load_rng_color(&self) {
         let rng_color = Vector3::new(
             rand::random::<f64>(),

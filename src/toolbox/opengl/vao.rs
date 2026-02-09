@@ -90,11 +90,7 @@ impl VAO {
         BindVertexArray(0)
     }
 
-    pub fn create_point() -> VAO {
-        let mut vao = Self::create_vao().expect("Error creating VAO");
-        vao.store_data(0, 3, vec![[0.0, 0.0, 0.0]]);
-        vao
-    }
+
     pub fn create_sphere() -> VAO {
         let model = load_obj("sphere.obj");
         let mut vao = Self::create_vao().expect("Error creating VAO");

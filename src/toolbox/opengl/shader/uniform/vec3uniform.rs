@@ -1,6 +1,6 @@
-use nalgebra::{Matrix4, Vector3};
-use crate::toolbox::logging::LOGGER;
 use super::uniform::Uniform;
+use crate::toolbox::logging::LOGGER;
+use nalgebra::Vector3;
 
 pub struct Vec3Uniform{
     pub uniform: Uniform,

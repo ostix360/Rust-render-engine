@@ -1,14 +1,15 @@
-use std::ops::AddAssign;
-use gl::{DrawArrays, DrawElements, Enable, TRIANGLES, UNSIGNED_INT};
-use gl::types::GLsizei;
-use nalgebra::Matrix4;
-use rustc_hash::FxHashMap;
+#![allow(dead_code)]
 use crate::graphics::model::{Model, Sphere};
 use crate::render::classic_shader::ClassicShader;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::set_wireframe_mode;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 use crate::toolbox::opengl::vao::VAO;
+use gl::types::GLsizei;
+use gl::{DrawElements, TRIANGLES, UNSIGNED_INT};
+use nalgebra::Matrix4;
+use rustc_hash::FxHashMap;
+use std::ops::AddAssign;
 
 pub struct Renderer {
     shader: ClassicShader,
@@ -29,7 +30,7 @@ impl Renderer {
             time: 0.0,
         }
     }
-    
+
     pub fn render(&mut self, models: &FxHashMap<&VAO, Vec<&Model>>, cam: &Camera) {
         self.prepare(cam);
         self.time.add_assign(0.01);
