@@ -99,7 +99,7 @@ mod test {
 
     #[test]
     fn test_logger() {
-        let logger = Logger::new(vec![LogLevel::Debug, LogLevel::Info], String::from("log.txt"));
+        let logger = Logger::new(vec![Debug, Info], String::from("log.txt"));
         logger.info("This is an info message");
         logger.debug("This is a debug message");
         logger.warning("This is a warning message");

@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use egui::TextBuffer;
-use exmex::{Differentiate, Express, FlatEx, FloatOpsFactory};
+use exmex::{Calculate, Differentiate, Express, FlatEx, FloatOpsFactory};
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use nalgebra::Vector3;
@@ -17,8 +17,8 @@ use symbolica::printer::PrintOptions;
 use typed_floats::NonNaN;
 use crate::maths::space::Metric;
 
-mod differential;
-mod space;
+pub mod differential;
+pub mod space;
 
 pub type Expr = FlatEx<f64, FloatOpsFactory<f64>>;
 pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
@@ -124,7 +124,8 @@ pub fn expr_to_fastexpr3d(mut expr: Expr) -> FastExpr3d {
 
 pub fn derivate(expr: Expr, variable_name: &String) -> Expr {
     if variable_name == "x" && expr.var_names().contains(variable_name) {
-        expr.partial(0).unwrap()
+        let mut out = expr.clone().partial(0).unwrap();
+        out
     }else if variable_name == "y" && expr.var_names().contains(variable_name) {
         if !expr.var_names().contains(&"x".to_string()) {
             expr.partial(0).unwrap()
@@ -134,13 +135,13 @@ pub fn derivate(expr: Expr, variable_name: &String) -> Expr {
     }else if variable_name == "z" && expr.var_names().contains(variable_name) {
         if !expr.var_names().contains(&"x".to_string()) && !expr.var_names().contains(&"y".to_string()) {
             expr.partial(0).unwrap()
-        } else if !expr.var_names().contains(&"y".to_string()) {
+        } else if !expr.var_names().contains(&"x".to_string()) || !expr.var_names().contains(&"y".to_string()) {
             expr.partial(1).unwrap()
         } else {
             expr.partial(2).unwrap()
         }
     }else {
-        panic!("Variable {} not found in expression", variable_name);
+        Expr::from_num(0f64)
     }
 }
 
@@ -157,6 +158,6 @@ trait Hodge {
 }
 
 trait ExternalDerivative {
-    fn d(&self) -> Self;
+    fn d(&mut self) -> Self;
 }
 
