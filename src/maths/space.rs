@@ -1,72 +1,58 @@
-use exmex::{Calculate, Differentiate, ExError, ExResult, Express};
-use nalgebra::{Dim, Matrix, Matrix1, Matrix3, MatrixXx4, VecStorage};
-use crate::maths::{Expr, ExternalDerivative, COORD};
 use crate::maths::differential::Form;
-use crate::toolbox::logging::LOGGER;
+use crate::maths::{Expr, ExternalDerivative};
+use exmex::{Calculate, Express};
 
-pub type Metric = [[Expr;3];3];
+pub type Metric = [[Expr; 3]; 3];
 
 pub struct Space {
     dim: u32,
-    metric: Metric
+    metric: Metric,
 }
-fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
-    let mut out = a.clone()
-        .operate_binary(b.clone(), "+").unwrap()
-        .operate_binary(c.clone(), "+").unwrap();
+
+fn binary(lhs: &Expr, rhs: &Expr, op: &str) -> Expr {
+    let mut out = lhs.clone().operate_binary(rhs.clone(), op).unwrap();
     out.compile();
     out
 }
-impl Space {
 
+fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
+    let ab = binary(a, b, "+");
+    binary(&ab, c, "+")
+}
+
+fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Expr {
+    let p0 = binary(a0, b0, "*");
+    let p1 = binary(a1, b1, "*");
+    let p2 = binary(a2, b2, "*");
+    sum3(&p0, &p1, &p2)
+}
+
+impl Space {
     pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Space {
-        // For now, we only support 3D spaces with Euclidean metric
-        let two = Expr::from_num(2f64);
-        let x_form = Form::new(vec![x_eq], 0).d();
-        let y_form = Form::new(vec![y_eq], 0).d();
-        let z_form = Form::new(vec![z_eq], 0).d();
-        let x_exprs = x_form.square();
-        let y_exprs = y_form.square();
-        let z_exprs = z_form.square();
-        let need = 6usize;
+        // J columns: d(X,Y,Z)/d(x), d(X,Y,Z)/d(y), d(X,Y,Z)/d(z)
+        let d_x = Form::new(vec![x_eq], 0).d().exprs;
+        let d_y = Form::new(vec![y_eq], 0).d().exprs;
+        let d_z = Form::new(vec![z_eq], 0).d().exprs;
 
         assert!(
-            x_exprs.len() >= need && y_exprs.len() >= need && z_exprs.len() >= need,
-            "Form::square() must yield {need} terms (3D metric). got x={}, y={}, z={}",
-            x_exprs.len(),
-            y_exprs.len(),
-            z_exprs.len()
+            d_x.len() == 3 && d_y.len() == 3 && d_z.len() == 3,
+            "Expected 3 derivatives per coordinate expression; got X={}, Y={}, Z={}",
+            d_x.len(),
+            d_y.len(),
+            d_z.len()
         );
 
-        let at = |i: usize| -> Expr {
-            let x = x_exprs.get(i).unwrap_or_else(|| panic!("x_exprs[{i}] (len={})", x_exprs.len()));
-            let y = y_exprs.get(i).unwrap_or_else(|| panic!("y_exprs[{i}] (len={})", y_exprs.len()));
-            let z = z_exprs.get(i).unwrap_or_else(|| panic!("z_exprs[{i}] (len={})", z_exprs.len()));
-            sum3(x, y, z)
-        };
+        let g_xx = dot3(&d_x[0], &d_y[0], &d_z[0], &d_x[0], &d_y[0], &d_z[0]);
+        let g_xy = dot3(&d_x[0], &d_y[0], &d_z[0], &d_x[1], &d_y[1], &d_z[1]);
+        let g_xz = dot3(&d_x[0], &d_y[0], &d_z[0], &d_x[2], &d_y[2], &d_z[2]);
+        let g_yy = dot3(&d_x[1], &d_y[1], &d_z[1], &d_x[1], &d_y[1], &d_z[1]);
+        let g_yz = dot3(&d_x[1], &d_y[1], &d_z[1], &d_x[2], &d_y[2], &d_z[2]);
+        let g_zz = dot3(&d_x[2], &d_y[2], &d_z[2], &d_x[2], &d_y[2], &d_z[2]);
 
-        let dxdx = at(0);
-        let dxdy = at(1);
-        let dxdz = at(2);
-        let dydy = at(3);
-        let dydz = at(4);
-        let dzdz = at(5);
-
-        // let dxdx = x_exprs[0].clone().operate_binary(y_exprs[0].clone(), "+").unwrap().operate_binary(z_exprs[0].clone(), "+").unwrap();
-        // let dxdy = x_exprs[1].clone().operate_binary(y_exprs[1].clone(), "+").unwrap().operate_binary(z_exprs[1].clone(), "+").unwrap();
-        // let dxdz = x_exprs[2].clone().operate_binary(y_exprs[2].clone(), "+").unwrap().operate_binary(z_exprs[2].clone(), "+").unwrap();
-
-        // let dydy = x_exprs[3].clone().operate_binary(y_exprs[3].clone(), "+").unwrap().operate_binary(z_exprs[3].clone(), "+").unwrap();
-        // let dydz = x_exprs[4].clone().operate_binary(y_exprs[4].clone(), "+").unwrap().operate_binary(z_exprs[4].clone(), "+").unwrap();
-        // let dzdz = x_exprs[5].clone().operate_binary(y_exprs[5].clone(), "+").unwrap().operate_binary(z_exprs[5].clone(), "+").unwrap();
-        let dxdy_c = dxdy.clone();
-
-        let dxdz_c = dxdz.clone();
-        let dydz_c = dydz.clone();
         let metric: Metric = [
-            [dxdx, dxdy_c, dxdz_c],
-            [dxdy, dydy, dydz_c],
-            [dxdz, dydz, dzdz],
+            [g_xx, g_xy.clone(), g_xz.clone()],
+            [g_xy, g_yy, g_yz.clone()],
+            [g_xz, g_yz, g_zz],
         ];
 
         Space { dim: 3, metric }
