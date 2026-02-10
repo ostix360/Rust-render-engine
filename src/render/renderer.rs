@@ -24,7 +24,7 @@ impl Renderer {
         shader.bind();
         shader.load_projection_matrix(projection);
         shader.unbind();
-        Renderer{
+        Renderer {
             shader,
             point_vao,
             time: 0.0,
@@ -39,9 +39,15 @@ impl Renderer {
             vao.binds(&[0, 1, 2]);
             if let Some(models) = models.get(vao) {
                 for model in models {
-                    self.shader.load_transformation_matrix(model.get_transformation_matrix(0.));
+                    self.shader
+                        .load_transformation_matrix(model.get_transformation_matrix(0.));
                     unsafe {
-                        DrawElements(TRIANGLES, vao.get_vertex_count() as GLsizei, UNSIGNED_INT, 0 as *const _);
+                        DrawElements(
+                            TRIANGLES,
+                            vao.get_vertex_count() as GLsizei,
+                            UNSIGNED_INT,
+                            0 as *const _,
+                        );
                     }
                 }
             }
@@ -49,17 +55,21 @@ impl Renderer {
         }
         self.finish();
     }
-    
-    pub fn draw_point(&mut self, points: Vec<Sphere>, cam: &Camera) {
+
+    pub fn draw_point(&self, point: &Sphere, cam: &Camera) {
         self.prepare(cam);
 
         self.point_vao.binds(&[0]);
-        for point in points.iter() {
-            self.shader.load_transformation_matrix(point.get_transformation_matrix());
-            self.shader.load_color(point.get_color());
-            unsafe {
-                DrawElements(TRIANGLES, self.point_vao.get_vertex_count() as GLsizei, UNSIGNED_INT, 0 as *const _);
-            }
+        self.shader
+            .load_transformation_matrix(point.get_transformation_matrix());
+        self.shader.load_color(point.get_color());
+        unsafe {
+            DrawElements(
+                TRIANGLES,
+                self.point_vao.get_vertex_count() as GLsizei,
+                UNSIGNED_INT,
+                0 as *const _,
+            );
         }
         self.point_vao.unbinds(&[0]);
         self.finish();
@@ -69,7 +79,6 @@ impl Renderer {
         self.shader.bind();
         self.shader.load_view_matrix(cam.get_view_matrix());
     }
-    
 
     fn finish(&self) {
         self.shader.unbind();

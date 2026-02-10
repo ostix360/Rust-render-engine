@@ -40,7 +40,7 @@ pub struct GridUiState {
     pub bounds_x: (f64, f64),
     pub bounds_y: (f64,  f64),
     pub bounds_z: (f64, f64),
-    pub apply_counter: usize,
+    pub apply_counter: u64,
 }
 
 impl GridUiState {
