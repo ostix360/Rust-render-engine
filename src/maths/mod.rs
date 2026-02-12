@@ -19,6 +19,7 @@ use crate::maths::space::Metric;
 
 pub mod differential;
 pub mod space;
+mod field;
 
 pub type Expr = FlatEx<f64, FloatOpsFactory<f64>>;
 pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
@@ -154,7 +155,7 @@ pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
 }
 
 trait Hodge {
-    fn hodge_star(&self, metric: Metric) -> Self;
+    fn hodge_star(&self, metric: &Metric) -> Self;
 }
 
 trait ExternalDerivative {

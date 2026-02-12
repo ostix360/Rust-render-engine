@@ -40,7 +40,7 @@ impl Form {
 }
 
 impl Hodge for Form {
-    fn hodge_star(&self, metric: Metric) -> Form {
+    fn hodge_star(&self, metric: &Metric) -> Form {
         todo!()
     }
 }

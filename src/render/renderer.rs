@@ -13,7 +13,7 @@ use std::ops::AddAssign;
 
 pub struct Renderer {
     shader: ClassicShader,
-    point_vao: VAO,
+    pub sphere_vao: VAO,
     time: f64,
 }
 
@@ -26,7 +26,7 @@ impl Renderer {
         shader.unbind();
         Renderer {
             shader,
-            point_vao,
+            sphere_vao: point_vao,
             time: 0.0,
         }
     }
@@ -59,19 +59,19 @@ impl Renderer {
     pub fn draw_point(&self, point: &Sphere, cam: &Camera) {
         self.prepare(cam);
 
-        self.point_vao.binds(&[0]);
+        self.sphere_vao.binds(&[0]);
         self.shader
             .load_transformation_matrix(point.get_transformation_matrix());
         self.shader.load_color(point.get_color());
         unsafe {
             DrawElements(
                 TRIANGLES,
-                self.point_vao.get_vertex_count() as GLsizei,
+                self.sphere_vao.get_vertex_count() as GLsizei,
                 UNSIGNED_INT,
                 0 as *const _,
             );
         }
-        self.point_vao.unbinds(&[0]);
+        self.sphere_vao.unbinds(&[0]);
         self.finish();
     }
 

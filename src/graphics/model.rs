@@ -68,3 +68,26 @@ impl Sphere {
     }
 }
 
+pub struct Arrow {
+    pub position: Vector3<f64>,
+    pub direction: Vector3<f64>,
+    pub length: f64,
+    pub color: Color,
+}
+
+impl Arrow {
+    pub fn new(position: Vector3<f64>, direction: Vector3<f64>, length: f64, color: Color) -> Self {
+        Self { position, direction, length, color }
+    }
+    
+    pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
+        let translation = Translation3::from(self.position);
+        let direction = Translation3::from(self.direction * self.length);
+        translation.to_homogeneous() * direction.to_homogeneous()
+    }
+    
+    pub fn get_color(&self) -> Vector4<f64> {
+        self.color.to_vector4()
+    }
+}
+
