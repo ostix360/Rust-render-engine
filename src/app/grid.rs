@@ -288,14 +288,7 @@ impl Grid {
 
         let (cu, segment_dir) = match coord_index {
             0 => (curvature.0, SegmentDir::X),
-            1 => {
-                // Specific for polar coordinates.
-                if mid.x != 0.0 {
-                    (curvature.1, SegmentDir::Y)
-                } else {
-                    (curvature.1, SegmentDir::Y)
-                }
-            }
+            1 => (curvature.1, SegmentDir::Y),
             2 => (curvature.2, SegmentDir::Z),
             _ => (0.0, SegmentDir::X),
         };
