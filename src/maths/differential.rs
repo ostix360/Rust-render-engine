@@ -1,8 +1,6 @@
 #![allow(unused)]
 
 use std::ops::{Add, Mul, Sub};
-use exmex::{parse, FloatOpsFactory};
-use exmex::prelude::*;
 use mathhook::prelude::expr;
 use crate::maths::{derivate, Expr, ExternalDerivative, Hodge};
 use crate::maths::space::Metric;

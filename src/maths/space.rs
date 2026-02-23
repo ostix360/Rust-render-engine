@@ -1,7 +1,6 @@
 use std::ops::{Add, Mul};
 use crate::maths::differential::Form;
 use crate::maths::{Expr, ExternalDerivative};
-use exmex::{Calculate, Express};
 use mathhook_core::Simplify;
 
 pub type Metric = [[Expr; 3]; 3];

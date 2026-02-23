@@ -4,7 +4,6 @@ use eframe::egui::{self, Color32, RichText, Stroke};
 use eframe::epaint::{CornerRadius, Margin};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use exmex::{parse, Express};
 use mathhook_core::Parser;
 use winit::event_loop::EventLoop;
 use winit::platform::x11::EventLoopBuilderExtX11;

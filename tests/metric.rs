@@ -1,5 +1,5 @@
 // tests/metric.rs
-use mathhook_core::{expr, Parser};
+use mathhook_core::Parser;
 use nalgebra::Matrix3;
 use render_engine::maths::space::{Metric, Space};
 use render_engine::maths::{num, Expr};

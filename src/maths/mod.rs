@@ -5,18 +5,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use egui::TextBuffer;
-use exmex::{Calculate, Differentiate, Express, FlatEx, FloatOpsFactory};
 use lazy_static::lazy_static;
 use mathhook::Expression;
 use mathhook::prelude::Simplify;
 use mathhook_core::{Derivative, EvalContext, Symbol};
 use once_cell::sync::Lazy;
 use nalgebra::Vector3;
-use symbolica::atom::{Atom, AtomCore};
-use symbolica::evaluate::{FunctionMap, OptimizationSettings};
-use symbolica::numerical_integration::{ContinuousGrid, MonteCarloRng, Sample};
-use symbolica::{parse, symbol};
-use symbolica::printer::PrintOptions;
 use typed_floats::NonNaN;
 use crate::maths::space::Metric;
 

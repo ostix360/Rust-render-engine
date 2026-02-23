@@ -1,9 +1,7 @@
-use mathhook::Symbol;
 use crate::maths::{expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d};
-use exmex::{Calculate, ExResult};
 use integrate::prelude::trapezoidal_rule;
 use mathhook::prelude::*;
-use mathhook::Number;
+use mathhook::Symbol;
 use nalgebra::Vector3;
 use std::ops::{Add, Deref};
 
@@ -21,7 +19,7 @@ pub struct CoordsSys {
 
 impl CoordsSys {
     pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Self {
-        let (x_curvature, y_curvature, z_curvature) = Self::calculate_curvature(&x_eq, &y_eq, &z_eq).unwrap();
+        let (x_curvature, y_curvature, z_curvature) = Self::calculate_curvature(&x_eq, &y_eq, &z_eq);
         let fast_x_eq = expr_to_fastexpr3d(x_eq.clone());
         let fast_y_eq = expr_to_fastexpr3d(y_eq.clone());
         let fast_z_eq = expr_to_fastexpr3d(z_eq.clone());
@@ -33,7 +31,7 @@ impl CoordsSys {
     }
 
     #[inline]
-    fn calculate_curvature(x_eq: &Expr, y_eq: &Expr, z_eq: &Expr) -> ExResult<(FastExpr2dto1d, FastExpr2dto1d, FastExpr2dto1d)>{
+    fn calculate_curvature(x_eq: &Expr, y_eq: &Expr, z_eq: &Expr) -> (FastExpr2dto1d, FastExpr2dto1d, FastExpr2dto1d){
         let mut curvature = Vec::new();
         let x = Symbol::new("x");
         let y = Symbol::new("y");
@@ -47,7 +45,7 @@ impl CoordsSys {
             curvature.push(ddx);
         }
         let [a, b, c] = curvature.try_into().expect("COORD must have 3 elements");
-        Ok((expr_to_fastexpr2dto1d(a, "x".to_string()), expr_to_fastexpr2dto1d(b, "y".to_string()), expr_to_fastexpr2dto1d(c, "z".to_string())))
+        (expr_to_fastexpr2dto1d(a, "x".to_string()), expr_to_fastexpr2dto1d(b, "y".to_string()), expr_to_fastexpr2dto1d(c, "z".to_string()))
     }
 
     pub fn get_curvature(&self, point: Vector3<f64>, len: f64) -> (f64, f64, f64) {

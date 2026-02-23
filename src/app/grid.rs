@@ -3,7 +3,6 @@ use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::vao::VAO;
 use crate::Vertex;
 
-use exmex::NeutralElts;
 use nalgebra::{Matrix4, Rotation3, Translation3, Unit, Vector3};
 use ndarray::Array;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -44,7 +43,7 @@ impl Edge {
         for i in 0..nb_vertices {
             let t = i as f64 / (nb_vertices - 1) as f64;
             let x = NonNaN::<f64>::new(t).unwrap();
-            edge.add_vertex(Vector3::new(x, NonNaN::zero(), NonNaN::zero()));
+            edge.add_vertex(Vector3::new(x, NonNaN::default(), NonNaN::default()));
         }
 
         Ok(edge)
