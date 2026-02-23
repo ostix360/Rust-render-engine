@@ -5,6 +5,7 @@ use eframe::epaint::{CornerRadius, Margin};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use exmex::{parse, Express};
+use mathhook_core::Parser;
 use winit::event_loop::EventLoop;
 use winit::platform::x11::EventLoopBuilderExtX11;
 use crate::app::grid::GridConfig;
@@ -346,11 +347,11 @@ fn check_eq_validity(eq: &String) -> Result<Expr, String> {
     if eq.is_empty() {
         return Err("Equation cannot be empty".to_string());
     }
-    let formal_eq = parse::<f64>(eq).map_err(|e| format!("Invalid equation: {}", e))?;
-    let vars = formal_eq.var_names();
+    let formal_eq = Parser::default().parse(eq).map_err(|e| format!("Invalid equation: {}", e))?;
+    let vars = formal_eq.find_variables();
     for var in vars.iter() {
-        if var != "x" && var != "y" && var != "z" {
-            return Err(format!("Invalid variable '{}' in equation. Only 'x', 'y', and 'z' are allowed.", var));
+        if var.name() != "x" && var.name() != "y" && var.name() != "z" {
+            return Err(format!("Invalid variable '{}' in equation. Only 'x', 'y', and 'z' are allowed.", var.name()));
         }
     }
     Ok(formal_eq)

@@ -1,6 +1,8 @@
+use std::ops::{Add, Mul};
 use crate::maths::differential::Form;
 use crate::maths::{Expr, ExternalDerivative};
 use exmex::{Calculate, Express};
+use mathhook_core::Simplify;
 
 pub type Metric = [[Expr; 3]; 3];
 
@@ -9,22 +11,17 @@ pub struct Space {
     metric: Metric,
 }
 
-fn binary(lhs: &Expr, rhs: &Expr, op: &str) -> Expr {
-    let mut out = lhs.clone().operate_binary(rhs.clone(), op).unwrap();
-    out.compile();
-    out
-}
 
 fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
-    let ab = binary(a, b, "+");
-    binary(&ab, c, "+")
+    a.add(b).add(c).simplify()
 }
 
 fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Expr {
-    let p0 = binary(a0, b0, "*");
-    let p1 = binary(a1, b1, "*");
-    let p2 = binary(a2, b2, "*");
-    sum3(&p0, &p1, &p2)
+    sum3(
+        &(a0.clone().mul(b0.clone())),
+        &(a1.clone().mul(b1.clone())),
+        &(a2.clone().mul(b2.clone())),
+    )
 }
 
 impl Space {

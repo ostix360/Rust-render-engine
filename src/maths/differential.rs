@@ -1,7 +1,9 @@
 #![allow(unused)]
 
+use std::ops::{Add, Mul, Sub};
 use exmex::{parse, FloatOpsFactory};
 use exmex::prelude::*;
+use mathhook::prelude::expr;
 use crate::maths::{derivate, Expr, ExternalDerivative, Hodge};
 use crate::maths::space::Metric;
 use crate::toolbox::logging::LOGGER;
@@ -28,13 +30,13 @@ impl Form {
             panic!("Square only works for 1-form")
         }
         let mut out = Vec::with_capacity(6);
-        let two = Expr::from_num(2f64);
-        out.push(self.exprs[0].clone().operate_binary(two.clone(), "^").unwrap());
-        out.push(self.exprs[0].clone().operate_binary(self.exprs[1].clone(), "*").unwrap().operate_binary(two.clone(), "*").unwrap());
-        out.push(self.exprs[0].clone().operate_binary(self.exprs[2].clone(), "*").unwrap().operate_binary(two.clone(), "*").unwrap());
-        out.push(self.exprs[1].clone().operate_binary(two.clone(), "^").unwrap());
-        out.push(self.exprs[1].clone().operate_binary(self.exprs[2].clone(), "*").unwrap().operate_binary(two.clone(), "*").unwrap());
-        out.push(self.exprs[2].clone().operate_binary(two.clone(), "^").unwrap());
+        let two = expr!(2.0);
+        out.push(Expr::pow(self.exprs[0].clone(), two.clone()));
+        out.push(self.exprs[0].clone().mul(self.exprs[1].clone()).mul(two.clone()));
+        out.push(self.exprs[0].clone().mul(self.exprs[2].clone()).mul(two.clone()));
+        out.push(Expr::pow(self.exprs[1].clone(), two.clone()));
+        out.push(self.exprs[1].clone().mul(self.exprs[2].clone()).mul(two.clone()));
+        out.push(Expr::pow(self.exprs[2].clone(), two.clone()));
         out
     }
 }
@@ -53,21 +55,21 @@ impl ExternalDerivative for Form {
             let dz = derivate(self.exprs[0].clone(), &"z".to_string());
             Form::new(vec![dx, dy, dz], 1)
         }else if self.n_forms == 1 {
-            let dx_dy = derivate(self.exprs[1].clone(), &"x".to_string()).operate_binary(
-                derivate(self.exprs[0].clone(), &"y".to_string()), "-", ).unwrap();
-            let dy_dz = derivate(self.exprs[2].clone(), &"y".to_string()).operate_binary(
-                derivate(self.exprs[1].clone(), &"z".to_string()), "-", ).unwrap();
-            let dz_dx = derivate(self.exprs[0].clone(), &"z".to_string()).operate_binary(
-                derivate(self.exprs[2].clone(), &"x".to_string()), "-", ).unwrap();
+            let dx_dy = derivate(self.exprs[1].clone(), &"x".to_string()).sub(
+                derivate(self.exprs[0].clone(), &"y".to_string()));
+            let dy_dz = derivate(self.exprs[2].clone(), &"y".to_string()).sub(
+                derivate(self.exprs[1].clone(), &"z".to_string()));
+            let dz_dx = derivate(self.exprs[0].clone(), &"z".to_string()).sub(
+                derivate(self.exprs[2].clone(), &"x".to_string()));
             Form::new(vec![dx_dy, dy_dz, dz_dx], 2)
         }else if self.n_forms == 2 {
             let dz = derivate(self.exprs[0].clone(), &"z".to_string());
             let dx = derivate(self.exprs[1].clone(), &"x".to_string());
             let dy = derivate(self.exprs[2].clone(), &"y".to_string());
-            let dx_dy_dz = dx.operate_binary(dy.operate_binary(dz, "+").unwrap(), "+").unwrap();
+            let dx_dy_dz = dx.add(dy).add(dz);
             Form::new(vec![dx_dy_dz], 3)
         }else if self.n_forms == 3 {
-            Form::new(vec![parse("0").unwrap()], 0) // zero form
+            Form::new(vec![Expr::number(0.)], 0) // zero form
         }else {
             panic!("Unknown number of forms {}", self.n_forms)
         }

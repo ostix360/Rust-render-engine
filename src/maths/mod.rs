@@ -7,10 +7,13 @@ use std::sync::{Arc, Mutex};
 use egui::TextBuffer;
 use exmex::{Calculate, Differentiate, Express, FlatEx, FloatOpsFactory};
 use lazy_static::lazy_static;
+use mathhook::Expression;
+use mathhook::prelude::Simplify;
+use mathhook_core::{Derivative, EvalContext, Symbol};
 use once_cell::sync::Lazy;
 use nalgebra::Vector3;
 use symbolica::atom::{Atom, AtomCore};
-use symbolica::evaluate::{Expression, FunctionMap, OptimizationSettings};
+use symbolica::evaluate::{FunctionMap, OptimizationSettings};
 use symbolica::numerical_integration::{ContinuousGrid, MonteCarloRng, Sample};
 use symbolica::{parse, symbol};
 use symbolica::printer::PrintOptions;
@@ -21,13 +24,17 @@ pub mod differential;
 pub mod space;
 mod field;
 
-pub type Expr = FlatEx<f64, FloatOpsFactory<f64>>;
+pub type Expr = Expression;
 pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
 
 pub type FastExpr2dto1d = Arc<dyn Fn(f64, f64) -> FastExpr1d>;
 pub type FastExpr3d = Arc<dyn Fn(f64, f64, f64) -> f64 + Sync>;
 
 pub const COORD: [&str; 3] = ["x", "y", "z"];
+
+pub fn num(value: f64) -> Expression {
+    Expression::from(value)
+}
 
 // pub fn integrate1d(f: &FastExpr, interval: (f64, f64)) -> f64 {
 //     let (a, b) = interval;
@@ -64,86 +71,73 @@ pub const COORD: [&str; 3] = ["x", "y", "z"];
 // }
 
 pub fn expr_to_fastexpr1d(mut expr: Expr) -> FastExpr1d {
-    expr.compile();
+    let eval_expr = expr.simplify();
+    if eval_expr.find_variables().len() > 1 {
+        panic!("Cannot convert expression to fastexpr1d: too many variables");
+    }
+    let var_name = eval_expr.find_variables()[0].clone();
 
     let eval = move |x:f64| -> f64{
-        expr.eval_relaxed(&[x]).unwrap()
+        let mut vars = HashMap::new();
+        vars.insert(var_name.name().to_string(), num(x));
+        eval_expr.substitute(&vars).evaluate_to_f64().unwrap()
     };
     Arc::new(eval)
 }
 
 #[inline]
 pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1d {
-    expr.compile();
-    let expr = Arc::new(expr);
+    let eval_expr = expr.simplify();
+    let eval_expr = Arc::new(eval_expr);
     #[inline]
-    fn select_arg(name: &str, target: &str, value: f64, first: f64, second: f64) -> f64 {
-        match (name, target) {
-            ("x", "x") => value,
-            ("y", "x") => first,
-            ("z", "x") => second,
-            ("x", "y") => first,
-            ("y", "y") => value,
-            ("z", "y") => second,
-            ("x", "z") => first,
-            ("y", "z") => second,
-            ("z", "z") => value,
-            _ => panic!("Unknown variable {} while fixing {}", name, target),
+    fn select_arg(target: &str, value: Expression, first: Expression, second: Expression) -> HashMap<String, Expression> {
+        let mut map = HashMap::new();
+        match (target) {
+            "x" => {
+                map.insert("x".to_string(), value);
+                map.insert("y".to_string(), first);
+                map.insert("z".to_string(), second);
+            },
+            "y" => {
+                map.insert("x".to_string(), first);
+                map.insert("y".to_string(), value);
+                map.insert("z".to_string(), second);
+            },
+            "z" => {
+                map.insert("x".to_string(), first);
+                map.insert("y".to_string(), second);
+                map.insert("z".to_string(), value);
+            },
+            _ => panic!("Unknown target {}", target),
         }
-    }
+        map
+    };
     let func = move |x_: f64, y_: f64| -> FastExpr1d {
-        let expr = expr.clone();
-        let target_name = var_name.clone();
-
-        let eval = move |value: f64| -> f64 {
-            let names = expr.var_names();
-            let args = names
-                .iter()
-                .map(|name| select_arg(name, target_name.as_str(), value, x_, y_))
-                .collect::<Vec<_>>();
-            expr.eval_relaxed(&args).unwrap()
+        let eval_expr = eval_expr.clone();
+        let name = var_name.clone();
+        let expr1d_func = move |z_: f64| -> f64 {
+            let vars = select_arg(&name, num(z_), num(x_), num(y_));
+            eval_expr.substitute_and_simplify(&vars).evaluate_to_f64().unwrap()
         };
-        Arc::new(eval)
+        Arc::new(expr1d_func)
     };
     Arc::new(func)
 }
 
 pub fn expr_to_fastexpr3d(mut expr: Expr) -> FastExpr3d {
-    expr.compile();
+    let eval_expr = expr.simplify();
     let eval = move |x:f64, y:f64, z:f64| -> f64{
-        let vars = expr.var_names()
-            .iter().map(|name| match name.as_str() {
-                "x" => x,
-                "y" => y,
-                "z" => z,
-                _ => panic!("Unknown variable name {}", name),
-        }).collect::<Vec<_>>();
-        expr.eval_relaxed(&vars).unwrap()
+        let mut vars = HashMap::new();
+        vars.insert("x".to_string(), num(x));
+        vars.insert("y".to_string(), num(y));
+        vars.insert("z".to_string(), num(z));
+        expr.substitute(&vars).evaluate_to_f64().unwrap()
     };
     Arc::new(eval)
 }
 
 pub fn derivate(expr: Expr, variable_name: &String) -> Expr {
-    if variable_name == "x" && expr.var_names().contains(variable_name) {
-        let mut out = expr.clone().partial(0).unwrap();
-        out
-    }else if variable_name == "y" && expr.var_names().contains(variable_name) {
-        if !expr.var_names().contains(&"x".to_string()) {
-            expr.partial(0).unwrap()
-        } else {
-            expr.partial(1).unwrap()
-        }
-    }else if variable_name == "z" && expr.var_names().contains(variable_name) {
-        if !expr.var_names().contains(&"x".to_string()) && !expr.var_names().contains(&"y".to_string()) {
-            expr.partial(0).unwrap()
-        } else if !expr.var_names().contains(&"x".to_string()) || !expr.var_names().contains(&"y".to_string()) {
-            expr.partial(1).unwrap()
-        } else {
-            expr.partial(2).unwrap()
-        }
-    }else {
-        Expr::from_num(0f64)
-    }
+    expr.derivative(Symbol::new(variable_name)).simplify()
 }
 
 pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {

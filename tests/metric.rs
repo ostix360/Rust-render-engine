@@ -1,21 +1,16 @@
 // tests/metric.rs
-use exmex::{parse, Express};
+use mathhook_core::{expr, Parser};
 use nalgebra::Matrix3;
 use render_engine::maths::space::{Metric, Space};
-use render_engine::maths::Expr;
+use render_engine::maths::{num, Expr};
+use std::collections::HashMap;
 
 fn eval_expr_at_xyz(expr: &Expr, x: f64, y: f64, z: f64) -> f64 {
-    let args = expr
-        .var_names()
-        .iter()
-        .map(|name| match name.as_str() {
-            "x" => x,
-            "y" => y,
-            "z" => z,
-            unknown => panic!("unexpected variable in metric expression: {unknown}"),
-        })
-        .collect::<Vec<_>>();
-    expr.eval_relaxed(&args).unwrap()
+    let mut vars = HashMap::new();
+    vars.insert("x".to_string(), num(x));
+    vars.insert("y".to_string(), num(y));
+    vars.insert("z".to_string(), num(z));
+    expr.substitute(&vars).evaluate_to_f64().unwrap()
 }
 
 fn eval_metric_at_xyz(m: &Metric, x: f64, y: f64, z: f64) -> Matrix3<f64> {
@@ -51,9 +46,9 @@ fn metric_algebra_matches_known_linear_transform() {
     // g = [1 2 0;
     //      2 13 -3;
     //      0 -3 17]
-    let x_eq = parse("x").unwrap();
-    let y_eq = parse("y").unwrap();
-    let z_eq = parse("z").unwrap();
+    let x_eq = Parser::default().parse("x").unwrap();
+    let y_eq = Parser::default().parse("y").unwrap();
+    let z_eq = Parser::default().parse("z").unwrap();
 
     let space = Space::new(x_eq, y_eq, z_eq);
     // Evaluate at an arbitrary point (should be constant anyway for linear transform).

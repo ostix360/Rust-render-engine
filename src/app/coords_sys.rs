@@ -1,8 +1,11 @@
-use crate::maths::{expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d, COORD};
-use exmex::{Calculate, Differentiate, ExError, ExResult, Express};
+use mathhook::Symbol;
+use crate::maths::{expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d};
+use exmex::{Calculate, ExResult};
 use integrate::prelude::trapezoidal_rule;
+use mathhook::prelude::*;
+use mathhook::Number;
 use nalgebra::Vector3;
-use std::ops::Deref;
+use std::ops::{Add, Deref};
 
 pub struct CoordsSys {
     x_eq: Expr,
@@ -32,36 +35,15 @@ impl CoordsSys {
     #[inline]
     fn calculate_curvature(x_eq: &Expr, y_eq: &Expr, z_eq: &Expr) -> ExResult<(FastExpr2dto1d, FastExpr2dto1d, FastExpr2dto1d)>{
         let mut curvature = Vec::new();
-        let two = Expr::from_num(2f64);
-        for x_i in 0..3 {
-            let mk = |expr: &Expr| -> ExResult<Expr> {
-                let vars = expr.var_names();
-                match vars {
-                    [x] => {
-                        if x == COORD[x_i] {
-                            Ok(expr.clone().partial_nth(0, 2)?.operate_binary(two.clone(), "^")?)
-                        }else {
-                            Ok(Expr::from_num(0f64))
-                        }
-                    },
-                    [x, y] => {
-                        if x == COORD[x_i] {    // coord[1] = y => dy
-                            Ok(expr.clone().partial_nth(0, 2)?.operate_binary(two.clone(), "^")?)
-                        } else if y == COORD[x_i] {
-                            Ok(expr.clone().partial_nth(1, 2)?.operate_binary(two.clone(), "^")?)
-                        }else {
-                            Ok(Expr::from_num(0f64))
-                        }
-                    },
-                    [_, _, _] => Ok(expr.clone().partial_nth(x_i, 2)?.operate_binary(two.clone(), "^")?),
-                    _ => Err(ExError::new(""))
-                }
-            };
-            let ddx_1 = mk(&x_eq)?;
-            let ddx_2 = mk(&y_eq)?;
-            let ddx_3 = mk(&z_eq)?;
-            let ddx = ddx_1.operate_binary(ddx_2, "+")?.operate_binary(ddx_3, "+")?;
-            let ddx = ddx.operate_unary("sqrt")?;
+        let x = Symbol::new("x");
+        let y = Symbol::new("y");
+        let z = Symbol::new("z");
+        for x_i in [x, y, z] {
+            let ddx_1 = &Expression::pow(x_eq.nth_derivative(x_i.clone(), 2), expr!(2));
+            let ddx_2 = &Expression::pow(y_eq.nth_derivative(x_i.clone(), 2), expr!(2));
+            let ddx_3 = &Expression::pow(z_eq.nth_derivative(x_i, 2), expr!(2));
+            let ddx = ddx_1.add(ddx_2).add(ddx_3);
+            let ddx = Expression::sqrt(ddx);
             curvature.push(ddx);
         }
         let [a, b, c] = curvature.try_into().expect("COORD must have 3 elements");

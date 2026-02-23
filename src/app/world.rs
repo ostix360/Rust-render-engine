@@ -8,9 +8,9 @@ use crate::render::master_render::MasterRenderer;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::color::WHITE;
 use crate::toolbox::opengl::display_manager::DisplayManager;
-use exmex::parse;
 use nalgebra::{vector, Matrix4, Vector3};
 use std::sync::{Arc, Mutex};
+use mathhook::core::parse;
 
 pub struct World {
     fields: Vec<Form>,
@@ -40,9 +40,9 @@ impl World {
     }
 
     fn init(initial_state: GridUiState) -> (Grid, GridWorld) {
-        let x_eq = parse(&initial_state.eq_x).unwrap_or_else(|_| parse("x").unwrap());
-        let y_eq = parse(&initial_state.eq_y).unwrap_or_else(|_| parse("y").unwrap());
-        let z_eq = parse(&initial_state.eq_z).unwrap_or_else(|_| parse("z").unwrap());
+        let x_eq = parse!(&initial_state.eq_x).unwrap_or_else(|_| {parse!("x").unwrap()});
+        let y_eq = parse!(&initial_state.eq_y).unwrap_or_else(|_| {parse!("y").unwrap()});
+        let z_eq = parse!(&initial_state.eq_z).unwrap_or_else(|_| {parse!("z").unwrap()});
         let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
         let config = GridConfig::default();
         let mut grid = Grid::new(sys_coord);
