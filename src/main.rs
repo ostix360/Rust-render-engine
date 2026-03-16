@@ -1,6 +1,7 @@
 extern crate gl;
 extern crate glfw;
 extern crate meval;
+extern crate mathhook;
 // mod app;
 mod maths;
 mod render;
@@ -74,7 +75,7 @@ fn main() {
     let mut display_manager = display_manager::DisplayManager::new(WIDTH, HEIGHT, "Test Window");
 
     display_manager.create_display();
-    add_opengl_debug();
+    // add_opengl_debug();
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
     }

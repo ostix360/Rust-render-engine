@@ -8,7 +8,7 @@ use egui::TextBuffer;
 use lazy_static::lazy_static;
 use mathhook::Expression;
 use mathhook::prelude::Simplify;
-use mathhook_core::{Derivative, EvalContext, Symbol};
+use mathhook_core::{Derivative, Symbol};
 use once_cell::sync::Lazy;
 use nalgebra::Vector3;
 use typed_floats::NonNaN;

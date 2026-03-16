@@ -4,6 +4,8 @@ use mathhook::prelude::*;
 use mathhook::Symbol;
 use nalgebra::Vector3;
 use std::ops::{Add, Deref};
+use crate::maths::space::Space;
+use crate::toolbox::maths::print_matrix;
 
 pub struct CoordsSys {
     x_eq: Expr,
@@ -23,6 +25,8 @@ impl CoordsSys {
         let fast_x_eq = expr_to_fastexpr3d(x_eq.clone());
         let fast_y_eq = expr_to_fastexpr3d(y_eq.clone());
         let fast_z_eq = expr_to_fastexpr3d(z_eq.clone());
+        let space = Space::new(x_eq.clone(), y_eq.clone(), z_eq.clone());
+        print_matrix(space.get_metric());
         Self {
             x_eq,
             y_eq,

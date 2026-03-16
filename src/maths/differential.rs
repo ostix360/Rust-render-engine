@@ -22,17 +22,17 @@ impl Form {
     }
 
     /// This square function has a sense only for a 1-form and calculates the square of the 1 form treated like a simple expression
-    /// Return a vec of expr containing is this order dx^2 dxdy dxdz dy^2 dydz dz^2
+    /// Return a vec of expr containing is this order dx^2 dxdy dy^2 dxdz dydz dz^2
     pub fn square(&self) -> Vec<Expr> {
         if self.n_forms != 1 {
             panic!("Square only works for 1-form")
         }
         let mut out = Vec::with_capacity(6);
-        let two = expr!(2.0);
+        let two = expr!(2);
         out.push(Expr::pow(self.exprs[0].clone(), two.clone()));
         out.push(self.exprs[0].clone().mul(self.exprs[1].clone()).mul(two.clone()));
-        out.push(self.exprs[0].clone().mul(self.exprs[2].clone()).mul(two.clone()));
         out.push(Expr::pow(self.exprs[1].clone(), two.clone()));
+        out.push(self.exprs[0].clone().mul(self.exprs[2].clone()).mul(two.clone()));
         out.push(self.exprs[1].clone().mul(self.exprs[2].clone()).mul(two.clone()));
         out.push(Expr::pow(self.exprs[2].clone(), two.clone()));
         out

@@ -75,10 +75,10 @@ impl World {
             .grid_world
             .ray_cast(&mouse_info.0, &mouse_info.1, 0.45, 200.);
         if let Some(point) = nearest_point {
-            println!(
-                "Nearest point at: x: {}, y: {}, z: {}",
-                point.0, point.1, point.2
-            );
+            // println!(
+            //     "Nearest point at: x: {}, y: {}, z: {}",
+            //     point.0, point.1, point.2
+            // );
             self.sphere = Some(Sphere::new(vector![point.0, point.1, point.2], WHITE, 0.1));
         } else {
             self.sphere = None;

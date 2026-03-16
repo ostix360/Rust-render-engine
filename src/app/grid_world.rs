@@ -48,7 +48,7 @@ impl GridWorld {
     fn find_nearest(pos: &Vector3<f64>, points: &Vec<&[f64; 3]>) -> (f64, f64, f64) {
         let dist = f64::MAX;
         let mut coord = points[0];
-        println!("Number of points found: {}", points.len());
+        // println!("Number of points found: {}", points.len());
         for point in points {
             let d = (pos - Vector3::new(point[0], point[1], point[2])).norm();
             if d < dist {
