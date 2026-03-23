@@ -17,6 +17,7 @@ pub struct CoordsSys {
     x_curvature: FastExpr2dto1d,
     y_curvature: FastExpr2dto1d,
     z_curvature: FastExpr2dto1d,
+    space: Space,
 }
 
 impl CoordsSys {
@@ -26,12 +27,12 @@ impl CoordsSys {
         let fast_y_eq = expr_to_fastexpr3d(y_eq.clone());
         let fast_z_eq = expr_to_fastexpr3d(z_eq.clone());
         let space = Space::new(x_eq.clone(), y_eq.clone(), z_eq.clone());
-        print_matrix(space.get_metric());
+        // print_matrix(space.get_metric());
         Self {
             x_eq,
             y_eq,
             z_eq,
-            fast_x_eq, fast_y_eq, fast_z_eq, x_curvature, y_curvature, z_curvature }
+            fast_x_eq, fast_y_eq, fast_z_eq, x_curvature, y_curvature, z_curvature, space }
     }
 
     #[inline]
@@ -73,5 +74,9 @@ impl CoordsSys {
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {
         println!("{:?}", self.x_eq.to_string());
         eqs[0] == self.x_eq.to_string() && eqs[1] == self.y_eq.to_string() && eqs[2] == self.z_eq.to_string()
+    }
+
+    pub fn get_space(&self) -> &Space {
+        &self.space
     }
 }

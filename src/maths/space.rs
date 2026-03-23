@@ -6,13 +6,16 @@ use crate::maths::{Expr, ExternalDerivative};
 use mathhook_core::{expr, Expression, Simplify};
 use mathhook_core::core::expression::smart_display::SmartDisplayFormatter;
 use mathhook_core::MathLanguage::{LaTeX, Simple};
-use mathhook_core::matrices::Matrix;
+use mathhook_core::matrices::{Matrix, MatrixOperations};
+use crate::toolbox::maths::print_matrix;
 
 pub type Metric = Matrix;
 
 pub struct Space {
     dim: u32,
     metric: Metric,
+    vielbein: Expr,
+    vielbein_inv: Expr,
 }
 
 
@@ -73,10 +76,39 @@ impl Space {
         // print_dx(&d_y);
         // print_dx(&d_z);
 
-        Space { dim: 3, metric }
+        // basically the sqrt of g
+        match vielbein.simplify() {
+            Expression::Matrix(m) => {
+                print_matrix(&m);
+            }
+            _ => {}
+        };
+
+        Space {
+            dim: 3,
+            metric,
+            vielbein: vielbein.clone(),
+            vielbein_inv: vielbein.inverse()
+        }
+    }
+
+    pub fn natural_to_otn(&self) -> Matrix {
+        let expr111 = Expression::matrix(vec![vec![expr!(1), expr!(1), expr!(1)]]);
+        let otn_factor = &expr111.matrix_multiply(&self.vielbein_inv);
+        otn_factor.as_matrix().unwrap()
+    }
+
+    pub fn otn_to_natural(&self) -> Matrix {
+        let expr111 = Expression::matrix(vec![vec![expr!(1), expr!(1), expr!(1)]]);
+        let otn_factor = &expr111.matrix_multiply(&self.vielbein);
+        otn_factor.as_matrix().unwrap()
     }
 
     pub fn get_metric(&self) -> &Metric {
         &self.metric
+    }
+
+    pub fn get_vielbein(&self) -> &Expr {
+        &self.vielbein
     }
 }

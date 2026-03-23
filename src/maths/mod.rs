@@ -16,7 +16,7 @@ use crate::maths::space::Metric;
 
 pub mod differential;
 pub mod space;
-mod field;
+pub mod field;
 
 pub type Expr = Expression;
 pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
@@ -25,6 +25,12 @@ pub type FastExpr2dto1d = Arc<dyn Fn(f64, f64) -> FastExpr1d>;
 pub type FastExpr3d = Arc<dyn Fn(f64, f64, f64) -> f64 + Sync>;
 
 pub const COORD: [&str; 3] = ["x", "y", "z"];
+
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
 
 pub fn num(value: f64) -> Expression {
     Expression::from(value)

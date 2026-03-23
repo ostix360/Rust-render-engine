@@ -31,7 +31,7 @@ impl GridRenderer {
             for value in values {
                 let transform = value.0;
                 self.shader.load_transformation_matrix(transform);
-                self.shader.load_color(value.1);
+                self.shader.load_color_from_dir(value.1);
                 unsafe {
                     gl::DrawElements(gl::LINES, (key.get_vao().unwrap().get_vertex_count()-1) as GLsizei, gl::UNSIGNED_INT, null())
                 }

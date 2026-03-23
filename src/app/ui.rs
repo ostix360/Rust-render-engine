@@ -10,6 +10,59 @@ use winit::platform::x11::EventLoopBuilderExtX11;
 use crate::app::grid::GridConfig;
 use crate::maths::Expr;
 
+#[derive(Debug, Clone)]
+pub struct EqRender {
+    pub eq: Expr,
+    pub eq_str: String,
+}
+
+impl EqRender {
+    pub fn new(eq: Expr, eq_str: String) -> Self {
+        Self { eq, eq_str }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SpacialEqs {
+    pub x: EqRender,
+    pub y: EqRender,
+    pub z: EqRender,
+}
+
+impl SpacialEqs {
+    pub fn default_sys() -> Self {
+        let x = EqRender {
+            eq: Parser::default().parse("x*cos(y) * sin(z)").unwrap(),
+            eq_str: "x*cos(y) * sin(z)".to_string(),
+        };
+        let y = EqRender {
+            eq: Parser::default().parse("x*sin(y) * sin(z)").unwrap(),
+            eq_str: "x*sin(y) * sin(z)".to_string(),
+        };
+        let z = EqRender {
+            eq: Parser::default().parse("x * cos(z)").unwrap(),
+            eq_str: "x * cos(z)".to_string(),
+        };
+        Self { x, y, z }
+    }
+
+    pub fn default_field() -> Self {
+        let x = EqRender {
+            eq: Parser::default().parse("1").unwrap(),
+            eq_str: "1".to_string(),
+        };
+        let y = EqRender {
+            eq: Parser::default().parse("0").unwrap(),
+            eq_str: "0".to_string(),
+        };
+        let z = EqRender {
+            eq: Parser::default().parse("0").unwrap(),
+            eq_str: "0".to_string(),
+        };
+        Self { x, y, z }
+    }
+}
+
 const RASPBERRY: Color32 = Color32::from_rgb(0xB0, 0x18, 0xA2);
 const CRAYOLA_BLUE: Color32 = Color32::from_rgb(0x3A, 0x74, 0xE0);
 const GOLDEN_GLOW: Color32 = Color32::from_rgb(0xD1, 0xCD, 0x07);
@@ -28,12 +81,8 @@ const MUTED: Color32 = Color32::from_rgb(175, 182, 195);
 #[derive(Debug, Clone)]
 pub struct GridUiState {
     pub render_3d: bool,
-    pub eq_x: String,
-    pub eq_y: String,
-    pub eq_z: String,
-    pub expr_eqx: Option<Expr>,
-    pub expr_eqy: Option<Expr>,
-    pub expr_eqz: Option<Expr>,
+    pub coords_sys: SpacialEqs,
+    pub field: SpacialEqs,
     pub nb_x: f64,
     pub nb_y: f64,
     pub nb_z: f64,
@@ -74,12 +123,8 @@ impl Default for GridUiState {
     fn default() -> Self {
         Self {
             render_3d: true,
-            eq_x: "x*cos(y) * sin(z)".to_string(),
-            eq_y: "x*sin(y) * sin(z)".to_string(),
-            eq_z: "x * cos(z)".to_string(),
-            expr_eqx: None,
-            expr_eqy: None,
-            expr_eqz: None,
+            coords_sys: SpacialEqs::default_sys(),
+            field: SpacialEqs::default_field(),
             nb_x: 5.0,
             nb_y: 5.0,
             nb_z: 5.0,
@@ -224,9 +269,9 @@ impl eframe::App for ControlApp {
                 .show(ui, |ui| {
                     ui.checkbox(&mut data.render_3d, RichText::new("Render 3D").color(TEXT));
                     ui.separator();
-                    Self::eq_row(ui, "Equation x:  x =", &mut data.eq_x);
-                    Self::eq_row(ui, "Equation y:  y =", &mut data.eq_y);
-                    Self::eq_row(ui, "Equation z:  z =", &mut data.eq_z);
+                    Self::eq_row(ui, "Equation x:  x =", &mut data.coords_sys.x.eq_str);
+                    Self::eq_row(ui, "Equation y:  y =", &mut data.coords_sys.y.eq_str);
+                    Self::eq_row(ui, "Equation z:  z =", &mut data.coords_sys.z.eq_str);
                 });
 
             ui.add_space(8.0);
@@ -277,13 +322,13 @@ impl eframe::App for ControlApp {
                     )
                     .clicked();
                 if apply_pressed {
-                    let res_x = check_eq_validity(&data.eq_x);
-                    let res_y = check_eq_validity(&data.eq_y);
-                    let res_z = check_eq_validity(&data.eq_z);
+                    let res_x = check_eq_validity(&data.coords_sys.x.eq_str);
+                    let res_y = check_eq_validity(&data.coords_sys.y.eq_str);
+                    let res_z = check_eq_validity(&data.coords_sys.z.eq_str);
                     if res_x.is_ok() && res_y.is_ok() && res_z.is_ok() {
-                        data.expr_eqx = Some(res_x.unwrap());
-                        data.expr_eqy = Some(res_y.unwrap());
-                        data.expr_eqz = Some(res_z.unwrap());
+                        data.coords_sys.x.eq = res_x.unwrap();
+                        data.coords_sys.y.eq = res_y.unwrap();
+                        data.coords_sys.z.eq = res_z.unwrap();
                         data.apply_counter += 1;
                     }else {
                         let msg = format!("Error in equation(s): \

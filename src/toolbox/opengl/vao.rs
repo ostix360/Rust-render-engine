@@ -98,6 +98,14 @@ impl VAO {
         vao.store_indices(model.1);
         vao
     }
+    
+    pub fn create_arrow() -> VAO {
+        let model = load_obj("arrow.obj");
+        let mut vao = Self::create_vao().expect("Error creating VAO");
+        vao.store_data(0, 3, model.0);
+        vao.store_indices(model.1);
+        vao
+    }
 }
 
 impl Drop for VAO {
