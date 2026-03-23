@@ -1,9 +1,9 @@
 #![allow(unused)]
+use crate::toolbox::input::Input;
+use crate::toolbox::logging::LOGGER;
 use glfw::ffi::*;
 use glfw::{Action, Context, Key, PWindow};
 use std::ffi::c_int;
-use crate::toolbox::input::Input;
-use crate::toolbox::logging::LOGGER;
 
 pub struct DisplayManager {
     width: u32,
@@ -40,9 +40,18 @@ impl DisplayManager {
         //     |_, description| eprintln!("GLFW Error: {}", description)
         // );
         glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-        glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
         glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
-        let (window, events) = glfw.create_window(self.width, self.height, &self.title, glfw::WindowMode::Windowed).expect("Failed to create GLFW window.");
+        let (window, events) = glfw
+            .create_window(
+                self.width,
+                self.height,
+                &self.title,
+                glfw::WindowMode::Windowed,
+            )
+            .expect("Failed to create GLFW window.");
         self.glfw = Some(glfw);
         self.window = Some(window);
         self.events = Some(events);
@@ -57,14 +66,20 @@ impl DisplayManager {
         unsafe {
             let vid_mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
             let (width, height) = ((*vid_mode).width, (*vid_mode).height);
-            glfwSetWindowPos(win, (width - (self.width as c_int)) / 2, (height - (self.height as c_int)) / 2);
+            glfwSetWindowPos(
+                win,
+                (width - (self.width as c_int)) / 2,
+                (height - (self.height as c_int)) / 2,
+            );
             glfwMakeContextCurrent(win)
         }
 
         gl::load_with(|s| window.get_proc_address(s) as *const _);
         let version = unsafe {
             let data = gl::GetString(gl::VERSION);
-            let version = std::ffi::CStr::from_ptr(data as *const i8).to_str().unwrap();
+            let version = std::ffi::CStr::from_ptr(data as *const i8)
+                .to_str()
+                .unwrap();
             version
         };
 
@@ -80,9 +95,13 @@ impl DisplayManager {
 
     pub fn size_handler(&mut self) {
         let mut width: c_int = 0;
-        let mut height: c_int = 0 ;
+        let mut height: c_int = 0;
         unsafe {
-            glfwGetWindowSize(self.window.as_ref().unwrap().window_ptr(), &mut width, &mut height);
+            glfwGetWindowSize(
+                self.window.as_ref().unwrap().window_ptr(),
+                &mut width,
+                &mut height,
+            );
         }
         self.width = width as u32;
         self.height = height as u32;
@@ -107,9 +126,9 @@ impl DisplayManager {
             }
         }
     }
-    
+
     fn get_current_time(&self) -> f32 {
-        unsafe {  (glfwGetTime() * 1000.0 / glfwGetTimerFrequency() as f64) as f32 }
+        unsafe { (glfwGetTime() * 1000.0 / glfwGetTimerFrequency() as f64) as f32 }
     }
     pub fn update_display(&mut self) {
         self.handle_window_events();
@@ -117,43 +136,43 @@ impl DisplayManager {
         let current_time = self.get_current_time();
         self.delta = (current_time - self.last_frame_time) / 1000.0;
         self.last_frame_time = current_time;
-        unsafe { 
-            gl::Viewport(0, 0, self.width as i32, self.height as i32); 
+        unsafe {
+            gl::Viewport(0, 0, self.width as i32, self.height as i32);
         }
         self.window.as_mut().unwrap().swap_buffers();
     }
-    
+
     pub fn is_close_requested(&self) -> bool {
         self.window.as_ref().unwrap().should_close()
     }
-    
+
     pub fn close_display(&mut self) {
         println!("Closing display");
         // self.glfw.as_mut().unwrap().unset_error_callback();
         // unsafe {
         //     glfwDestroyWindow(self.window.as_ref().unwrap().window_ptr());
-        //     glfwTerminate(); 
+        //     glfwTerminate();
         // }
         self.events.take();
         self.window.take();
     }
-    
+
     pub fn get_delta(&self) -> f32 {
         self.delta
     }
-    
+
     pub fn get_width(&self) -> u32 {
         self.width
     }
-    
+
     pub fn get_height(&self) -> u32 {
         self.height
     }
-    
+
     pub fn get_input(&self) -> &Input {
         &self.input
     }
-    
+
     pub fn get_window(&mut self) -> &mut PWindow {
         self.window.as_mut().unwrap()
     }
@@ -161,7 +180,7 @@ impl DisplayManager {
     pub fn get_window_mut(&mut self) -> &mut PWindow {
         self.window.as_mut().unwrap()
     }
-    
+
     pub fn get_glfw(&self) -> &glfw::Glfw {
         self.glfw.as_ref().unwrap()
     }
@@ -178,4 +197,3 @@ impl Drop for DisplayManager {
         self.glfw.take(); // Drop the glfw instance properly
     }
 }
-

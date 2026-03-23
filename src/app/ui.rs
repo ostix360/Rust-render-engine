@@ -1,14 +1,14 @@
 #![allow(unused)]
-use std::f64::consts::PI;
-use eframe::egui::{self, Color32, RichText, Stroke};
-use eframe::epaint::{CornerRadius, Margin};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use mathhook_core::Parser;
-use winit::event_loop::EventLoop;
-use winit::platform::x11::EventLoopBuilderExtX11;
 use crate::app::grid::GridConfig;
 use crate::maths::Expr;
+use eframe::egui::{self, Color32, RichText, Stroke};
+use eframe::epaint::{CornerRadius, Margin};
+use mathhook_core::Parser;
+use std::f64::consts::PI;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use winit::event_loop::EventLoop;
+use winit::platform::x11::EventLoopBuilderExtX11;
 
 #[derive(Debug, Clone)]
 pub struct EqRender {
@@ -87,14 +87,14 @@ pub struct GridUiState {
     pub nb_y: f64,
     pub nb_z: f64,
     pub bounds_x: (f64, f64),
-    pub bounds_y: (f64,  f64),
+    pub bounds_y: (f64, f64),
     pub bounds_z: (f64, f64),
     pub apply_counter: u64,
 }
 
 impl GridUiState {
     pub fn approximate_grid_config(&self) -> GridConfig {
-        let app = |v: f64| -> f64{
+        let app = |v: f64| -> f64 {
             match v {
                 v if v == 3.14 => PI,
                 v if v == 6.28 => 2.0 * PI,
@@ -113,7 +113,7 @@ impl GridUiState {
             self.nb_z.round(),
         )
     }
-    
+
     pub fn to_grid_config(&self) -> GridConfig {
         self.approximate_grid_config()
     }
@@ -146,7 +146,10 @@ pub fn spawn_control_window(state: Arc<Mutex<GridUiState>>) {
             ..Default::default()
         };
 
-        let eventloop = EventLoop::with_user_event().with_any_thread(true).build().unwrap();
+        let eventloop = EventLoop::with_user_event()
+            .with_any_thread(true)
+            .build()
+            .unwrap();
 
         let shared = state.clone();
         let mut app = eframe::create_native(
@@ -255,12 +258,7 @@ impl eframe::App for ControlApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Title bar
             ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("Grid")
-                        .color(TEXT)
-                        .size(22.0)
-                        .strong(),
-                );
+                ui.label(RichText::new("Grid").color(TEXT).size(22.0).strong());
             });
             ui.add_space(10.0);
 
@@ -330,12 +328,14 @@ impl eframe::App for ControlApp {
                         data.coords_sys.y.eq = res_y.unwrap();
                         data.coords_sys.z.eq = res_z.unwrap();
                         data.apply_counter += 1;
-                    }else {
-                        let msg = format!("Error in equation(s): \
+                    } else {
+                        let msg = format!(
+                            "Error in equation(s): \
                         \nEquation x: {} \nEquation y: {}\nEquation z: {}",
-                                          res_x.err().unwrap_or("No Error here".to_string()),
-                                          res_y.err().unwrap_or("No Error here".to_string()),
-                                          res_z.err().unwrap_or("No Error here".to_string()));
+                            res_x.err().unwrap_or("No Error here".to_string()),
+                            res_y.err().unwrap_or("No Error here".to_string()),
+                            res_z.err().unwrap_or("No Error here".to_string())
+                        );
                         self.error_popup = Some(msg);
                     }
                 }
@@ -357,13 +357,19 @@ impl eframe::App for ControlApp {
                 )
                 .open(&mut open)
                 .show(ctx, |ui| {
-                    ui.label(RichText::new("Please fix your equations").color(TEXT).strong());
+                    ui.label(
+                        RichText::new("Please fix your equations")
+                            .color(TEXT)
+                            .strong(),
+                    );
                     ui.add_space(6.0);
                     ui.label(RichText::new(msg.clone()).color(MUTED));
                     ui.add_space(8.0);
                     ui.label(RichText::new("Tips:").color(TEXT).strong());
                     ui.add_space(6.0);
-                    ui.label(RichText::new("Don't forget to use * for multiplication.").color(MUTED));
+                    ui.label(
+                        RichText::new("Don't forget to use * for multiplication.").color(MUTED),
+                    );
                     ui.add_space(10.0);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
@@ -391,11 +397,16 @@ fn check_eq_validity(eq: &String) -> Result<Expr, String> {
     if eq.is_empty() {
         return Err("Equation cannot be empty".to_string());
     }
-    let formal_eq = Parser::default().parse(eq).map_err(|e| format!("Invalid equation: {}", e))?;
+    let formal_eq = Parser::default()
+        .parse(eq)
+        .map_err(|e| format!("Invalid equation: {}", e))?;
     let vars = formal_eq.find_variables();
     for var in vars.iter() {
         if var.name() != "x" && var.name() != "y" && var.name() != "z" {
-            return Err(format!("Invalid variable '{}' in equation. Only 'x', 'y', and 'z' are allowed.", var.name()));
+            return Err(format!(
+                "Invalid variable '{}' in equation. Only 'x', 'y', and 'z' are allowed.",
+                var.name()
+            ));
         }
     }
     Ok(formal_eq)

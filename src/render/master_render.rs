@@ -1,11 +1,12 @@
 use crate::app::grid::Grid;
 use crate::graphics::model::{RenderVField, Sphere};
+use crate::maths::field::VectorField;
 use crate::render;
+use crate::render::classic_shader::ClassicShader;
+use crate::render::field_renderer::FieldRenderer;
 use crate::render::grid_renderer::GridRenderer;
 use crate::render::grid_shader::GridShader;
 use crate::render::renderer::Renderer;
-use crate::render::field_renderer::FieldRenderer;
-use crate::maths::field::VectorField;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::clear_gl;
 use crate::toolbox::opengl::shader::shader_program::ShaderProgram;
@@ -39,22 +40,33 @@ impl MasterRenderer {
         let grid_shader = GridShader::new(grid_shader_prog);
         let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
         let classic_shader_prog = ShaderProgram::new("classic");
-        let classic_shader = render::classic_shader::ClassicShader::new(classic_shader_prog);
+        let classic_shader = ClassicShader::new(classic_shader_prog);
         let point_renderer = Renderer::new(classic_shader, projection.to_homogeneous());
 
         let field_shader_prog = ShaderProgram::new("grid");
         let field_shader = GridShader::new(field_shader_prog);
         let field_renderer = FieldRenderer::new(field_shader, projection.to_homogeneous());
 
-        (grid_renderer, point_renderer, field_renderer, projection.to_homogeneous())
+        (
+            grid_renderer,
+            point_renderer,
+            field_renderer,
+            projection.to_homogeneous(),
+        )
     }
 
-    pub fn render(&self, grid: &Grid, field_vectors: &[Vec<RenderVField>], camera: &Camera, sphere: &Option<Sphere>) {
+    pub fn render(
+        &self,
+        grid: &Grid,
+        field_vectors: &[Vec<RenderVField>],
+        camera: &Camera,
+        sphere: &Option<Sphere>,
+    ) {
         clear_gl();
         self.grid_renderer.render(&grid, &camera);
-        // for vectors in field_vectors {
-        //     self.field_renderer.render(vectors, camera);
-        // }
+        for vectors in field_vectors {
+            self.field_renderer.render(vectors, camera);
+        }
         if let Some(sphere) = sphere {
             self.renderer.draw_point(sphere, &camera);
         }

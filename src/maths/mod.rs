@@ -1,22 +1,22 @@
 #![allow(unused)]
 
+use crate::maths::space::Metric;
+use egui::TextBuffer;
+use lazy_static::lazy_static;
+use mathhook::prelude::Simplify;
+use mathhook::Expression;
+use mathhook_core::{Derivative, Symbol};
+use nalgebra::Vector3;
+use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use egui::TextBuffer;
-use lazy_static::lazy_static;
-use mathhook::Expression;
-use mathhook::prelude::Simplify;
-use mathhook_core::{Derivative, Symbol};
-use once_cell::sync::Lazy;
-use nalgebra::Vector3;
 use typed_floats::NonNaN;
-use crate::maths::space::Metric;
 
 pub mod differential;
-pub mod space;
 pub mod field;
+pub mod space;
 
 pub type Expr = Expression;
 pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
@@ -77,7 +77,7 @@ pub fn expr_to_fastexpr1d(mut expr: Expr) -> FastExpr1d {
     }
     let var_name = eval_expr.find_variables()[0].clone();
 
-    let eval = move |x:f64| -> f64{
+    let eval = move |x: f64| -> f64 {
         let mut vars = HashMap::new();
         vars.insert(var_name.name().to_string(), num(x));
         eval_expr.substitute(&vars).evaluate_to_f64().unwrap()
@@ -90,24 +90,29 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
     let eval_expr = expr.simplify();
     let eval_expr = Arc::new(eval_expr);
     #[inline]
-    fn select_arg(target: &str, value: Expression, first: Expression, second: Expression) -> HashMap<String, Expression> {
+    fn select_arg(
+        target: &str,
+        value: Expression,
+        first: Expression,
+        second: Expression,
+    ) -> HashMap<String, Expression> {
         let mut map = HashMap::new();
         match (target) {
             "x" => {
                 map.insert("x".to_string(), value);
                 map.insert("y".to_string(), first);
                 map.insert("z".to_string(), second);
-            },
+            }
             "y" => {
                 map.insert("x".to_string(), first);
                 map.insert("y".to_string(), value);
                 map.insert("z".to_string(), second);
-            },
+            }
             "z" => {
                 map.insert("x".to_string(), first);
                 map.insert("y".to_string(), second);
                 map.insert("z".to_string(), value);
-            },
+            }
             _ => panic!("Unknown target {}", target),
         }
         map
@@ -117,7 +122,10 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
         let name = var_name.clone();
         let expr1d_func = move |z_: f64| -> f64 {
             let vars = select_arg(&name, num(z_), num(x_), num(y_));
-            eval_expr.substitute_and_simplify(&vars).evaluate_to_f64().unwrap()
+            eval_expr
+                .substitute_and_simplify(&vars)
+                .evaluate_to_f64()
+                .unwrap()
         };
         Arc::new(expr1d_func)
     };
@@ -126,7 +134,7 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
 
 pub fn expr_to_fastexpr3d(mut expr: Expr) -> FastExpr3d {
     let eval_expr = expr.simplify();
-    let eval = move |x:f64, y:f64, z:f64| -> f64{
+    let eval = move |x: f64, y: f64, z: f64| -> f64 {
         let mut vars = HashMap::new();
         vars.insert("x".to_string(), num(x));
         vars.insert("y".to_string(), num(y));
@@ -155,4 +163,3 @@ trait Hodge {
 trait ExternalDerivative {
     fn d(&mut self) -> Self;
 }
-

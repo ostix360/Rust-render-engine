@@ -23,19 +23,20 @@ pub mod open_gl_utils {
         }
         LOGGER.gl_debug("Error setting wireframe mode");
     }
-    
+
     #[allow(unused)]
     extern "system" fn gl_message_callback(
-                           source: GLenum,
-                           level: GLenum,
-                           id: GLuint,
-                           severity: GLenum,
-                           length: GLsizei,
-                           message:*const GLchar,
-                           user_param: *mut c_void,){
-        let err = if level == DEBUG_TYPE_ERROR{
+        source: GLenum,
+        level: GLenum,
+        id: GLuint,
+        severity: GLenum,
+        length: GLsizei,
+        message: *const GLchar,
+        user_param: *mut c_void,
+    ) {
+        let err = if level == DEBUG_TYPE_ERROR {
             "** GL ERROR **"
-        }else{
+        } else {
             ""
         };
         let level = match level {
@@ -48,14 +49,14 @@ pub mod open_gl_utils {
             gl::DEBUG_TYPE_PUSH_GROUP => "PUSH_GROUP",
             gl::DEBUG_TYPE_POP_GROUP => "POP_GROUP",
             gl::DEBUG_TYPE_OTHER => "OTHER",
-            _ => "UNKNOWN"
+            _ => "UNKNOWN",
         };
         let severity = match severity {
             gl::DEBUG_SEVERITY_HIGH => "HIGH",
             gl::DEBUG_SEVERITY_MEDIUM => "MEDIUM",
             gl::DEBUG_SEVERITY_LOW => "LOW",
             gl::DEBUG_SEVERITY_NOTIFICATION => "NOTIFICATION",
-            _ => "UNKNOWN"
+            _ => "UNKNOWN",
         };
         let message = format!(
             "GL CALLBACK: {} type = {}, severity = {}, message = {}\n",
@@ -66,9 +67,9 @@ pub mod open_gl_utils {
         );
         LOGGER.debug(&message);
     }
-    
+
     pub fn add_opengl_debug() {
-        unsafe { 
+        unsafe {
             Enable(DEBUG_OUTPUT);
             DebugMessageCallback(Some(gl_message_callback), std::ptr::null())
         }

@@ -7,8 +7,7 @@ use std::io::Write;
 use std::thread;
 use std::thread::ThreadId;
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum LogLevel {
     None,
     Debug,
@@ -18,34 +17,38 @@ pub enum LogLevel {
     GLDebug,
 }
 
-
-
 pub struct Logger {
     level: Vec<LogLevel>,
     log_file: String,
 }
-// const LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string()); 
+// const LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
 lazy_static! {
-    pub static ref LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
+    pub static ref LOGGER: Logger =
+        Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
 }
 
 impl Logger {
     pub const fn new(level: Vec<LogLevel>, log_file: String) -> Logger {
-        Logger {
-            level,
-            log_file,
-        }
+        Logger { level, log_file }
     }
 
     pub fn log(&self, level: LogLevel, message: &str) {
-        let log = format!("[{}]-[{:?}]-[{:?}]: {}\n",
-                          Logger::get_time(), self.get_current_thread_id(), level, message);
+        let log = format!(
+            "[{}]-[{:?}]-[{:?}]: {}\n",
+            Logger::get_time(),
+            self.get_current_thread_id(),
+            level,
+            message
+        );
         if self.level.contains(&level) {
             println!("{}", log);
         }
         // write to file
-        let file = match std::fs::OpenOptions::new().append(true).create(true)
-            .open(&self.log_file){
+        let file = match std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&self.log_file)
+        {
             Ok(file) => file,
             Err(error) => {
                 eprintln!("Error opening log file: {}", error);

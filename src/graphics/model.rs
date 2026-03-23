@@ -1,6 +1,6 @@
 use crate::toolbox::color::Color;
 use crate::toolbox::opengl::vao::VAO;
-use nalgebra::{Matrix4, Rotation3, Translation3, Vector3, Vector4, UnitQuaternion};
+use nalgebra::{Matrix4, Rotation3, Translation3, UnitQuaternion, Vector3, Vector4};
 
 #[derive(PartialEq)]
 pub struct Model<'a> {
@@ -13,7 +13,13 @@ pub struct Model<'a> {
 
 #[allow(dead_code)]
 impl<'a> Model<'a> {
-    pub fn new(vao: &'a VAO, position: Vector3<f64>, rotation: Vector3<f64>, scale: f64, thickness: f64) -> Self {
+    pub fn new(
+        vao: &'a VAO,
+        position: Vector3<f64>,
+        rotation: Vector3<f64>,
+        scale: f64,
+        thickness: f64,
+    ) -> Self {
         Self {
             vao,
             position,
@@ -39,8 +45,16 @@ impl<'a> Model<'a> {
 
     pub fn get_transformation_matrix(&self, time: f64) -> Matrix4<f64> {
         let translation = Translation3::from(self.position);
-        let rotation = Rotation3::from_euler_angles(self.rotation.x + time * 0.3, self.rotation.y, self.rotation.z);
-        let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(self.scale, self.thickness, self.thickness));
+        let rotation = Rotation3::from_euler_angles(
+            self.rotation.x + time * 0.3,
+            self.rotation.y,
+            self.rotation.z,
+        );
+        let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(
+            self.scale,
+            self.thickness,
+            self.thickness,
+        ));
         let result = translation.to_homogeneous() * rotation.to_homogeneous() * scale;
         result
     }
@@ -54,7 +68,11 @@ pub struct Sphere {
 
 impl Sphere {
     pub fn new(position: Vector3<f64>, color: Color, size: f64) -> Self {
-        Self { position, color, size }
+        Self {
+            position,
+            color,
+            size,
+        }
     }
 
     pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
@@ -76,14 +94,19 @@ pub struct UnitArrow {
 
 impl UnitArrow {
     pub fn new(position: Vector3<f64>, direction: Vector3<f64>, color: Color) -> Self {
-        Self { position, direction, color }
+        Self {
+            position,
+            direction,
+            color,
+        }
     }
-    
+
     pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
         let translation = Translation3::from(self.position);
-        translation.to_homogeneous() * Rotation3::face_towards(&self.direction, &Vector3::y()).to_homogeneous()
+        translation.to_homogeneous()
+            * Rotation3::face_towards(&self.direction, &Vector3::y()).to_homogeneous()
     }
-    
+
     pub fn get_color(&self) -> Vector4<f64> {
         self.color.to_vector4()
     }
@@ -92,12 +115,16 @@ impl UnitArrow {
 pub struct RenderVField {
     pub position: Vector3<f64>,
     pub vector: Vector3<f64>,
-    pub color: Vector3<f64>,
+    pub color: Vector4<f64>,
 }
 
 impl RenderVField {
-    pub fn new(position: Vector3<f64>, vector: Vector3<f64>, color: Vector3<f64>) -> Self {
-        Self { position, vector, color }
+    pub fn new(position: Vector3<f64>, vector: Vector3<f64>, color: Vector4<f64>) -> Self {
+        Self {
+            position,
+            vector,
+            color,
+        }
     }
 
     pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
@@ -106,16 +133,17 @@ impl RenderVField {
             return Matrix4::zeros();
         }
 
-        const ARROW_SCALE: f64 = 0.2;
-        let scale_factor = magnitude * ARROW_SCALE;
+        const ARROW_SCALE: f64 = 0.02;
+        let scale_factor = 1.0 * ARROW_SCALE; // magnitude normalized for better visualization needs to be a parameter
         let target_dir = self.vector.normalize();
         let up = Vector3::y_axis();
 
-        let rotation = UnitQuaternion::rotation_between(&up, &target_dir).unwrap_or(UnitQuaternion::identity());
+        let rotation = UnitQuaternion::rotation_between(&up, &target_dir)
+            .unwrap_or(UnitQuaternion::identity());
         let translation = Translation3::from(self.position);
 
         let mut transform = nalgebra::Isometry3::from_parts(translation, rotation).to_homogeneous();
-        transform.prepend_nonuniform_scaling_mut(&Vector3::new(scale_factor, scale_factor, scale_factor));
+        transform.prepend_nonuniform_scaling_mut(&Vector3::new(scale_factor, 10. * scale_factor, scale_factor));
         transform
     }
 }

@@ -1,11 +1,11 @@
+use crate::maths::space::Space;
 use crate::maths::{expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d};
+use crate::toolbox::maths::print_matrix;
 use integrate::prelude::trapezoidal_rule;
 use mathhook::prelude::*;
 use mathhook::Symbol;
 use nalgebra::Vector3;
 use std::ops::{Add, Deref};
-use crate::maths::space::Space;
-use crate::toolbox::maths::print_matrix;
 
 pub struct CoordsSys {
     x_eq: Expr,
@@ -22,7 +22,8 @@ pub struct CoordsSys {
 
 impl CoordsSys {
     pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Self {
-        let (x_curvature, y_curvature, z_curvature) = Self::calculate_curvature(&x_eq, &y_eq, &z_eq);
+        let (x_curvature, y_curvature, z_curvature) =
+            Self::calculate_curvature(&x_eq, &y_eq, &z_eq);
         let fast_x_eq = expr_to_fastexpr3d(x_eq.clone());
         let fast_y_eq = expr_to_fastexpr3d(y_eq.clone());
         let fast_z_eq = expr_to_fastexpr3d(z_eq.clone());
@@ -32,11 +33,22 @@ impl CoordsSys {
             x_eq,
             y_eq,
             z_eq,
-            fast_x_eq, fast_y_eq, fast_z_eq, x_curvature, y_curvature, z_curvature, space }
+            fast_x_eq,
+            fast_y_eq,
+            fast_z_eq,
+            x_curvature,
+            y_curvature,
+            z_curvature,
+            space,
+        }
     }
 
     #[inline]
-    fn calculate_curvature(x_eq: &Expr, y_eq: &Expr, z_eq: &Expr) -> (FastExpr2dto1d, FastExpr2dto1d, FastExpr2dto1d){
+    fn calculate_curvature(
+        x_eq: &Expr,
+        y_eq: &Expr,
+        z_eq: &Expr,
+    ) -> (FastExpr2dto1d, FastExpr2dto1d, FastExpr2dto1d) {
         let mut curvature = Vec::new();
         let x = Symbol::new("x");
         let y = Symbol::new("y");
@@ -50,14 +62,18 @@ impl CoordsSys {
             curvature.push(ddx);
         }
         let [a, b, c] = curvature.try_into().expect("COORD must have 3 elements");
-        (expr_to_fastexpr2dto1d(a, "x".to_string()), expr_to_fastexpr2dto1d(b, "y".to_string()), expr_to_fastexpr2dto1d(c, "z".to_string()))
+        (
+            expr_to_fastexpr2dto1d(a, "x".to_string()),
+            expr_to_fastexpr2dto1d(b, "y".to_string()),
+            expr_to_fastexpr2dto1d(c, "z".to_string()),
+        )
     }
 
     pub fn get_curvature(&self, point: Vector3<f64>, len: f64) -> (f64, f64, f64) {
         let (x, y, z) = (point.x, point.y, point.z);
-        let fx = (self.x_curvature)(y,z);
-        let fy = (self.y_curvature)(x,z);
-        let fz = (self.z_curvature)(x,y);
+        let fx = (self.x_curvature)(y, z);
+        let fy = (self.y_curvature)(x, z);
+        let fz = (self.z_curvature)(x, y);
         let cx = trapezoidal_rule(fx.deref(), x - len, x + len, 100u32);
         let cy = trapezoidal_rule(fy.deref(), y - len, y + len, 100u32);
         let cz = trapezoidal_rule(fz.deref(), z - len, z + len, 100u32);
@@ -73,7 +89,9 @@ impl CoordsSys {
 
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {
         println!("{:?}", self.x_eq.to_string());
-        eqs[0] == self.x_eq.to_string() && eqs[1] == self.y_eq.to_string() && eqs[2] == self.z_eq.to_string()
+        eqs[0] == self.x_eq.to_string()
+            && eqs[1] == self.y_eq.to_string()
+            && eqs[2] == self.z_eq.to_string()
     }
 
     pub fn get_space(&self) -> &Space {

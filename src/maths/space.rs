@@ -1,13 +1,13 @@
+use crate::maths::differential::Form;
+use crate::maths::{Expr, ExternalDerivative};
+use crate::toolbox::maths::print_matrix;
+use mathhook_core::core::expression::smart_display::SmartDisplayFormatter;
+use mathhook_core::matrices::{Matrix, MatrixOperations};
+use mathhook_core::MathLanguage::{LaTeX, Simple};
+use mathhook_core::{expr, Expression, Simplify};
 use std::collections::HashMap;
 use std::ops::{Add, Mul};
 use std::sync::Arc;
-use crate::maths::differential::Form;
-use crate::maths::{Expr, ExternalDerivative};
-use mathhook_core::{expr, Expression, Simplify};
-use mathhook_core::core::expression::smart_display::SmartDisplayFormatter;
-use mathhook_core::MathLanguage::{LaTeX, Simple};
-use mathhook_core::matrices::{Matrix, MatrixOperations};
-use crate::toolbox::maths::print_matrix;
 
 pub type Metric = Matrix;
 
@@ -17,7 +17,6 @@ pub struct Space {
     vielbein: Expr,
     vielbein_inv: Expr,
 }
-
 
 fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
     a.add(b).add(c).simplify()
@@ -53,18 +52,13 @@ impl Space {
         // );
 
         let g_xx = sum3(&d_x[0], &d_y[0], &d_z[0]);
-        let g_xy = sum3( &d_x[1], &d_y[1], &d_z[1]);
+        let g_xy = sum3(&d_x[1], &d_y[1], &d_z[1]);
         let g_yy = sum3(&d_x[2], &d_y[2], &d_z[2]);
         let g_xz = sum3(&d_x[3], &d_y[3], &d_z[3]);
         let g_yz = sum3(&d_x[4], &d_y[4], &d_z[4]);
         let g_zz = sum3(&d_x[5], &d_y[5], &d_z[5]);
 
-        let metric: Matrix = Matrix::symmetric(3, vec![
-            g_xx,
-            g_xy, g_yy,
-            g_xz, g_yz, g_zz,
-        ]
-        );
+        let metric: Matrix = Matrix::symmetric(3, vec![g_xx, g_xy, g_yy, g_xz, g_yz, g_zz]);
         let vielbein = Expression::Matrix(Arc::new(metric.cholesky_decomposition().unwrap().l));
         // let mut map = HashMap::default();
         // map.insert("x".to_string(), expr!(1));
@@ -88,7 +82,7 @@ impl Space {
             dim: 3,
             metric,
             vielbein: vielbein.clone(),
-            vielbein_inv: vielbein.inverse()
+            vielbein_inv: vielbein.inverse(),
         }
     }
 

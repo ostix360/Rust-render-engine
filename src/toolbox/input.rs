@@ -42,14 +42,14 @@ impl Input {
                 } else if action == Action::Release {
                     self.left_mouse_button = false;
                 }
-            },
+            }
             glfw::MouseButton::Right => {
                 if action == Action::Press {
                     self.right_mouse_button = true;
                 } else if action == Action::Release {
                     self.right_mouse_button = false;
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -57,7 +57,7 @@ impl Input {
     pub fn is_key_pressed(&self, key: Key) -> bool {
         self.input_keyboard.contains(&key)
     }
-    
+
     pub fn is_mouse_button_pressed(&self, button: glfw::MouseButton) -> bool {
         match button {
             glfw::MouseButton::Left => self.left_mouse_button,

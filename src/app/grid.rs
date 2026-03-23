@@ -113,7 +113,6 @@ struct SegmentKey {
     len: NonNaN<f64>,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridConfig {
     u_min: f64,
@@ -129,9 +128,15 @@ pub struct GridConfig {
 
 impl GridConfig {
     pub fn new(
-        u_min: f64, u_max: f64, nb_u: f64,
-        v_min: f64, v_max: f64, nb_v: f64,
-        w_min: f64, w_max: f64, nb_w: f64,
+        u_min: f64,
+        u_max: f64,
+        nb_u: f64,
+        v_min: f64,
+        v_max: f64,
+        nb_v: f64,
+        w_min: f64,
+        w_max: f64,
+        nb_w: f64,
     ) -> Self {
         Self {
             u_min,
@@ -149,13 +154,9 @@ impl GridConfig {
 
 impl Default for GridConfig {
     fn default() -> Self {
-        Self::new(0.0, 7.0, 2.0,
-                  0.0, 7.0, 2.0,
-                  0.0, 7.0, 2.0
-        )
+        Self::new(0.0, 7.0, 2.0, 0.0, 7.0, 2.0, 0.0, 7.0, 2.0)
     }
 }
-
 
 pub struct Grid {
     coordinates: CoordsSys,
@@ -172,14 +173,13 @@ impl Grid {
         }
     }
 
-
     #[inline]
     fn build_keys_for_indices(indices: &GridConfig) -> FxHashSet<SegmentKey> {
         let mut keys = FxHashSet::default();
 
-        let total_u =  Array::<f64, _>::range(indices.u_min, indices.u_max, 1.);
-        let total_v =  Array::<f64, _>::range(indices.v_min, indices.v_max, 1.);
-        let total_w =  Array::<f64, _>::range(indices.w_min, indices.w_max, 1.);
+        let total_u = Array::<f64, _>::range(indices.u_min, indices.u_max, 1.);
+        let total_v = Array::<f64, _>::range(indices.v_min, indices.v_max, 1.);
+        let total_w = Array::<f64, _>::range(indices.w_min, indices.w_max, 1.);
 
         let us = Array::<f64, _>::linspace(indices.u_min, indices.u_max, indices.nb_u as usize);
         let vs = Array::<f64, _>::linspace(indices.v_min, indices.v_max, indices.nb_v as usize);
@@ -295,8 +295,7 @@ impl Grid {
         let ex = Unit::new_normalize(Vector3::new(1.0, 0.0, 0.0));
         let dir_u = Unit::new_normalize(dir);
 
-        let rot = Rotation3::rotation_between(&ex, &dir_u)
-            .unwrap_or_else(Rotation3::identity);
+        let rot = Rotation3::rotation_between(&ex, &dir_u).unwrap_or_else(Rotation3::identity);
 
         let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(len, THICKNESS, THICKNESS));
         let translation = Translation3::from(p0).to_homogeneous();

@@ -11,7 +11,7 @@ impl GridWorld {
         let kd_tree = KdTree::par_build_by_ordered_float(data);
         Self { data: kd_tree }
     }
-    fn process_data(grid: &Grid) -> Vec<[f64;3]> {
+    fn process_data(grid: &Grid) -> Vec<[f64; 3]> {
         let data = grid.get_data();
         let coords = grid.get_coords();
         let mut estimate_cap = 0;
@@ -22,7 +22,9 @@ impl GridWorld {
         for (edge, transforms) in data.iter() {
             let vertices = edge.get_vertices();
             for (transform, _) in transforms.iter() {
-                if vertices.len() == 0 { continue; }
+                if vertices.len() == 0 {
+                    continue;
+                }
                 for vertex in vertices.iter() {
                     let vec4 = Vector4::new(vertex.x.get(), vertex.y.get(), vertex.z.get(), 1.0);
                     let world_pos = transform * vec4;
@@ -35,12 +37,12 @@ impl GridWorld {
     }
 
     pub fn update_data(&mut self, grid: &Grid) {
-        let data: Vec<[f64;3]> = Self::process_data(grid);
+        let data: Vec<[f64; 3]> = Self::process_data(grid);
         self.data = KdTree::par_build_by_ordered_float(data);
     }
 
     #[allow(dead_code)]
-    pub fn found_nearest(&self, pos: &[f64; 3]) -> Option<(f64, f64, f64)>  {
+    pub fn found_nearest(&self, pos: &[f64; 3]) -> Option<(f64, f64, f64)> {
         let coords = self.data.nearest(pos)?.item;
         Some((coords[0], coords[1], coords[2]))
     }
@@ -61,7 +63,13 @@ impl GridWorld {
     /// Ray casting in the grid world.
     ///
     /// dir: direction of the ray (should be normalized)
-    pub fn ray_cast(&self, pos: &Vector3<f64>, dir: &Vector3<f64>, radius: f64, length: f64) -> Option<(f64, f64, f64)> {
+    pub fn ray_cast(
+        &self,
+        pos: &Vector3<f64>,
+        dir: &Vector3<f64>,
+        radius: f64,
+        length: f64,
+    ) -> Option<(f64, f64, f64)> {
         let step_len = radius / 2.;
         let nb_steps = (length / step_len).ceil() as usize;
         for step in 0..nb_steps {
@@ -69,7 +77,7 @@ impl GridWorld {
             let q = [query_point.x, query_point.y, query_point.z];
             let coords = self.data.within_radius(&q, radius);
             if !coords.is_empty() {
-                return Some(Self::find_nearest(pos, &coords))
+                return Some(Self::find_nearest(pos, &coords));
             }
         }
         None

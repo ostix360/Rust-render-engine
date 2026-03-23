@@ -1,24 +1,29 @@
-use nalgebra::Matrix4;
-use crate::toolbox::logging::LOGGER;
 use super::uniform::Uniform;
+use crate::toolbox::logging::LOGGER;
+use nalgebra::Matrix4;
 
-pub struct Matrix4Uniform{
+pub struct Matrix4Uniform {
     pub uniform: Uniform,
 }
 
 impl Matrix4Uniform {
-    pub fn new(name: &'static str) -> Matrix4Uniform{
+    pub fn new(name: &'static str) -> Matrix4Uniform {
         Matrix4Uniform {
             uniform: Uniform::new(name),
         }
     }
 
-    pub fn load_matrix_to_uniform(&self, m:Matrix4<f64>) {
+    pub fn load_matrix_to_uniform(&self, m: Matrix4<f64>) {
         let m32 = m.cast::<f32>();
         unsafe {
             gl::UniformMatrix4fv(self.uniform.get_location(), 1, gl::FALSE, m32.as_ptr());
         }
-        LOGGER.gl_debug(format!("Error while loading matrix \"{}\" to uniform", self.uniform.name).as_str());
+        LOGGER.gl_debug(
+            format!(
+                "Error while loading matrix \"{}\" to uniform",
+                self.uniform.name
+            )
+            .as_str(),
+        );
     }
 }
-

@@ -2,10 +2,10 @@
 extern crate serde_derive;
 extern crate meval;
 extern crate toml;
-use meval::{Expr, Context};
+use meval::{Context, Expr};
 #[derive(Deserialize)]
-struct Func{
-    f: Expr
+struct Func {
+    f: Expr,
 }
 
 #[test]

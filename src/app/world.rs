@@ -3,6 +3,7 @@ use crate::app::grid::{Grid, GridConfig};
 use crate::app::grid_world::GridWorld;
 use crate::app::ui::GridUiState;
 use crate::graphics::model::{RenderVField, Sphere};
+use crate::maths::differential::Form;
 use crate::maths::field::VectorField;
 use crate::maths::Point;
 use crate::render::master_render::MasterRenderer;
@@ -11,7 +12,6 @@ use crate::toolbox::color::WHITE;
 use crate::toolbox::opengl::display_manager::DisplayManager;
 use nalgebra::{vector, Matrix4, Vector3, Vector4};
 use std::sync::{Arc, Mutex};
-use crate::maths::differential::Form;
 
 pub struct World {
     fields: Vec<VectorField>,
@@ -75,15 +75,12 @@ impl World {
                 let coords = sharded.coords_sys;
                 let eqs = [coords.x.eq_str, coords.y.eq_str, coords.z.eq_str];
                 if !self.grid.get_coords().is_equivalent(&eqs) {
-                    let coord_sys = CoordsSys::new(
-                        coords.x.eq,
-                        coords.y.eq,
-                        coords.z.eq,
-                    );
+                    let coord_sys = CoordsSys::new(coords.x.eq, coords.y.eq, coords.z.eq);
                     self.grid.set_coordinates(coord_sys);
                 }
                 self.grid.update_config(&conf);
-                self.renderer.grid_renderer.update_shader_eqs(eqs);
+                self.renderer.grid_renderer.update_shader_eqs(&eqs);
+                self.renderer.field_renderer.update_shader_eqs(&eqs);
                 self.grid_world.update_data(&self.grid);
 
                 // Recompute field vectors since grid or coordinates changed
@@ -109,39 +106,45 @@ impl World {
     }
 
     pub fn render(&self, camera: &Camera) {
-        self.renderer.render(&self.grid, &self.render_Vfields, camera, &self.sphere)
+        self.renderer
+            .render(&self.grid, &self.render_Vfields, camera, &self.sphere)
     }
 
     fn recompute_field_vectors(&mut self) {
         self.render_Vfields.clear();
         let data = self.grid.get_data();
-        let coords = self.grid.get_coords();
 
         for field in &self.fields {
             let mut vectors = Vec::new();
             for (edge, transforms) in data.iter() {
                 let vertices = edge.get_vertices();
-                if vertices.is_empty() { continue; }
-                for (transform, _) in transforms.iter() {
-                    for vertex in vertices.iter() {
-                        let x = vertex.x.get();
-                        let y = vertex.y.get();
-                        let z = vertex.z.get();
 
-                        let vec4 = Vector4::new(x, y, z, 1.0);
-                        let abstract_pos = transform * vec4;
+                if vertices.is_empty() {
+                    continue;
+                }
+                for transform in transforms {
+                    let x = vertices[0].x.get();
+                    let y = vertices[0].y.get();
+                    let z = vertices[0].z.get();
 
-                        // Evaluate actual world position
-                        let (wx, wy, wz) = coords.eval(abstract_pos.x, abstract_pos.y, abstract_pos.z);
-                        let world_pos = Vector3::new(wx, wy, wz);
+                    let vec4 = Vector4::new(x, y, z, 1.0);
+                    let abstract_pos = transform.0 * vec4;
 
-                        // Evaluate field at abstract position
-                        let p = Point { x: abstract_pos.x, y: abstract_pos.y, z: abstract_pos.z };
-                        let vec_res = field.at(p);
-                        let vector = Vector3::new(vec_res.x, vec_res.y, vec_res.z);
+                    // Evaluate field at abstract position
+                    let p = Point {
+                        x: abstract_pos.x,
+                        y: abstract_pos.y,
+                        z: abstract_pos.z,
+                    };
+                    let vec_res = field.at(p);
+                    let vector = Vector3::new(vec_res.x, vec_res.y, vec_res.z);
 
-                        vectors.push(RenderVField::new(world_pos, vector, Vector3::new(1.0, 1.0, 0.0)));
-                    }
+                    vectors.push(RenderVField::new(
+                        abstract_pos.xyz(),
+                        vector,
+                        Vector4::new(1.0, 1.0, 0.0, 1.0),
+                    ));
+
                 }
             }
             self.render_Vfields.push(vectors);

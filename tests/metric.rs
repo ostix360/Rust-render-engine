@@ -10,7 +10,9 @@ fn eval_expr_at_xyz(expr: &Expr, x: f64, y: f64, z: f64) -> f64 {
     vars.insert("x".to_string(), num(x));
     vars.insert("y".to_string(), num(y));
     vars.insert("z".to_string(), num(z));
-    expr.substitute_and_simplify(&vars).evaluate_to_f64().unwrap()
+    expr.substitute_and_simplify(&vars)
+        .evaluate_to_f64()
+        .unwrap()
 }
 
 fn eval_metric_at_xyz(m: &Metric, x: f64, y: f64, z: f64) -> Matrix3<f64> {
@@ -26,8 +28,6 @@ fn eval_metric_at_xyz(m: &Metric, x: f64, y: f64, z: f64) -> Matrix3<f64> {
         eval_expr_at_xyz(&m.get_element(2, 2), x, y, z),
     )
 }
-
-
 
 #[test]
 fn metric_algebra_matches_known_linear_transform() {

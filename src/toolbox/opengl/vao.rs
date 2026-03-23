@@ -1,9 +1,9 @@
-use crate::toolbox::opengl::vbo::VBO;
-use gl::types::{GLint, GLuint};
 use crate::toolbox::logging::LOGGER;
-use gl::{BindVertexArray, DisableVertexAttribArray, EnableVertexAttribArray};
-use crate::{TriIndexes, Vertex};
 use crate::toolbox::obj_loader::load_obj;
+use crate::toolbox::opengl::vbo::VBO;
+use crate::{TriIndexes, Vertex};
+use gl::types::{GLint, GLuint};
+use gl::{BindVertexArray, DisableVertexAttribArray, EnableVertexAttribArray};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct VAO {
@@ -19,64 +19,76 @@ impl VAO {
             id,
             vbos: Vec::new(),
             vertex_count: 0,
-            indices: None
+            indices: None,
         }
     }
 
     pub fn create_vao() -> Result<VAO, String> {
         let mut id = 0;
         unsafe {
-            gl::GenVertexArrays(1,&mut id);
+            gl::GenVertexArrays(1, &mut id);
         }
         if id == 0 {
-            return Err("Error creating VAO".to_string())
+            return Err("Error creating VAO".to_string());
         }
         Ok(VAO::new(id))
     }
 
     pub fn store_data(&mut self, attrib: GLuint, data_size: GLint, position: Vec<Vertex>) -> () {
-        unsafe { self.bind(); }
+        unsafe {
+            self.bind();
+        }
         let vbo = VBO::create_vbo().expect("Error creating VBO");
         vbo.store_data(attrib, data_size, &position);
         self.vbos.push(vbo);
-        unsafe { self.unbind(); }
+        unsafe {
+            self.unbind();
+        }
     }
-    
+
     pub fn store_indices(&mut self, indices: Vec<TriIndexes>) -> () {
-        unsafe { self.bind(); }
-        let vbo =  VBO::create_vbo().expect("Error creating VBO");
+        unsafe {
+            self.bind();
+        }
+        let vbo = VBO::create_vbo().expect("Error creating VBO");
         vbo.store_indices(&indices);
         self.vbos.push(vbo);
         self.vertex_count = indices.len() * 3;
         self.indices = Some(indices);
-        unsafe { self.unbind(); }
+        unsafe {
+            self.unbind();
+        }
     }
 
-    pub fn store_indices_line(&mut self, indices: Vec<[u32; 2]>) -> (){
-        unsafe { self.bind(); }
-        let vbo =  VBO::create_vbo().expect("Error creating VBO");
+    pub fn store_indices_line(&mut self, indices: Vec<[u32; 2]>) -> () {
+        unsafe {
+            self.bind();
+        }
+        let vbo = VBO::create_vbo().expect("Error creating VBO");
         vbo.store_indices_line(&indices);
         self.vbos.push(vbo);
         self.vertex_count = indices.len() * 2;
-        unsafe { self.unbind(); }
+        unsafe {
+            self.unbind();
+        }
     }
 
     pub fn binds(&self, attributes: &[u32]) -> () {
         unsafe { self.bind() }
-        for i in attributes{
-            unsafe { EnableVertexAttribArray(*i)}
+        for i in attributes {
+            unsafe { EnableVertexAttribArray(*i) }
             LOGGER.gl_debug("Error while binding attrib")
         }
     }
-    
+
     pub fn unbinds(&self, attributes: &[u32]) -> () {
         unsafe { self.unbind() }
-        for i in attributes{
-            unsafe { DisableVertexAttribArray(*i)}
+        for i in attributes {
+            unsafe { DisableVertexAttribArray(*i) }
             LOGGER.gl_debug("Error while binding attrib")
         }
     }
-    
+
     pub fn get_vertex_count(&self) -> usize {
         self.vertex_count
     }
@@ -90,7 +102,6 @@ impl VAO {
         BindVertexArray(0)
     }
 
-
     pub fn create_sphere() -> VAO {
         let model = load_obj("sphere.obj");
         let mut vao = Self::create_vao().expect("Error creating VAO");
@@ -98,7 +109,7 @@ impl VAO {
         vao.store_indices(model.1);
         vao
     }
-    
+
     pub fn create_arrow() -> VAO {
         let model = load_obj("arrow.obj");
         let mut vao = Self::create_vao().expect("Error creating VAO");
@@ -113,8 +124,6 @@ impl Drop for VAO {
         for vbo in self.vbos.iter() {
             vbo.delete();
         }
-        unsafe {
-            gl::DeleteVertexArrays(1, &self.id)
-        }
+        unsafe { gl::DeleteVertexArrays(1, &self.id) }
     }
 }

@@ -1,8 +1,8 @@
-use nalgebra::{Matrix4, Vector4};
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::uniform::Uniform;
 use crate::toolbox::opengl::shader::uniform::vec4uniform::Vec4Uniform;
+use nalgebra::{Matrix4, Vector4};
 
 pub struct ClassicShader {
     shader_program: ShaderProgram,
@@ -15,7 +15,7 @@ pub struct ClassicShader {
 impl ClassicShader {
     pub fn new(program: ShaderProgram) -> ClassicShader {
         program.bind_attrib(0, "position");
-        ClassicShader{
+        ClassicShader {
             shader_program: program,
             projection_matrix: Matrix4Uniform::new("projection_matrix"),
             transformation_matrix: Matrix4Uniform::new("transformation_matrix"),
