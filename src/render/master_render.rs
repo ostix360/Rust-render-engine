@@ -1,9 +1,8 @@
 use crate::app::grid::Grid;
 use crate::graphics::model::{RenderVField, Sphere};
-use crate::maths::field::VectorField;
-use crate::render;
 use crate::render::classic_shader::ClassicShader;
 use crate::render::field_renderer::FieldRenderer;
+use crate::render::field_shader::FieldShader;
 use crate::render::grid_renderer::GridRenderer;
 use crate::render::grid_shader::GridShader;
 use crate::render::renderer::Renderer;
@@ -43,8 +42,8 @@ impl MasterRenderer {
         let classic_shader = ClassicShader::new(classic_shader_prog);
         let point_renderer = Renderer::new(classic_shader, projection.to_homogeneous());
 
-        let field_shader_prog = ShaderProgram::new("grid");
-        let field_shader = GridShader::new(field_shader_prog);
+        let field_shader_prog = ShaderProgram::new("field");
+        let field_shader = FieldShader::new(field_shader_prog);
         let field_renderer = FieldRenderer::new(field_shader, projection.to_homogeneous());
 
         (

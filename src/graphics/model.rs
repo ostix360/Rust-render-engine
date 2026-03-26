@@ -134,7 +134,8 @@ impl RenderVField {
         }
 
         const ARROW_SCALE: f64 = 0.02;
-        let scale_factor = 1.0 * ARROW_SCALE; // magnitude normalized for better visualization needs to be a parameter
+        let radius_scale = ARROW_SCALE;
+        let length_scale = magnitude * ARROW_SCALE;
         let target_dir = self.vector.normalize();
         let up = Vector3::y_axis();
 
@@ -143,7 +144,11 @@ impl RenderVField {
         let translation = Translation3::from(self.position);
 
         let mut transform = nalgebra::Isometry3::from_parts(translation, rotation).to_homogeneous();
-        transform.prepend_nonuniform_scaling_mut(&Vector3::new(scale_factor, 10. * scale_factor, scale_factor));
+        transform.prepend_nonuniform_scaling_mut(&Vector3::new(
+            radius_scale,
+            10.0 * length_scale,
+            radius_scale,
+        ));
         transform
     }
 }

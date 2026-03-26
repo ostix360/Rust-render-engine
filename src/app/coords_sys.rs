@@ -4,7 +4,7 @@ use crate::toolbox::maths::print_matrix;
 use integrate::prelude::trapezoidal_rule;
 use mathhook::prelude::*;
 use mathhook::Symbol;
-use nalgebra::Vector3;
+use nalgebra::{vector, Vector3};
 use std::ops::{Add, Deref};
 
 pub struct CoordsSys {
@@ -85,6 +85,37 @@ impl CoordsSys {
         let y_ = (self.fast_y_eq)(x, y, z);
         let z_ = (self.fast_z_eq)(x, y, z);
         (x_, y_, z_)
+    }
+
+    pub fn eval_position(&self, point: Vector3<f64>) -> Vector3<f64> {
+        let (x, y, z) = self.eval(point.x, point.y, point.z);
+        vector![x, y, z]
+    }
+
+    fn tangent_axis(&self, point: Vector3<f64>, axis: usize) -> Vector3<f64> {
+        let step = (point[axis].abs() * 1e-4).max(1e-4);
+        let mut forward = point;
+        let mut backward = point;
+        forward[axis] += step;
+        backward[axis] -= step;
+
+        let tangent = (self.eval_position(forward) - self.eval_position(backward)) / (2.0 * step);
+        if tangent.norm() <= 1e-9 {
+            match axis {
+                0 => vector![1.0, 0.0, 0.0],
+                1 => vector![0.0, 1.0, 0.0],
+                _ => vector![0.0, 0.0, 1.0],
+            }
+        } else {
+            tangent.normalize()
+        }
+    }
+
+    pub fn eval_otn_vector(&self, point: Vector3<f64>, vector: Vector3<f64>) -> Vector3<f64> {
+        let ex = self.tangent_axis(point, 0);
+        let ey = self.tangent_axis(point, 1);
+        let ez = self.tangent_axis(point, 2);
+        ex * vector.x + ey * vector.y + ez * vector.z
     }
 
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {

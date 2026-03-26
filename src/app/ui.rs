@@ -83,6 +83,7 @@ pub struct GridUiState {
     pub render_3d: bool,
     pub coords_sys: SpacialEqs,
     pub field: SpacialEqs,
+    pub normalize_field: bool,
     pub nb_x: f64,
     pub nb_y: f64,
     pub nb_z: f64,
@@ -125,6 +126,7 @@ impl Default for GridUiState {
             render_3d: true,
             coords_sys: SpacialEqs::default_sys(),
             field: SpacialEqs::default_field(),
+            normalize_field: false,
             nb_x: 5.0,
             nb_y: 5.0,
             nb_z: 5.0,
@@ -168,6 +170,13 @@ struct ControlApp {
     state: Arc<Mutex<GridUiState>>,
     styled: bool,
     error_popup: Option<String>,
+    active_tab: ControlTab,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ControlTab {
+    Grid,
+    Field,
 }
 
 impl ControlApp {
@@ -176,6 +185,7 @@ impl ControlApp {
             state,
             styled: false,
             error_popup: None,
+            active_tab: ControlTab::Grid,
         }
     }
 
@@ -244,6 +254,88 @@ impl ControlApp {
             );
         });
     }
+
+    fn tab_button(ui: &mut egui::Ui, selected: bool, label: &str) -> bool {
+        let fill = if selected { ACCENT } else { JET_BLACK };
+        let stroke = if selected {
+            Stroke::new(1.0, ACCENT)
+        } else {
+            Stroke::new(1.0, BORDER)
+        };
+        ui.add(
+            egui::Button::new(RichText::new(label).color(TEXT).strong())
+                .fill(fill)
+                .stroke(stroke)
+                .min_size(egui::vec2(96.0, 30.0))
+                .corner_radius(CornerRadius::same(6)),
+        )
+        .clicked()
+    }
+
+    fn render_grid_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(Self::section_heading("Coordinate system"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.checkbox(&mut data.render_3d, RichText::new("Render 3D").color(TEXT));
+                ui.separator();
+                Self::eq_row(ui, "Equation x:  x =", &mut data.coords_sys.x.eq_str);
+                Self::eq_row(ui, "Equation y:  y =", &mut data.coords_sys.y.eq_str);
+                Self::eq_row(ui, "Equation z:  z =", &mut data.coords_sys.z.eq_str);
+            });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(Self::section_heading("Grid settings"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.label(RichText::new("Line per coordinate").color(MUTED));
+                ui.add(
+                    egui::Slider::new(&mut data.nb_x, 0.0..=20.0)
+                        .logarithmic(false)
+                        .text("x")
+                        .trailing_fill(true),
+                );
+                ui.add(
+                    egui::Slider::new(&mut data.nb_y, 0.0..=20.0)
+                        .logarithmic(false)
+                        .text("y")
+                        .trailing_fill(true),
+                );
+                ui.add(
+                    egui::Slider::new(&mut data.nb_z, 0.0..=20.0)
+                        .logarithmic(false)
+                        .text("z")
+                        .trailing_fill(true),
+                );
+
+                ui.separator();
+                ui.label(RichText::new("Bounds").color(MUTED));
+                ui.horizontal(|ui| {
+                    ui.add_space(80.0);
+                    ui.colored_label(MUTED, "min");
+                    ui.add_space(10.0);
+                    ui.colored_label(MUTED, "max");
+                });
+                Self::bounds_row(ui, "Bounds (x):", &mut data.bounds_x);
+                Self::bounds_row(ui, "Bounds (y):", &mut data.bounds_y);
+                Self::bounds_row(ui, "Bounds (z):", &mut data.bounds_z);
+            });
+    }
+
+    fn render_field_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(Self::section_heading("Field equations"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.checkbox(
+                    &mut data.normalize_field,
+                    RichText::new("Normalize field").color(TEXT),
+                );
+                ui.separator();
+                ui.label(RichText::new("Vector components in the active coordinates").color(MUTED));
+                Self::eq_row(ui, "Equation x:  Fx =", &mut data.field.x.eq_str);
+                Self::eq_row(ui, "Equation y:  Fy =", &mut data.field.y.eq_str);
+                Self::eq_row(ui, "Equation z:  Fz =", &mut data.field.z.eq_str);
+            });
+    }
 }
 
 impl eframe::App for ControlApp {
@@ -256,58 +348,26 @@ impl eframe::App for ControlApp {
         let mut data = self.state.lock().expect("UI state poisoned");
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Title bar
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Grid").color(TEXT).size(22.0).strong());
-            });
-            ui.add_space(10.0);
-
-            egui::CollapsingHeader::new(Self::section_heading("Coordinate system"))
-                .default_open(true)
+            egui::Frame::new()
+                .fill(SHADOW_GREY)
+                .inner_margin(Margin::same(4))
                 .show(ui, |ui| {
-                    ui.checkbox(&mut data.render_3d, RichText::new("Render 3D").color(TEXT));
-                    ui.separator();
-                    Self::eq_row(ui, "Equation x:  x =", &mut data.coords_sys.x.eq_str);
-                    Self::eq_row(ui, "Equation y:  y =", &mut data.coords_sys.y.eq_str);
-                    Self::eq_row(ui, "Equation z:  z =", &mut data.coords_sys.z.eq_str);
-                });
-
-            ui.add_space(8.0);
-            egui::CollapsingHeader::new(Self::section_heading("Grid settings"))
-                .default_open(true)
-                .show(ui, |ui| {
-                    ui.label(RichText::new("Line per coordinate").color(MUTED));
-                    ui.add(
-                        egui::Slider::new(&mut data.nb_x, 0.0..=20.0)
-                            .logarithmic(false)
-                            .text("x")
-                            .trailing_fill(true),
-                    );
-                    ui.add(
-                        egui::Slider::new(&mut data.nb_y, 0.0..=20.0)
-                            .logarithmic(false)
-                            .text("y")
-                            .trailing_fill(true),
-                    );
-                    ui.add(
-                        egui::Slider::new(&mut data.nb_z, 0.0..=20.0)
-                            .logarithmic(false)
-                            .text("z")
-                            .trailing_fill(true),
-                    );
-
-                    ui.separator();
-                    ui.label(RichText::new("Bounds").color(MUTED));
                     ui.horizontal(|ui| {
-                        ui.add_space(80.0);
-                        ui.colored_label(MUTED, "min");
-                        ui.add_space(10.0);
-                        ui.colored_label(MUTED, "max");
+                        if Self::tab_button(ui, self.active_tab == ControlTab::Grid, "Grid") {
+                            self.active_tab = ControlTab::Grid;
+                        }
+                        if Self::tab_button(ui, self.active_tab == ControlTab::Field, "Field") {
+                            self.active_tab = ControlTab::Field;
+                        }
                     });
-                    Self::bounds_row(ui, "Bounds (x):", &mut data.bounds_x);
-                    Self::bounds_row(ui, "Bounds (y):", &mut data.bounds_y);
-                    Self::bounds_row(ui, "Bounds (z):", &mut data.bounds_z);
                 });
+
+            ui.add_space(16.0);
+
+            match self.active_tab {
+                ControlTab::Grid => Self::render_grid_tab(ui, &mut data),
+                ControlTab::Field => Self::render_field_tab(ui, &mut data),
+            }
 
             ui.add_space(10.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -320,21 +380,42 @@ impl eframe::App for ControlApp {
                     )
                     .clicked();
                 if apply_pressed {
-                    let res_x = check_eq_validity(&data.coords_sys.x.eq_str);
-                    let res_y = check_eq_validity(&data.coords_sys.y.eq_str);
-                    let res_z = check_eq_validity(&data.coords_sys.z.eq_str);
-                    if res_x.is_ok() && res_y.is_ok() && res_z.is_ok() {
-                        data.coords_sys.x.eq = res_x.unwrap();
-                        data.coords_sys.y.eq = res_y.unwrap();
-                        data.coords_sys.z.eq = res_z.unwrap();
+                    let coord_x = check_eq_validity(&data.coords_sys.x.eq_str);
+                    let coord_y = check_eq_validity(&data.coords_sys.y.eq_str);
+                    let coord_z = check_eq_validity(&data.coords_sys.z.eq_str);
+                    let field_x = check_eq_validity(&data.field.x.eq_str);
+                    let field_y = check_eq_validity(&data.field.y.eq_str);
+                    let field_z = check_eq_validity(&data.field.z.eq_str);
+
+                    if coord_x.is_ok()
+                        && coord_y.is_ok()
+                        && coord_z.is_ok()
+                        && field_x.is_ok()
+                        && field_y.is_ok()
+                        && field_z.is_ok()
+                    {
+                        data.coords_sys.x.eq = coord_x.unwrap();
+                        data.coords_sys.y.eq = coord_y.unwrap();
+                        data.coords_sys.z.eq = coord_z.unwrap();
+                        data.field.x.eq = field_x.unwrap();
+                        data.field.y.eq = field_y.unwrap();
+                        data.field.z.eq = field_z.unwrap();
                         data.apply_counter += 1;
                     } else {
                         let msg = format!(
-                            "Error in equation(s): \
-                        \nEquation x: {} \nEquation y: {}\nEquation z: {}",
-                            res_x.err().unwrap_or("No Error here".to_string()),
-                            res_y.err().unwrap_or("No Error here".to_string()),
-                            res_z.err().unwrap_or("No Error here".to_string())
+                            "Error in equation(s):\
+                            \nCoordinate x: {}\
+                            \nCoordinate y: {}\
+                            \nCoordinate z: {}\
+                            \nField Fx: {}\
+                            \nField Fy: {}\
+                            \nField Fz: {}",
+                            coord_x.err().unwrap_or("No Error here".to_string()),
+                            coord_y.err().unwrap_or("No Error here".to_string()),
+                            coord_z.err().unwrap_or("No Error here".to_string()),
+                            field_x.err().unwrap_or("No Error here".to_string()),
+                            field_y.err().unwrap_or("No Error here".to_string()),
+                            field_z.err().unwrap_or("No Error here".to_string())
                         );
                         self.error_popup = Some(msg);
                     }
@@ -425,4 +506,34 @@ fn info_dot(ui: &mut egui::Ui) {
         egui::FontId::proportional(10.0),
         Color32::BLACK,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_eq_validity;
+
+    #[test]
+    fn check_eq_validity_accepts_polynomial_expression() {
+        let result = check_eq_validity(&"x + y * z".to_string());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_eq_validity_accepts_trigonometric_expression() {
+        let result = check_eq_validity(&"sin(x) + cos(y) - z".to_string());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_eq_validity_rejects_empty_expression() {
+        let result = check_eq_validity(&String::new());
+        assert_eq!(result.unwrap_err(), "Equation cannot be empty");
+    }
+
+    #[test]
+    fn check_eq_validity_rejects_unknown_variable() {
+        let result = check_eq_validity(&"x + t".to_string());
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid variable 't'"));
+    }
 }

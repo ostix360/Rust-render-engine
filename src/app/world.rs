@@ -1,7 +1,7 @@
 use crate::app::coords_sys::CoordsSys;
-use crate::app::grid::{Grid, GridConfig};
+use crate::app::grid::Grid;
 use crate::app::grid_world::GridWorld;
-use crate::app::ui::GridUiState;
+use crate::app::ui::{GridUiState, SpacialEqs};
 use crate::graphics::model::{RenderVField, Sphere};
 use crate::maths::differential::Form;
 use crate::maths::field::VectorField;
@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 pub struct World {
     fields: Vec<VectorField>,
     render_Vfields: Vec<Vec<RenderVField>>,
+    normalize_field: bool,
     renderer: MasterRenderer,
     grid: Grid,
     grid_world: GridWorld,
@@ -26,12 +27,14 @@ pub struct World {
 
 impl World {
     pub fn new(shared_ui_state: Arc<Mutex<GridUiState>>, display_manager: &DisplayManager) -> Self {
-        let (grid, grid_world, vf) = Self::init(shared_ui_state.lock().unwrap().clone());
+        let initial_state = shared_ui_state.lock().unwrap().clone();
+        let (grid, grid_world, vf) = Self::init(initial_state.clone());
         let mut fields = Vec::new();
         fields.push(vf);
         let mut world = Self {
             fields,
             render_Vfields: Vec::new(),
+            normalize_field: initial_state.normalize_field,
             renderer: MasterRenderer::new(
                 display_manager.get_width() as f64,
                 display_manager.get_height() as f64,
@@ -47,21 +50,21 @@ impl World {
     }
 
     fn init(initial_state: GridUiState) -> (Grid, GridWorld, VectorField) {
+        let config = initial_state.to_grid_config();
         let x_eq = initial_state.coords_sys.x.eq;
         let y_eq = initial_state.coords_sys.y.eq;
         let z_eq = initial_state.coords_sys.z.eq;
         let sys_coord = CoordsSys::new(x_eq, y_eq, z_eq);
-        let config = GridConfig::default();
         let mut grid = Grid::new(sys_coord);
         grid.update_config(&config);
         let grid_world = GridWorld::new(&grid);
-        let mut field_eqs = Vec::new();
-        let field = initial_state.field;
-        field_eqs.push(field.x.eq);
-        field_eqs.push(field.y.eq);
-        field_eqs.push(field.z.eq);
-        let vf = VectorField::from_otn(Form::new(field_eqs, 1), grid.get_coords().get_space());
+        let vf = Self::build_vector_field(&initial_state.field, &grid);
         (grid, grid_world, vf)
+    }
+
+    fn build_vector_field(field: &SpacialEqs, grid: &Grid) -> VectorField {
+        let field_eqs = vec![field.x.eq.clone(), field.y.eq.clone(), field.z.eq.clone()];
+        VectorField::from_otn(Form::new(field_eqs, 1), grid.get_coords().get_space())
     }
 
     pub fn update(&mut self, mouse_info: (Vector3<f64>, Vector3<f64>)) {
@@ -80,10 +83,11 @@ impl World {
                 }
                 self.grid.update_config(&conf);
                 self.renderer.grid_renderer.update_shader_eqs(&eqs);
-                self.renderer.field_renderer.update_shader_eqs(&eqs);
                 self.grid_world.update_data(&self.grid);
+                self.fields = vec![Self::build_vector_field(&sharded.field, &self.grid)];
+                self.normalize_field = sharded.normalize_field;
 
-                // Recompute field vectors since grid or coordinates changed
+                // Recompute field vectors since grid, coordinates, or field equations changed.
                 should_update = true;
                 self.last_counter = sharded.apply_counter;
             }
@@ -129,6 +133,8 @@ impl World {
 
                     let vec4 = Vector4::new(x, y, z, 1.0);
                     let abstract_pos = transform.0 * vec4;
+                    let abstract_pos3 = abstract_pos.xyz();
+                    let world_pos = self.grid.get_coords().eval_position(abstract_pos3);
 
                     // Evaluate field at abstract position
                     let p = Point {
@@ -137,14 +143,22 @@ impl World {
                         z: abstract_pos.z,
                     };
                     let vec_res = field.at(p);
-                    let vector = Vector3::new(vec_res.x, vec_res.y, vec_res.z);
+                    let mut vector = self.grid.get_coords().eval_otn_vector(
+                        abstract_pos3,
+                        Vector3::new(vec_res.x, vec_res.y, vec_res.z),
+                    );
+                    if self.normalize_field {
+                        let magnitude = vector.norm();
+                        if magnitude > 1e-6 {
+                            vector /= magnitude;
+                        }
+                    }
 
                     vectors.push(RenderVField::new(
-                        abstract_pos.xyz(),
+                        world_pos,
                         vector,
                         Vector4::new(1.0, 1.0, 0.0, 1.0),
                     ));
-
                 }
             }
             self.render_Vfields.push(vectors);
