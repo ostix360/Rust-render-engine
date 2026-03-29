@@ -13,7 +13,7 @@ impl Matrix4Uniform {
         }
     }
 
-    pub fn load_matrix_to_uniform(&self, m: Matrix4<f64>) {
+    pub fn load_matrix_to_uniform(&self, m: &Matrix4<f64>) {
         let m32 = m.cast::<f32>();
         unsafe {
             gl::UniformMatrix4fv(self.uniform.get_location(), 1, gl::FALSE, m32.as_ptr());

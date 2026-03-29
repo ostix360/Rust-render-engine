@@ -41,13 +41,13 @@ impl GridShader {
         LOGGER.gl_debug("Shader edited");
     }
 
-    pub fn load_projection_matrix(&self, matrix: Matrix4<f64>) {
+    pub fn load_projection_matrix(&self, matrix: &Matrix4<f64>) {
         self.projection_matrix.load_matrix_to_uniform(matrix);
     }
-    pub fn load_transformation_matrix(&self, matrix: Matrix4<f64>) {
+    pub fn load_transformation_matrix(&self, matrix: &Matrix4<f64>) {
         self.transformation_matrix.load_matrix_to_uniform(matrix);
     }
-    pub fn load_view_matrix(&self, matrix: Matrix4<f64>) {
+    pub fn load_view_matrix(&self, matrix: &Matrix4<f64>) {
         self.view_matrix.load_matrix_to_uniform(matrix);
     }
     pub fn load_color_from_dir(&self, color: SegmentDir) {
