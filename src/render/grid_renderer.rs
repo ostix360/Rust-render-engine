@@ -1,6 +1,6 @@
 use crate::app::grid::Grid;
+use crate::app::grid::SegmentDir;
 use crate::render::grid_shader::GridShader;
-use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 use gl::types::GLsizei;
 use nalgebra::Matrix4;
@@ -8,39 +8,37 @@ use std::ptr::null;
 
 pub struct GridRenderer {
     shader: GridShader,
-    projection: Matrix4<f64>,
+    projection: Matrix4<f64>, // Should use reference but lifetime needs to be handled
 }
 
 impl GridRenderer {
     pub fn new(mut shader: GridShader, projection: Matrix4<f64>) -> GridRenderer {
         shader.store_all_uniforms();
         shader.bind();
-        shader.load_projection_matrix(projection);
+        shader.load_projection_matrix(&projection);
         shader.unbind();
         GridRenderer { shader, projection }
     }
 
-    pub fn render(&self, grid: &Grid, cam: &Camera) {
-        self.prepare(cam);
+    pub fn render(&self, grid: &Grid, view_matrix: &Matrix4<f64>) {
+        self.prepare(view_matrix);
         let data = grid.get_data();
         for (key, values) in data.iter() {
-            key.get_vao()
-                .expect("You should create the vao before rendering the edge")
-                .binds(&[0]);
-            for value in values {
-                let transform = value.0;
-                self.shader.load_transformation_matrix(transform);
-                self.shader.load_color_from_dir(value.1);
-                unsafe {
-                    gl::DrawElements(
-                        gl::LINES,
-                        (key.get_vao().unwrap().get_vertex_count() - 1) as GLsizei,
-                        gl::UNSIGNED_INT,
-                        null(),
-                    )
+            let vao = key
+                .get_vao()
+                .expect("You should create the vao before rendering the edge");
+            let draw_count = vao.get_vertex_count() as GLsizei;
+            vao.binds(&[0]);
+            let mut last_dir: Option<SegmentDir> = None;
+            for (transform, dir) in values {
+                if last_dir != Some(*dir) {
+                    self.shader.load_color_from_dir(*dir);
+                    last_dir = Some(*dir);
                 }
+                self.shader.load_transformation_matrix(transform);
+                unsafe { gl::DrawElements(gl::LINES, draw_count, gl::UNSIGNED_INT, null()) }
             }
-            key.get_vao().unwrap().unbinds(&[0]);
+            vao.unbinds(&[0]);
         }
         self.unprepare();
     }
@@ -48,13 +46,13 @@ impl GridRenderer {
     pub fn update_shader_eqs(&mut self, new_eqs: &[String; 3]) {
         self.shader.edit_eqs(new_eqs);
         self.shader.bind();
-        self.shader.load_projection_matrix(self.projection);
+        self.shader.load_projection_matrix(&self.projection);
         self.shader.unbind();
     }
 
-    fn prepare(&self, cam: &Camera) {
+    fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
-        self.shader.load_view_matrix(cam.get_view_matrix());
+        self.shader.load_view_matrix(view_matrix);
     }
 
     fn unprepare(&self) {

@@ -79,8 +79,6 @@ impl Camera {
         let right = self.quat.transform_vector(&Vector3::x_axis());
         let right = Unit::new_normalize(right);
         self.quat = UnitQuaternion::from_axis_angle(&right, pitch) * self.quat;
-
-        println!("New rotation quaternion: {:?}", self.quat.euler_angles());
         // Keep unit length to avoid drift.
         self.quat.renormalize();
     }
@@ -88,13 +86,8 @@ impl Camera {
     #[allow(unused)]
     pub fn increase_rotation(&mut self, dir: &Unit<Vector3<f64>>, angle: f64) {
         let rot_quat = UnitQuaternion::from_axis_angle(dir, angle);
-        println!(
-            "Rotating around axis {:?} by angle {:.4} radians",
-            dir, angle
-        );
         self.quat = rot_quat * self.quat;
         self.quat.renormalize();
-        println!("New rotation quaternion: {:?}", self.quat.euler_angles());
     }
 
     #[inline]

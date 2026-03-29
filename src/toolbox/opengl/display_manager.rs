@@ -3,7 +3,7 @@ use crate::toolbox::input::Input;
 use crate::toolbox::logging::LOGGER;
 use glfw::ffi::*;
 use glfw::{Action, Context, Key, PWindow};
-use std::ffi::c_int;
+use std::ffi::{c_int, c_void};
 
 pub struct DisplayManager {
     width: u32,
@@ -74,7 +74,11 @@ impl DisplayManager {
             glfwMakeContextCurrent(win)
         }
 
-        gl::load_with(|s| window.get_proc_address(s) as *const _);
+        gl::load_with(|s| {
+            window
+                .get_proc_address(s)
+                .map_or(std::ptr::null(), |proc| proc as *const () as *const c_void)
+        });
         let version = unsafe {
             let data = gl::GetString(gl::VERSION);
             let version = std::ffi::CStr::from_ptr(data as *const i8)

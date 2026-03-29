@@ -3,6 +3,7 @@
 use crate::toolbox::logging::LogLevel::*;
 use chrono;
 use lazy_static::lazy_static;
+use std::env;
 use std::io::Write;
 use std::thread;
 use std::thread::ThreadId;
@@ -21,10 +22,16 @@ pub struct Logger {
     level: Vec<LogLevel>,
     log_file: String,
 }
-// const LOGGER: Logger = Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
+fn default_log_levels() -> Vec<LogLevel> {
+    let mut levels = vec![Info, Debug, Error];
+    if env::var_os("RENDER_ENGINE_GL_DEBUG").is_some() {
+        levels.push(GLDebug);
+    }
+    levels
+}
+
 lazy_static! {
-    pub static ref LOGGER: Logger =
-        Logger::new(vec![Info, Debug, GLDebug, Error], "log.txt".to_string());
+    pub static ref LOGGER: Logger = Logger::new(default_log_levels(), "log.txt".to_string());
 }
 
 impl Logger {
@@ -32,6 +39,7 @@ impl Logger {
         Logger { level, log_file }
     }
 
+    #[inline]
     pub fn log(&self, level: LogLevel, message: &str) {
         let log = format!(
             "[{}]-[{:?}]-[{:?}]: {}\n",
@@ -62,24 +70,32 @@ impl Logger {
         }
     }
 
+    #[inline]
     pub fn info(&self, message: &str) {
         self.log(Info, message);
     }
 
+    #[inline]
     pub fn debug(&self, message: &str) {
         self.log(Debug, message);
     }
 
+    #[inline]
     pub fn warning(&self, message: &str) {
         self.log(Warning, message);
     }
 
+    #[inline]
     pub fn error(&self, message: &str) {
         self.log(Error, message);
         panic!("Error: {}", message)
     }
 
+    #[inline]
     pub fn gl_debug(&self, message: &str) {
+        if !self.level.contains(&GLDebug) {
+            return;
+        }
         let error = unsafe { gl::GetError() };
         if error != gl::NO_ERROR {
             self.log(GLDebug, message);
@@ -90,6 +106,7 @@ impl Logger {
         thread::current().id()
     }
 
+    #[inline]
     pub fn get_time() -> String {
         let now = chrono::Utc::now();
         now.to_rfc3339()

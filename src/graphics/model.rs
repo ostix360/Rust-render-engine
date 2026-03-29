@@ -64,21 +64,24 @@ pub struct Sphere {
     pub position: Vector3<f64>,
     color: Color,
     size: f64,
+    transformation: Matrix4<f64>,
 }
 
 impl Sphere {
     pub fn new(position: Vector3<f64>, color: Color, size: f64) -> Self {
+        let translation = Translation3::from(position);
+        let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(size, size, size));
+        let transformation = translation.to_homogeneous() * scale;
         Self {
             position,
             color,
             size,
+            transformation,
         }
     }
 
-    pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
-        let translation = Translation3::from(self.position);
-        let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(self.size, self.size, self.size));
-        translation.to_homogeneous() * scale
+    pub fn get_transformation_matrix(&self) -> &Matrix4<f64> {
+        &self.transformation
     }
 
     pub fn get_color(&self) -> Vector4<f64> {
@@ -113,35 +116,37 @@ impl UnitArrow {
 }
 
 pub struct RenderVField {
-    pub position: Vector3<f64>,
-    pub vector: Vector3<f64>,
     pub color: Vector4<f64>,
+    transform: Matrix4<f64>,
+    renderable: bool,
 }
 
 impl RenderVField {
     pub fn new(position: Vector3<f64>, vector: Vector3<f64>, color: Vector4<f64>) -> Self {
+        let (transform, renderable) = Self::build_transform(&position, &vector);
         Self {
-            position,
-            vector,
             color,
+            transform,
+            renderable,
         }
     }
 
-    pub fn get_transformation_matrix(&self) -> Matrix4<f64> {
-        let magnitude = self.vector.norm();
+    fn build_transform(position: &Vector3<f64>, vector: &Vector3<f64>) -> (Matrix4<f64>, bool) {
+        const ARROW_SCALE: f64 = 0.02;
+
+        let magnitude = vector.norm();
         if magnitude < 1e-6 {
-            return Matrix4::zeros();
+            return (Matrix4::zeros(), false);
         }
 
-        const ARROW_SCALE: f64 = 0.02;
         let radius_scale = ARROW_SCALE;
         let length_scale = magnitude * ARROW_SCALE;
-        let target_dir = self.vector.normalize();
+        let target_dir = vector.normalize();
         let up = Vector3::y_axis();
 
         let rotation = UnitQuaternion::rotation_between(&up, &target_dir)
             .unwrap_or(UnitQuaternion::identity());
-        let translation = Translation3::from(self.position);
+        let translation = Translation3::from(*position);
 
         let mut transform = nalgebra::Isometry3::from_parts(translation, rotation).to_homogeneous();
         transform.prepend_nonuniform_scaling_mut(&Vector3::new(
@@ -149,6 +154,14 @@ impl RenderVField {
             10.0 * length_scale,
             radius_scale,
         ));
-        transform
+        (transform, true)
+    }
+
+    pub fn get_transformation_matrix(&self) -> &Matrix4<f64> {
+        &self.transform
+    }
+
+    pub fn is_renderable(&self) -> bool {
+        self.renderable
     }
 }

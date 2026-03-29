@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use crate::graphics::model::{Model, Sphere};
 use crate::render::classic_shader::ClassicShader;
-use crate::toolbox::camera::Camera;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::set_wireframe_mode;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 use crate::toolbox::opengl::vao::VAO;
@@ -18,7 +17,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(mut shader: ClassicShader, projection: Matrix4<f64>) -> Renderer {
+    pub fn new(mut shader: ClassicShader, projection: &Matrix4<f64>) -> Renderer {
         let point_vao = VAO::create_sphere();
         shader.store_all_uniforms();
         shader.bind();
@@ -31,8 +30,8 @@ impl Renderer {
         }
     }
 
-    pub fn render(&mut self, models: &FxHashMap<&VAO, Vec<&Model>>, cam: &Camera) {
-        self.prepare(cam);
+    pub fn render(&mut self, models: &FxHashMap<&VAO, Vec<&Model>>, view_matrix: &Matrix4<f64>) {
+        self.prepare(view_matrix);
         self.time.add_assign(0.01);
         set_wireframe_mode(true);
         for vao in models.keys() {
@@ -40,7 +39,7 @@ impl Renderer {
             if let Some(models) = models.get(vao) {
                 for model in models {
                     self.shader
-                        .load_transformation_matrix(model.get_transformation_matrix(0.));
+                        .load_transformation_matrix(&model.get_transformation_matrix(0.));
                     unsafe {
                         DrawElements(
                             TRIANGLES,
@@ -56,8 +55,8 @@ impl Renderer {
         self.finish();
     }
 
-    pub fn draw_point(&self, point: &Sphere, cam: &Camera) {
-        self.prepare(cam);
+    pub fn draw_point(&self, point: &Sphere, view_matrix: &Matrix4<f64>) {
+        self.prepare(view_matrix);
 
         self.sphere_vao.binds(&[0]);
         self.shader
@@ -75,9 +74,9 @@ impl Renderer {
         self.finish();
     }
 
-    fn prepare(&self, cam: &Camera) {
+    fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
-        self.shader.load_view_matrix(cam.get_view_matrix());
+        self.shader.load_view_matrix(view_matrix);
     }
 
     fn finish(&self) {

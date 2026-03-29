@@ -18,8 +18,9 @@ pub struct Edge {
 
 impl Edge {
     fn build_indices(nb_vertices: usize) -> Vec<[u32; 2]> {
-        let mut indices = Vec::with_capacity(nb_vertices);
-        for i in 0..nb_vertices {
+        let segment_count = nb_vertices.saturating_sub(1);
+        let mut indices = Vec::with_capacity(segment_count);
+        for i in 0..segment_count {
             indices.push([i as u32, (i + 1) as u32]);
         }
         indices

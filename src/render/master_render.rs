@@ -34,23 +34,23 @@ impl MasterRenderer {
 
     fn init(w: f64, h: f64) -> (GridRenderer, Renderer, FieldRenderer, Matrix4<f64>) {
         let aspect_ratio = w / h;
-        let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR);
+        let projection = Perspective3::new(aspect_ratio, 1.6, NEAR, FAR).to_homogeneous();
         let grid_shader_prog = ShaderProgram::new("grid");
         let grid_shader = GridShader::new(grid_shader_prog);
-        let grid_renderer = GridRenderer::new(grid_shader, projection.to_homogeneous());
+        let grid_renderer = GridRenderer::new(grid_shader, projection.clone());
         let classic_shader_prog = ShaderProgram::new("classic");
         let classic_shader = ClassicShader::new(classic_shader_prog);
-        let point_renderer = Renderer::new(classic_shader, projection.to_homogeneous());
+        let point_renderer = Renderer::new(classic_shader, &projection);
 
         let field_shader_prog = ShaderProgram::new("field");
         let field_shader = FieldShader::new(field_shader_prog);
-        let field_renderer = FieldRenderer::new(field_shader, projection.to_homogeneous());
+        let field_renderer = FieldRenderer::new(field_shader, &projection);
 
         (
             grid_renderer,
             point_renderer,
             field_renderer,
-            projection.to_homogeneous(),
+            projection,
         )
     }
 
@@ -62,12 +62,13 @@ impl MasterRenderer {
         sphere: &Option<Sphere>,
     ) {
         clear_gl();
-        self.grid_renderer.render(&grid, &camera);
+        let view_matrix = camera.get_view_matrix();
+        self.grid_renderer.render(&grid, &view_matrix);
         for vectors in field_vectors {
-            self.field_renderer.render(vectors, camera);
+            self.field_renderer.render(vectors, &view_matrix);
         }
         if let Some(sphere) = sphere {
-            self.renderer.draw_point(sphere, &camera);
+            self.renderer.draw_point(sphere, &view_matrix);
         }
     }
 }

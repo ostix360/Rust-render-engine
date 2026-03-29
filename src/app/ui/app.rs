@@ -244,27 +244,37 @@ impl ControlApp {
             );
         });
     }
-}
 
-impl eframe::App for ControlApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if !self.styled {
-            theme::apply_style(ctx);
-            self.styled = true;
-        }
+    fn render_ui(&mut self, ui: &mut egui::Ui) {
         let active_tab = &mut self.active_tab;
         let error_popup = &mut self.error_popup;
         let state = self.state.clone();
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let mut data = state.lock().expect("UI state poisoned");
-            Self::render_tab_bar(ui, active_tab);
-            ui.add_space(16.0);
-            Self::render_active_tab(ui, *active_tab, &mut data);
-            ui.add_space(10.0);
-            Self::render_apply_button(ui, &mut data, error_popup);
+        let mut data = state.lock().expect("UI state poisoned");
+        Self::render_tab_bar(ui, active_tab);
+        ui.add_space(16.0);
+        Self::render_active_tab(ui, *active_tab, &mut data);
+        ui.add_space(10.0);
+        Self::render_apply_button(ui, &mut data, error_popup);
+    }
+}
+
+impl eframe::App for ControlApp {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if !self.styled {
+            theme::apply_style(ctx);
+            self.styled = true;
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::Frame::central_panel(ui.style()).show(ui, |ui| {
+            self.render_ui(ui);
         });
-        self.show_error_popup(ctx);
+        self.show_error_popup(ui.ctx());
+    }
+
+    fn update(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
     }
 }
 
