@@ -29,14 +29,14 @@ pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState,
 
     Ok(ValidatedUiState {
         coords_sys: SpacialEqs {
-            x: coord_x.unwrap(),
-            y: coord_y.unwrap(),
-            z: coord_z.unwrap(),
+            x: coord_x?,
+            y: coord_y?,
+            z: coord_z?,
         },
         field: SpacialEqs {
-            x: field_x.unwrap(),
-            y: field_y.unwrap(),
-            z: field_z.unwrap(),
+            x: field_x?,
+            y: field_y?,
+            z: field_z?,
         },
     })
 }

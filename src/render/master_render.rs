@@ -46,27 +46,20 @@ impl MasterRenderer {
         let field_shader = FieldShader::new(field_shader_prog);
         let field_renderer = FieldRenderer::new(field_shader, &projection);
 
-        (
-            grid_renderer,
-            point_renderer,
-            field_renderer,
-            projection,
-        )
+        (grid_renderer, point_renderer, field_renderer, projection)
     }
 
     pub fn render(
         &self,
         grid: &Grid,
-        field_vectors: &[Vec<RenderVField>],
+        field_vectors: &[RenderVField],
         camera: &Camera,
         sphere: &Option<Sphere>,
     ) {
         clear_gl();
         let view_matrix = camera.get_view_matrix();
         self.grid_renderer.render(&grid, &view_matrix);
-        for vectors in field_vectors {
-            self.field_renderer.render(vectors, &view_matrix);
-        }
+        self.field_renderer.render(field_vectors, &view_matrix);
         if let Some(sphere) = sphere {
             self.renderer.draw_point(sphere, &view_matrix);
         }

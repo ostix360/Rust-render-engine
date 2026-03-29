@@ -7,10 +7,14 @@ pub struct GridWorld {
 
 impl GridWorld {
     pub fn new(grid: &Grid) -> Self {
-        let data: Vec<[f64; 3]> = Self::process_data(grid);
-        let kd_tree = KdTree::par_build_by_ordered_float(data);
+        Self::from_points(Self::process_data(grid))
+    }
+
+    pub fn from_points(points: Vec<[f64; 3]>) -> Self {
+        let kd_tree = KdTree::par_build_by_ordered_float(points);
         Self { data: kd_tree }
     }
+
     fn process_data(grid: &Grid) -> Vec<[f64; 3]> {
         let data = grid.get_data();
         let coords = grid.get_coords();
@@ -37,8 +41,11 @@ impl GridWorld {
     }
 
     pub fn update_data(&mut self, grid: &Grid) {
-        let data: Vec<[f64; 3]> = Self::process_data(grid);
-        self.data = KdTree::par_build_by_ordered_float(data);
+        self.replace_points(Self::process_data(grid));
+    }
+
+    pub fn replace_points(&mut self, points: Vec<[f64; 3]>) {
+        self.data = KdTree::par_build_by_ordered_float(points);
     }
 
     #[allow(dead_code)]
@@ -47,13 +54,13 @@ impl GridWorld {
         Some((coords[0], coords[1], coords[2]))
     }
 
-    fn find_nearest(pos: &Vector3<f64>, points: &Vec<&[f64; 3]>) -> (f64, f64, f64) {
-        let dist = f64::MAX;
+    fn find_nearest(pos: &Vector3<f64>, points: &[&[f64; 3]]) -> (f64, f64, f64) {
+        let mut best_dist = f64::MAX;
         let mut coord = points[0];
-        // println!("Number of points found: {}", points.len());
         for point in points {
             let d = (pos - Vector3::new(point[0], point[1], point[2])).norm();
-            if d < dist {
+            if d < best_dist {
+                best_dist = d;
                 coord = point;
             }
         }

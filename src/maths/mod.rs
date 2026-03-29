@@ -132,14 +132,14 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
     Arc::new(func)
 }
 
-pub fn expr_to_fastexpr3d(mut expr: Expr) -> FastExpr3d {
-    let eval_expr = expr.simplify();
+pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
+    let eval_expr = Arc::new(expr.simplify());
     let eval = move |x: f64, y: f64, z: f64| -> f64 {
-        let mut vars = HashMap::new();
+        let mut vars = HashMap::with_capacity(3);
         vars.insert("x".to_string(), num(x));
         vars.insert("y".to_string(), num(y));
         vars.insert("z".to_string(), num(z));
-        expr.substitute(&vars).evaluate_to_f64().unwrap()
+        eval_expr.substitute(&vars).evaluate_to_f64().unwrap()
     };
     Arc::new(eval)
 }

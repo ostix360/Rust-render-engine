@@ -274,8 +274,7 @@ impl eframe::App for ControlApp {
         self.show_error_popup(ui.ctx());
     }
 
-    fn update(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
-    }
+    fn update(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {}
 }
 
 fn info_dot(ui: &mut egui::Ui) {

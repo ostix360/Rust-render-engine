@@ -1,11 +1,7 @@
 use crate::maths::differential::Form;
 use crate::maths::{Expr, ExternalDerivative};
-use crate::toolbox::maths::print_matrix;
-use mathhook_core::core::expression::smart_display::SmartDisplayFormatter;
 use mathhook_core::matrices::{Matrix, MatrixOperations};
-use mathhook_core::MathLanguage::{LaTeX, Simple};
 use mathhook_core::{expr, Expression, Simplify};
-use std::collections::HashMap;
 use std::ops::{Add, Mul};
 use std::sync::Arc;
 
@@ -28,12 +24,6 @@ fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Exp
         &(a1.clone().mul(b1.clone())),
         &(a2.clone().mul(b2.clone())),
     )
-}
-
-fn print_dx(dx: &Vec<Expr>) {
-    for i in 0..dx.len() {
-        println!("dx[{}] = {}", i, dx[i].format_as(LaTeX).unwrap());
-    }
 }
 
 impl Space {
@@ -60,24 +50,6 @@ impl Space {
 
         let metric: Matrix = Matrix::symmetric(3, vec![g_xx, g_xy, g_yy, g_xz, g_yz, g_zz]);
         let vielbein = Expression::Matrix(Arc::new(metric.cholesky_decomposition().unwrap().l));
-        // let mut map = HashMap::default();
-        // map.insert("x".to_string(), expr!(1));
-        // map.insert("y".to_string(), expr!(1));
-        // map.insert("z".to_string(), expr!(1));
-        // println!("Value: {}", vielbein.substitute_and_simplify(&map).format_as(LaTeX).unwrap());
-        // let num = vielbein.substitute(&map).evaluate_to_f64();
-        // print_dx(&d_x);
-        // print_dx(&d_y);
-        // print_dx(&d_z);
-
-        // basically the sqrt of g
-        match vielbein.simplify() {
-            Expression::Matrix(m) => {
-                print_matrix(&m);
-            }
-            _ => {}
-        };
-
         Space {
             dim: 3,
             metric,
