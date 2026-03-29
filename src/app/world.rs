@@ -10,10 +10,10 @@ use crate::render::master_render::MasterRenderer;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::color::WHITE;
 use crate::toolbox::opengl::display_manager::DisplayManager;
-use nalgebra::{vector, Matrix4, Vector3, Vector4};
-use std::sync::{Arc, Mutex};
 use mathhook_core::formatter::simple::SimpleContext;
 use mathhook_core::SimpleFormatter;
+use nalgebra::{vector, Matrix4, Vector3, Vector4};
+use std::sync::{Arc, Mutex};
 use typed_floats::NonNaN;
 
 #[derive(Clone, PartialEq)]
@@ -30,9 +30,15 @@ impl AppliedConfig {
         Self {
             grid_config: state.to_grid_config(),
             coord_eqs: [
-                state.coords_sys.x.eq.to_simple(&context).expect("Error while converting x eq"),
-                state.coords_sys.y.eq.to_simple(&context).expect("Error while converting y eq"),
-                state.coords_sys.z.eq.to_simple(&context).expect("Error while converting z eq"),
+                state.coords_sys.x.eq
+                    .to_simple(&context)
+                    .expect("Error while converting x eq"),
+                state.coords_sys.y.eq
+                    .to_simple(&context)
+                    .expect("Error while converting y eq"),
+                state.coords_sys.z.eq
+                    .to_simple(&context)
+                    .expect("Error while converting z eq"),
             ],
             field_eqs: [
                 state.field.x.eq_str.clone(),

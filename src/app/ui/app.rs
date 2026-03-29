@@ -146,7 +146,7 @@ impl ControlApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .frame(
-                egui::Frame::window(&ctx.style())
+                egui::Frame::window(&ctx.global_style())
                     .fill(PANEL)
                     .stroke(Stroke::new(1.5, BORDER))
                     .inner_margin(Margin::same(14)),

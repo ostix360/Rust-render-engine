@@ -59,6 +59,7 @@ impl GridShader {
         self.color.load_vector_to_uniform(color_vec);
     }
 
+    #[allow(dead_code)]
     pub fn load_color(&self, color: Vector3<f64>) {
         self.color.load_vector_to_uniform(color);
     }

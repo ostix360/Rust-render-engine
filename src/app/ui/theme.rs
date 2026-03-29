@@ -20,7 +20,7 @@ pub(crate) const MUTED: Color32 = Color32::from_rgb(175, 182, 195);
 
 pub(crate) fn apply_style(ctx: &egui::Context) {
     ctx.set_visuals(egui::Visuals::dark());
-    let mut style = (*ctx.style()).clone();
+    let mut style = (*ctx.global_style()).clone();
     style.spacing.item_spacing = egui::vec2(10.0, 10.0);
     style.spacing.window_margin = Margin::same(18);
 
@@ -46,7 +46,7 @@ pub(crate) fn apply_style(ctx: &egui::Context) {
     style.visuals.selection.bg_fill = ACCENT;
     style.visuals.selection.stroke = Stroke::new(1.0, Color32::from_rgb(30, 60, 120));
     style.visuals.slider_trailing_fill = true;
-    ctx.set_style(style);
+    ctx.set_global_style(style);
 }
 
 pub(crate) fn section_heading(text: &str) -> RichText {

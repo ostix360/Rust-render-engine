@@ -6,6 +6,7 @@ pub struct GridWorld {
 }
 
 impl GridWorld {
+    #[allow(dead_code)]
     pub fn new(grid: &Grid) -> Self {
         Self::from_points(Self::process_data(grid))
     }
@@ -15,6 +16,7 @@ impl GridWorld {
         Self { data: kd_tree }
     }
 
+    #[allow(dead_code)]
     fn process_data(grid: &Grid) -> Vec<[f64; 3]> {
         let data = grid.get_data();
         let coords = grid.get_coords();
@@ -40,6 +42,7 @@ impl GridWorld {
         points
     }
 
+    #[allow(dead_code)]
     pub fn update_data(&mut self, grid: &Grid) {
         self.replace_points(Self::process_data(grid));
     }

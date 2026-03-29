@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub type Metric = Matrix;
 
 pub struct Space {
+    #[allow(dead_code)]
     dim: u32,
     metric: Metric,
     vielbein: Expr,
@@ -18,6 +19,7 @@ fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
     a.add(b).add(c).simplify()
 }
 
+#[allow(dead_code)]
 fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Expr {
     sum3(
         &(a0.clone().mul(b0.clone())),
@@ -74,6 +76,7 @@ impl Space {
         &self.metric
     }
 
+    #[allow(dead_code)]
     pub fn get_vielbein(&self) -> &Expr {
         &self.vielbein
     }

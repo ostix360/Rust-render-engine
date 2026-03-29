@@ -61,9 +61,9 @@ impl<'a> Model<'a> {
 }
 
 pub struct Sphere {
+    #[allow(dead_code)]
     pub position: Vector3<f64>,
     color: Color,
-    size: f64,
     transformation: Matrix4<f64>,
 }
 
@@ -75,7 +75,6 @@ impl Sphere {
         Self {
             position,
             color,
-            size,
             transformation,
         }
     }
@@ -89,12 +88,14 @@ impl Sphere {
     }
 }
 
+#[allow(dead_code)]
 pub struct UnitArrow {
     pub position: Vector3<f64>,
     pub direction: Vector3<f64>,
     pub color: Color,
 }
 
+#[allow(dead_code)]
 impl UnitArrow {
     pub fn new(position: Vector3<f64>, direction: Vector3<f64>, color: Color) -> Self {
         Self {

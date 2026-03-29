@@ -1,6 +1,7 @@
 use mathhook_core::matrices::Matrix;
 use mathhook_core::MathLanguage::LaTeX;
 
+#[allow(dead_code)]
 pub fn print_matrix(matrix: &Matrix) {
     let (n, m) = matrix.dimensions();
     for i in 0..n {

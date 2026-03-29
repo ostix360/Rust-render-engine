@@ -9,8 +9,11 @@ use nalgebra::{vector, Vector3};
 use std::ops::{Add, Deref};
 
 pub struct CoordsSys {
+    #[allow(dead_code)]
     x_eq: Expr,
+    #[allow(dead_code)]
     y_eq: Expr,
+    #[allow(dead_code)]
     z_eq: Expr,
     fast_x_eq: FastExpr3d,
     fast_y_eq: FastExpr3d,
@@ -140,6 +143,7 @@ impl CoordsSys {
         ]
     }
 
+    #[allow(dead_code)]
     pub fn eval_otn_vector_with_basis(
         &self,
         basis: &[Vector3<f64>; 3],
@@ -148,11 +152,13 @@ impl CoordsSys {
         basis[0] * vector.x + basis[1] * vector.y + basis[2] * vector.z
     }
 
+    #[allow(dead_code)]
     pub fn eval_otn_vector(&self, point: Vector3<f64>, vector: Vector3<f64>) -> Vector3<f64> {
         let basis = self.eval_tangent_basis(point);
         self.eval_otn_vector_with_basis(&basis, vector)
     }
 
+    #[allow(dead_code)]
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {
         eqs[0] == self.x_eq.to_string()
             && eqs[1] == self.y_eq.to_string()
