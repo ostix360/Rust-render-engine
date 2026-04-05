@@ -1,8 +1,8 @@
 use crate::app::grid::Grid;
 use crate::app::grid::SegmentDir;
+use crate::app::tangent_space::SceneSpaceTransform;
 use crate::render::grid_shader::GridShader;
 use crate::toolbox::opengl::shader::shader_program::Shader;
-use crate::toolbox::transition::SceneSpaceTransform;
 use gl::types::GLsizei;
 use nalgebra::Matrix4;
 use std::ptr::null;

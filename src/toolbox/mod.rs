@@ -5,4 +5,3 @@ pub mod logging;
 pub mod maths;
 pub mod obj_loader;
 pub mod opengl;
-pub mod transition;
