@@ -1,6 +1,8 @@
 use crate::app::grid::SegmentDir;
+use crate::render::master_render::SceneSpaceTransform;
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
+use crate::toolbox::opengl::shader::uniform::floatuniform::FloatUniform;
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::vec3uniform::Vec3Uniform;
 use nalgebra::{Matrix4, Vector3};
@@ -12,6 +14,11 @@ pub struct GridShader {
     view_matrix: Matrix4Uniform,
     vertex_editable_src: String,
     color: Vec3Uniform,
+    tangent_mix: FloatUniform,
+    tangent_anchor_abstract: Vec3Uniform,
+    tangent_basis_x: Vec3Uniform,
+    tangent_basis_y: Vec3Uniform,
+    tangent_basis_z: Vec3Uniform,
 }
 
 impl GridShader {
@@ -25,6 +32,11 @@ impl GridShader {
             view_matrix: Matrix4Uniform::new("view_matrix"),
             vertex_editable_src,
             color: Vec3Uniform::new("segment_color"),
+            tangent_mix: FloatUniform::new("tangent_mix"),
+            tangent_anchor_abstract: Vec3Uniform::new("tangent_anchor_abstract"),
+            tangent_basis_x: Vec3Uniform::new("tangent_basis_x"),
+            tangent_basis_y: Vec3Uniform::new("tangent_basis_y"),
+            tangent_basis_z: Vec3Uniform::new("tangent_basis_z"),
         }
     }
 
@@ -59,6 +71,19 @@ impl GridShader {
         self.color.load_vector_to_uniform(color_vec);
     }
 
+    pub fn load_scene_transform(&self, scene_transform: &SceneSpaceTransform) {
+        self.tangent_mix
+            .load_float_to_uniform(scene_transform.tangent_mix);
+        self.tangent_anchor_abstract
+            .load_vector_to_uniform(scene_transform.tangent_anchor_abstract);
+        self.tangent_basis_x
+            .load_vector_to_uniform(scene_transform.tangent_basis[0]);
+        self.tangent_basis_y
+            .load_vector_to_uniform(scene_transform.tangent_basis[1]);
+        self.tangent_basis_z
+            .load_vector_to_uniform(scene_transform.tangent_basis[2]);
+    }
+
     #[allow(dead_code)]
     pub fn load_color(&self, color: Vector3<f64>) {
         self.color.load_vector_to_uniform(color);
@@ -91,6 +116,11 @@ impl Shader for GridShader {
                 &mut self.transformation_matrix.uniform,
                 &mut self.view_matrix.uniform,
                 &mut self.color.uniform,
+                &mut self.tangent_mix.uniform,
+                &mut self.tangent_anchor_abstract.uniform,
+                &mut self.tangent_basis_x.uniform,
+                &mut self.tangent_basis_y.uniform,
+                &mut self.tangent_basis_z.uniform,
             ]);
         self.shader_program.store_all_uniforms(&mut uniforms);
     }

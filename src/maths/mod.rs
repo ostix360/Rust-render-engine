@@ -26,6 +26,7 @@ pub type FastExpr3d = Arc<dyn Fn(f64, f64, f64) -> f64 + Sync>;
 
 pub const COORD: [&str; 3] = ["x", "y", "z"];
 
+#[derive(Clone, Copy)]
 pub struct Point {
     pub x: f64,
     pub y: f64,

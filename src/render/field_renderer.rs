@@ -46,6 +46,12 @@ impl FieldRenderer {
         self.finish();
     }
 
+    pub fn update_projection(&mut self, projection: &Matrix4<f64>) {
+        self.shader.bind();
+        self.shader.load_projection_matrix(projection);
+        self.shader.unbind();
+    }
+
     fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);

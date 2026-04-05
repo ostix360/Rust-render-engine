@@ -74,6 +74,38 @@ impl Renderer {
         self.finish();
     }
 
+    pub fn draw_points(&self, points: &[Sphere], view_matrix: &Matrix4<f64>) {
+        if points.is_empty() {
+            return;
+        }
+
+        self.prepare(view_matrix);
+        self.sphere_vao.binds(&[0]);
+
+        for point in points {
+            self.shader
+                .load_transformation_matrix(point.get_transformation_matrix());
+            self.shader.load_color(point.get_color());
+            unsafe {
+                DrawElements(
+                    TRIANGLES,
+                    self.sphere_vao.get_vertex_count() as GLsizei,
+                    UNSIGNED_INT,
+                    0 as *const _,
+                );
+            }
+        }
+
+        self.sphere_vao.unbinds(&[0]);
+        self.finish();
+    }
+
+    pub fn update_projection(&mut self, projection: &Matrix4<f64>) {
+        self.shader.bind();
+        self.shader.load_projection_matrix(projection);
+        self.shader.unbind();
+    }
+
     fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);

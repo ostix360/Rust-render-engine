@@ -1,6 +1,7 @@
 use crate::app::grid::Grid;
 use crate::app::grid::SegmentDir;
 use crate::render::grid_shader::GridShader;
+use crate::render::master_render::SceneSpaceTransform;
 use crate::toolbox::opengl::shader::shader_program::Shader;
 use gl::types::GLsizei;
 use nalgebra::Matrix4;
@@ -20,8 +21,13 @@ impl GridRenderer {
         GridRenderer { shader, projection }
     }
 
-    pub fn render(&self, grid: &Grid, view_matrix: &Matrix4<f64>) {
-        self.prepare(view_matrix);
+    pub fn render(
+        &self,
+        grid: &Grid,
+        view_matrix: &Matrix4<f64>,
+        scene_transform: &SceneSpaceTransform,
+    ) {
+        self.prepare(view_matrix, scene_transform);
         let data = grid.get_data();
         for (key, values) in data.iter() {
             let vao = key
@@ -50,9 +56,17 @@ impl GridRenderer {
         self.shader.unbind();
     }
 
-    fn prepare(&self, view_matrix: &Matrix4<f64>) {
+    pub fn update_projection(&mut self, projection: Matrix4<f64>) {
+        self.projection = projection;
+        self.shader.bind();
+        self.shader.load_projection_matrix(&self.projection);
+        self.shader.unbind();
+    }
+
+    fn prepare(&self, view_matrix: &Matrix4<f64>, scene_transform: &SceneSpaceTransform) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);
+        self.shader.load_scene_transform(scene_transform);
     }
 
     fn unprepare(&self) {

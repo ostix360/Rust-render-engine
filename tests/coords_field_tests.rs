@@ -167,3 +167,22 @@ fn vector_field_new_preserves_dual_components_in_identity_space() {
         "dual z component",
     );
 }
+
+#[test]
+fn vector_field_dual_at_matches_dual_component_expressions() {
+    let space = Space::new(parse("x"), parse("y"), parse("z"));
+    let field = VectorField::new(
+        Form::new(vec![parse("x"), parse("y + 2"), parse("3*z")], 1),
+        &space,
+    );
+
+    let result = field.dual_at(Point {
+        x: 1.5,
+        y: -2.0,
+        z: 0.25,
+    });
+
+    assert_close(result.x, 1.5, "dual_at x component");
+    assert_close(result.y, 0.0, "dual_at y component");
+    assert_close(result.z, 0.75, "dual_at z component");
+}
