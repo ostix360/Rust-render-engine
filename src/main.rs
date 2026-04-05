@@ -41,16 +41,13 @@ fn main() {
 
     let mut world = World::new(ui_state, &display_manager);
     while !display_manager.is_close_requested() {
-        camera.update(display_manager.get_input());
-
-        let mouse_info = camera.mouse_pos_to_world_pos(&display_manager, world.get_projection());
-        // println!("Mouse dir: {}", mouse_info.1);
-
-        world.update(mouse_info);
+        world.update(
+            display_manager.get_input(),
+            display_manager.get_delta() as f64,
+            &display_manager,
+            &mut camera,
+        );
         world.render(&camera);
-
-        // let nearest = grid_world.found_nearest(&[camera.position.x, camera.position.y, camera.position.z]);
-        // println!("Nearest point: {:?}", nearest);
 
         display_manager.update_display();
     }

@@ -1,41 +1,63 @@
 use crate::app::grid::Grid;
-use kd_tree::KdTree;
-use nalgebra::{Vector3, Vector4};
+use kd_tree::KdMap;
+use nalgebra::{vector, Vector3, Vector4};
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GridSample {
+    pub world_pos: Vector3<f64>,
+    pub abstract_pos: Vector3<f64>,
+}
+
+type GridMap = KdMap<[f64; 3], Vector3<f64>>;
+
 pub struct GridWorld {
-    data: KdTree<[f64; 3]>,
+    data: GridMap,
 }
 
 impl GridWorld {
     #[allow(dead_code)]
     pub fn new(grid: &Grid) -> Self {
-        Self::from_points(Self::process_data(grid))
+        Self::from_samples(Self::process_data(grid))
     }
 
-    pub fn from_points(points: Vec<[f64; 3]>) -> Self {
-        let kd_tree = KdTree::par_build_by_ordered_float(points);
+    pub fn from_samples(samples: Vec<GridSample>) -> Self {
+        let kd_tree = GridMap::par_build_by_ordered_float(
+            samples
+                .into_iter()
+                .map(|sample| {
+                    (
+                        [sample.world_pos.x, sample.world_pos.y, sample.world_pos.z],
+                        sample.abstract_pos,
+                    )
+                })
+                .collect(),
+        );
         Self { data: kd_tree }
     }
 
     #[allow(dead_code)]
-    fn process_data(grid: &Grid) -> Vec<[f64; 3]> {
+    fn process_data(grid: &Grid) -> Vec<GridSample> {
         let data = grid.get_data();
         let coords = grid.get_coords();
         let mut estimate_cap = 0;
         for (edge, transforms) in data.iter() {
-            estimate_cap = estimate_cap + edge.get_nb_vertices() * transforms.len();
+            estimate_cap += edge.get_nb_vertices() * transforms.len();
         }
         let mut points = Vec::with_capacity(estimate_cap);
         for (edge, transforms) in data.iter() {
             let vertices = edge.get_vertices();
             for (transform, _) in transforms.iter() {
-                if vertices.len() == 0 {
+                if vertices.is_empty() {
                     continue;
                 }
                 for vertex in vertices.iter() {
                     let vec4 = Vector4::new(vertex.x.get(), vertex.y.get(), vertex.z.get(), 1.0);
-                    let world_pos = transform * vec4;
-                    let (x, y, z) = coords.eval(world_pos.x, world_pos.y, world_pos.z);
-                    points.push([x, y, z]);
+                    let abstract_pos = (transform * vec4).xyz();
+                    let world_pos = coords.eval_position(abstract_pos);
+                    points.push(GridSample {
+                        world_pos,
+                        abstract_pos,
+                    });
                 }
             }
         }
@@ -44,30 +66,46 @@ impl GridWorld {
 
     #[allow(dead_code)]
     pub fn update_data(&mut self, grid: &Grid) {
-        self.replace_points(Self::process_data(grid));
+        self.replace_samples(Self::process_data(grid));
     }
 
-    pub fn replace_points(&mut self, points: Vec<[f64; 3]>) {
-        self.data = KdTree::par_build_by_ordered_float(points);
+    pub fn replace_samples(&mut self, samples: Vec<GridSample>) {
+        self.data = GridMap::par_build_by_ordered_float(
+            samples
+                .into_iter()
+                .map(|sample| {
+                    (
+                        [sample.world_pos.x, sample.world_pos.y, sample.world_pos.z],
+                        sample.abstract_pos,
+                    )
+                })
+                .collect(),
+        );
     }
 
     #[allow(dead_code)]
-    pub fn found_nearest(&self, pos: &[f64; 3]) -> Option<(f64, f64, f64)> {
-        let coords = self.data.nearest(pos)?.item;
-        Some((coords[0], coords[1], coords[2]))
+    pub fn found_nearest(&self, pos: &[f64; 3]) -> Option<GridSample> {
+        let (world_pos, abstract_pos) = self.data.nearest(pos)?.item;
+        Some(GridSample {
+            world_pos: vector![world_pos[0], world_pos[1], world_pos[2]],
+            abstract_pos: *abstract_pos,
+        })
     }
 
-    fn find_nearest(pos: &Vector3<f64>, points: &[&[f64; 3]]) -> (f64, f64, f64) {
+    fn find_nearest(pos: &Vector3<f64>, points: &[&([f64; 3], Vector3<f64>)]) -> GridSample {
         let mut best_dist = f64::MAX;
         let mut coord = points[0];
         for point in points {
-            let d = (pos - Vector3::new(point[0], point[1], point[2])).norm();
+            let d = (pos - Vector3::new(point.0[0], point.0[1], point.0[2])).norm();
             if d < best_dist {
                 best_dist = d;
                 coord = point;
             }
         }
-        (coord[0], coord[1], coord[2])
+        GridSample {
+            world_pos: vector![coord.0[0], coord.0[1], coord.0[2]],
+            abstract_pos: coord.1,
+        }
     }
 
     /// Ray casting in the grid world.
@@ -79,8 +117,8 @@ impl GridWorld {
         dir: &Vector3<f64>,
         radius: f64,
         length: f64,
-    ) -> Option<(f64, f64, f64)> {
-        let step_len = radius / 2.;
+    ) -> Option<GridSample> {
+        let step_len = radius / 2.0;
         let nb_steps = (length / step_len).ceil() as usize;
         for step in 0..nb_steps {
             let query_point = pos + (dir * step_len * step as f64);
@@ -91,5 +129,32 @@ impl GridWorld {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{GridSample, GridWorld};
+    use nalgebra::vector;
+
+    #[test]
+    fn ray_cast_returns_world_and_abstract_coordinates() {
+        let world = GridWorld::from_samples(vec![
+            GridSample {
+                world_pos: vector![3.0, 0.0, 0.0],
+                abstract_pos: vector![1.0, 2.0, 3.0],
+            },
+            GridSample {
+                world_pos: vector![6.0, 0.0, 0.0],
+                abstract_pos: vector![4.0, 5.0, 6.0],
+            },
+        ]);
+
+        let hit = world
+            .ray_cast(&vector![0.0, 0.0, 0.0], &vector![1.0, 0.0, 0.0], 0.5, 10.0)
+            .expect("expected hit");
+
+        assert_eq!(hit.world_pos, vector![3.0, 0.0, 0.0]);
+        assert_eq!(hit.abstract_pos, vector![1.0, 2.0, 3.0]);
     }
 }

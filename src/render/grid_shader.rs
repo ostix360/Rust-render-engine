@@ -1,10 +1,10 @@
 use crate::app::grid::SegmentDir;
-use crate::render::master_render::SceneSpaceTransform;
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
 use crate::toolbox::opengl::shader::uniform::floatuniform::FloatUniform;
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::vec3uniform::Vec3Uniform;
+use crate::toolbox::transition::SceneSpaceTransform;
 use nalgebra::{Matrix4, Vector3};
 
 pub struct GridShader {

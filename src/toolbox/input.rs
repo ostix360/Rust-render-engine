@@ -2,6 +2,7 @@ use glfw::{Action, Key};
 
 pub struct Input {
     input_keyboard: Vec<Key>,
+    pressed_this_frame: Vec<Key>,
     pub mouse_pos: (f64, f64),
     pub d_mouse_pos: (f64, f64),
     left_mouse_button: bool,
@@ -12,6 +13,7 @@ impl Input {
     pub fn new() -> Input {
         Input {
             input_keyboard: Vec::new(),
+            pressed_this_frame: Vec::new(),
             mouse_pos: (0.0, 0.0),
             d_mouse_pos: (0.0, 0.0),
             left_mouse_button: false,
@@ -19,10 +21,17 @@ impl Input {
         }
     }
 
+    pub fn begin_frame(&mut self) {
+        self.pressed_this_frame.clear();
+    }
+
     pub fn key_handler(&mut self, action: Action, key: Key) {
         if action == Action::Press {
             if !self.input_keyboard.contains(&key) {
                 self.input_keyboard.push(key);
+            }
+            if !self.pressed_this_frame.contains(&key) {
+                self.pressed_this_frame.push(key);
             }
         } else if action == Action::Release {
             self.input_keyboard.retain(|&x| x != key);
@@ -58,11 +67,55 @@ impl Input {
         self.input_keyboard.contains(&key)
     }
 
+    pub fn is_key_just_pressed(&self, key: Key) -> bool {
+        self.pressed_this_frame.contains(&key)
+    }
+
     pub fn is_mouse_button_pressed(&self, button: glfw::MouseButton) -> bool {
         match button {
             glfw::MouseButton::Left => self.left_mouse_button,
             glfw::MouseButton::Right => self.right_mouse_button,
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Input;
+    use glfw::{Action, Key};
+
+    #[test]
+    fn just_pressed_only_last_for_one_frame() {
+        let mut input = Input::new();
+
+        input.begin_frame();
+        input.key_handler(Action::Press, Key::T);
+
+        assert!(input.is_key_pressed(Key::T));
+        assert!(input.is_key_just_pressed(Key::T));
+
+        input.begin_frame();
+
+        assert!(input.is_key_pressed(Key::T));
+        assert!(!input.is_key_just_pressed(Key::T));
+    }
+
+    #[test]
+    fn holding_key_does_not_retrigger_press_edge() {
+        let mut input = Input::new();
+
+        input.begin_frame();
+        input.key_handler(Action::Press, Key::T);
+        assert!(input.is_key_just_pressed(Key::T));
+
+        input.begin_frame();
+        input.key_handler(Action::Repeat, Key::T);
+
+        assert!(input.is_key_pressed(Key::T));
+        assert!(!input.is_key_just_pressed(Key::T));
+
+        input.key_handler(Action::Release, Key::T);
+        assert!(!input.is_key_pressed(Key::T));
     }
 }

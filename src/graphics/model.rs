@@ -79,6 +79,14 @@ impl Sphere {
         }
     }
 
+    pub fn from_rgba(position: Vector3<f64>, rgba: Vector4<f64>, size: f64) -> Self {
+        Self::new(
+            position,
+            Color::new(rgba.x as f32, rgba.y as f32, rgba.z as f32, rgba.w as f32),
+            size,
+        )
+    }
+
     pub fn get_transformation_matrix(&self) -> &Matrix4<f64> {
         &self.transformation
     }

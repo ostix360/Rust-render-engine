@@ -112,6 +112,7 @@ impl DisplayManager {
     }
 
     fn handle_window_events(&mut self) {
+        self.input.begin_frame();
         self.glfw.as_mut().unwrap().poll_events();
         let (x, y) = self.window.as_ref().unwrap().get_cursor_pos();
         self.input.set_mouse_pos(x, y);
@@ -132,13 +133,13 @@ impl DisplayManager {
     }
 
     fn get_current_time(&self) -> f32 {
-        unsafe { (glfwGetTime() * 1000.0 / glfwGetTimerFrequency() as f64) as f32 }
+        unsafe { glfwGetTime() as f32 }
     }
     pub fn update_display(&mut self) {
         self.handle_window_events();
         self.size_handler();
         let current_time = self.get_current_time();
-        self.delta = (current_time - self.last_frame_time) / 1000.0;
+        self.delta = current_time - self.last_frame_time;
         self.last_frame_time = current_time;
         unsafe {
             gl::Viewport(0, 0, self.width as i32, self.height as i32);
