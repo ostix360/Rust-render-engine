@@ -1,10 +1,12 @@
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid_world::{GridSample, GridWorld};
+use crate::app::ui::DualLegendState;
+use crate::graphics::model::Sphere;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::input::Input;
 use crate::toolbox::opengl::display_manager::DisplayManager;
 use glfw::Key;
-use nalgebra::{vector, Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Vector3, Vector4};
 
 const DIVE_DURATION_SEC: f64 = 0.45;
 const PICK_RADIUS: f64 = 0.45;
@@ -13,6 +15,20 @@ const ZOOM_FACTOR: f64 = 0.8;
 const MIN_ZOOM: f64 = 1.2;
 const MAX_ZOOM: f64 = 8.0;
 const MAX_ZOOM_FRACTION: f64 = 0.8;
+const FORM_SAMPLE_SIZE: f64 = 0.06;
+const DUAL_FORM_GRID_RADIUS: i32 = 4;
+const DUAL_FORM_GRID_STEP: f64 = 0.45;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TangentView {
+    Geometric,
+    Dual,
+}
+
+pub struct DualFormRender {
+    pub samples: Vec<Sphere>,
+    pub legend: DualLegendState,
+}
 
 #[derive(Clone, Copy)]
 pub struct SceneSpaceTransform {
@@ -27,9 +43,9 @@ impl SceneSpaceTransform {
             tangent_mix: 0.0,
             tangent_anchor_abstract: Vector3::zeros(),
             tangent_basis: [
-                vector![1.0, 0.0, 0.0],
-                vector![0.0, 1.0, 0.0],
-                vector![0.0, 0.0, 1.0],
+                Vector3::new(1.0, 0.0, 0.0),
+                Vector3::new(0.0, 1.0, 0.0),
+                Vector3::new(0.0, 0.0, 1.0),
             ],
         }
     }
@@ -58,12 +74,12 @@ struct DiveAnchor {
 }
 
 impl DiveAnchor {
-    fn tangent_position(&self, abstract_pos: Vector3<f64>) -> Vector3<f64> {
+    fn geometric_tangent_position(&self, abstract_pos: Vector3<f64>) -> Vector3<f64> {
         let delta = abstract_pos - self.abstract_pos;
         self.basis[0] * delta.x + self.basis[1] * delta.y + self.basis[2] * delta.z
     }
 
-    fn tangent_vector(&self, vector: Vector3<f64>) -> Vector3<f64> {
+    fn geometric_tangent_vector(&self, vector: Vector3<f64>) -> Vector3<f64> {
         self.basis[0] * vector.x + self.basis[1] * vector.y + self.basis[2] * vector.z
     }
 
@@ -103,6 +119,7 @@ impl DiveCameraEndpoints {
 struct DiveState {
     mode: DiveMode,
     alpha: f64,
+    view: TangentView,
     anchor: Option<DiveAnchor>,
     camera_endpoints: Option<DiveCameraEndpoints>,
 }
@@ -112,6 +129,7 @@ impl DiveState {
         Self {
             mode: DiveMode::World,
             alpha: 0.0,
+            view: TangentView::Geometric,
             anchor: None,
             camera_endpoints: None,
         }
@@ -202,15 +220,15 @@ impl TangentSpace {
         coords: &CoordsSys,
         projection: Matrix4<f64>,
     ) {
-        let toggle_pressed = input.is_key_just_pressed(Key::T);
+        let requested_view = requested_view(input);
         match self.dive.mode {
             DiveMode::World => {
                 camera.update(input);
                 self.hovered_sample =
                     self.pick_hover_sample(camera, display_manager, grid_world, projection);
-                if toggle_pressed {
+                if let Some(view) = requested_view {
                     if let Some(sample) = self.hovered_sample.clone() {
-                        self.start_enter(camera, coords, sample);
+                        self.start_enter(camera, coords, sample, view);
                     }
                 }
             }
@@ -222,14 +240,31 @@ impl TangentSpace {
                 if let Some(endpoints) = self.dive.camera_endpoints.as_mut() {
                     endpoints.shift(translation_delta);
                 }
-                if toggle_pressed {
-                    self.dive.mode = DiveMode::Exiting;
+                if let Some(view) = requested_view {
+                    if view == self.dive.view {
+                        self.dive.mode = DiveMode::Exiting;
+                    } else {
+                        self.dive.view = view;
+                    }
                 }
             }
             DiveMode::Entering | DiveMode::Exiting => {
                 self.hovered_sample = None;
-                if toggle_pressed {
-                    self.dive.reverse();
+                if let Some(view) = requested_view {
+                    match self.dive.mode {
+                        DiveMode::Entering => {
+                            if view == self.dive.view {
+                                self.dive.reverse();
+                            } else {
+                                self.dive.view = view;
+                            }
+                        }
+                        DiveMode::Exiting => {
+                            self.dive.view = view;
+                            self.dive.reverse();
+                        }
+                        DiveMode::World | DiveMode::Tangent => {}
+                    }
                 }
             }
         }
@@ -247,6 +282,14 @@ impl TangentSpace {
 
     pub fn scene_mix(&self) -> f64 {
         self.dive.scene_mix()
+    }
+
+    pub fn active_view(&self) -> Option<TangentView> {
+        if self.dive.mode == DiveMode::World {
+            None
+        } else {
+            Some(self.dive.view)
+        }
     }
 
     pub fn scene_transform(&self) -> SceneSpaceTransform {
@@ -269,17 +312,22 @@ impl TangentSpace {
         }
     }
 
+    pub fn anchor_abstract_position(&self) -> Option<Vector3<f64>> {
+        self.dive.anchor.as_ref().map(|anchor| anchor.abstract_pos)
+    }
+
     pub fn blend_position(
         &self,
         world_pos: Vector3<f64>,
         abstract_pos: Vector3<f64>,
     ) -> Vector3<f64> {
         if let Some(anchor) = &self.dive.anchor {
-            lerp_vec3(
-                world_pos,
-                anchor.tangent_position(abstract_pos),
-                self.dive.scene_mix(),
-            )
+            let tangent_pos = if self.active_view() == Some(TangentView::Geometric) {
+                anchor.geometric_tangent_position(abstract_pos)
+            } else {
+                abstract_pos - anchor.abstract_pos
+            };
+            lerp_vec3(world_pos, tangent_pos, self.dive.scene_mix())
         } else {
             world_pos
         }
@@ -291,18 +339,90 @@ impl TangentSpace {
         field_components: Vector3<f64>,
     ) -> Vector3<f64> {
         if let Some(anchor) = &self.dive.anchor {
-            lerp_vec3(
-                world_vector,
-                anchor.tangent_vector(field_components),
-                self.dive.scene_mix(),
-            )
+            let tangent_vector = if self.active_view() == Some(TangentView::Geometric) {
+                anchor.geometric_tangent_vector(field_components)
+            } else {
+                field_components
+            };
+            lerp_vec3(world_vector, tangent_vector, self.dive.scene_mix())
         } else {
             world_vector
         }
     }
 
     pub fn show_form_samples(&self) -> bool {
-        self.scene_mix() >= 0.5
+        self.active_view() == Some(TangentView::Dual) && self.scene_mix() >= 0.5
+    }
+
+    pub fn show_vector_field(&self) -> bool {
+        !self.show_form_samples()
+    }
+
+    pub fn show_grid(&self) -> bool {
+        self.active_view() != Some(TangentView::Dual) || self.scene_mix() < 0.5
+    }
+
+    pub fn dual_form_sample_capacity(&self) -> usize {
+        ((2 * DUAL_FORM_GRID_RADIUS + 1).pow(3)) as usize
+    }
+
+    pub fn blend_field_components(
+        &self,
+        field_components: Vector3<f64>,
+        anchor_field_components: Option<Vector3<f64>>,
+    ) -> Vector3<f64> {
+        if self.active_view() == Some(TangentView::Geometric) {
+            anchor_field_components
+                .map(|anchor| lerp_vec3(field_components, anchor, self.scene_mix()))
+                .unwrap_or(field_components)
+        } else {
+            field_components
+        }
+    }
+
+    pub fn build_dual_form_render(&self, dual_components: Vector3<f64>) -> Option<DualFormRender> {
+        let anchor = self.dive.anchor.as_ref()?;
+
+        let dual_norm = dual_components.norm();
+        let mut sampled_values = Vec::with_capacity(self.dual_form_sample_capacity());
+        let mut min_value = f64::INFINITY;
+        let mut max_value = f64::NEG_INFINITY;
+
+        for z in -DUAL_FORM_GRID_RADIUS..=DUAL_FORM_GRID_RADIUS {
+            for y in -DUAL_FORM_GRID_RADIUS..=DUAL_FORM_GRID_RADIUS {
+                for x in -DUAL_FORM_GRID_RADIUS..=DUAL_FORM_GRID_RADIUS {
+                    let tangent_position = vector![
+                        x as f64 * DUAL_FORM_GRID_STEP,
+                        y as f64 * DUAL_FORM_GRID_STEP,
+                        z as f64 * DUAL_FORM_GRID_STEP
+                    ];
+                    let value = dual_components.dot(&tangent_position);
+                    let render_position = anchor.geometric_tangent_vector(tangent_position);
+                    min_value = min_value.min(value);
+                    max_value = max_value.max(value);
+                    sampled_values.push((render_position, value));
+                }
+            }
+        }
+
+        if dual_norm <= 1.0e-6 {
+            min_value = -1.0;
+            max_value = 1.0;
+        }
+
+        let mut samples = Vec::with_capacity(sampled_values.len());
+        for (position, value) in sampled_values {
+            let color = differential_form_color(value, min_value, max_value);
+            samples.push(Sphere::from_rgba(position, color, FORM_SAMPLE_SIZE));
+        }
+
+        Some(DualFormRender {
+            samples,
+            legend: DualLegendState {
+                min_value,
+                max_value,
+            },
+        })
     }
 
     fn pick_hover_sample(
@@ -316,7 +436,13 @@ impl TangentSpace {
         grid_world.ray_cast(&mouse_info.0, &mouse_info.1, PICK_RADIUS, PICK_LENGTH)
     }
 
-    fn start_enter(&mut self, camera: &Camera, coords: &CoordsSys, sample: GridSample) {
+    fn start_enter(
+        &mut self,
+        camera: &Camera,
+        coords: &CoordsSys,
+        sample: GridSample,
+        view: TangentView,
+    ) {
         let anchor = DiveAnchor {
             abstract_pos: sample.abstract_pos,
             world_pos: sample.world_pos,
@@ -325,9 +451,22 @@ impl TangentSpace {
         };
         self.dive.alpha = 0.0;
         self.dive.mode = DiveMode::Entering;
+        self.dive.view = view;
         self.dive.camera_endpoints = Some(anchor.build_camera_endpoints(camera.position));
         self.dive.anchor = Some(anchor);
         self.hovered_sample = None;
+    }
+}
+
+fn requested_view(input: &Input) -> Option<TangentView> {
+    if !input.is_key_just_pressed(Key::T) {
+        return None;
+    }
+
+    if input.is_key_pressed(Key::LeftControl) || input.is_key_pressed(Key::RightControl) {
+        Some(TangentView::Dual)
+    } else {
+        Some(TangentView::Geometric)
     }
 }
 
@@ -352,9 +491,40 @@ fn smoothstep(t: f64) -> f64 {
     clamped * clamped * (3.0 - 2.0 * clamped)
 }
 
+fn differential_form_color(value: f64, min_value: f64, max_value: f64) -> Vector4<f64> {
+    let mix = if (max_value - min_value).abs() <= 1.0e-6 {
+        if value > 1.0e-6 {
+            1.0
+        } else if value < -1.0e-6 {
+            0.0
+        } else {
+            0.5
+        }
+    } else {
+        ((value - min_value) / (max_value - min_value)).clamp(0.0, 1.0)
+    };
+
+    let cold = vector![0.08, 0.22, 1.0];
+    let neutral = vector![0.95, 0.95, 1.0];
+    let warm = vector![1.0, 0.18, 0.08];
+    let color = if mix < 0.5 {
+        let local_mix = mix * 2.0;
+        cold * (1.0 - local_mix) + neutral * local_mix
+    } else {
+        let local_mix = (mix - 0.5) * 2.0;
+        neutral * (1.0 - local_mix) + warm * local_mix
+    };
+    Vector4::new(color.x, color.y, color.z, 0.95)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{compute_zoom_offset, smoothstep, DiveAnchor, DiveMode, SceneSpaceTransform};
+    use super::{
+        compute_zoom_offset, requested_view, smoothstep, DiveAnchor, DiveMode, SceneSpaceTransform,
+        TangentSpace, TangentView, DUAL_FORM_GRID_RADIUS, DUAL_FORM_GRID_STEP,
+    };
+    use crate::toolbox::input::Input;
+    use glfw::{Action, Key};
     use nalgebra::vector;
 
     #[test]
@@ -371,7 +541,7 @@ mod tests {
         };
 
         assert_eq!(
-            anchor.tangent_position(anchor.abstract_pos),
+            anchor.geometric_tangent_position(anchor.abstract_pos),
             vector![0.0, 0.0, 0.0]
         );
     }
@@ -428,5 +598,80 @@ mod tests {
         let transform = SceneSpaceTransform::identity();
 
         assert_eq!(transform.tangent_mix, 0.0);
+    }
+
+    #[test]
+    fn requested_view_defaults_to_geometric_tangent() {
+        let mut input = Input::new();
+        input.begin_frame();
+        input.key_handler(Action::Press, Key::T);
+
+        assert_eq!(requested_view(&input), Some(TangentView::Geometric));
+    }
+
+    #[test]
+    fn requested_view_uses_ctrl_t_for_dual_tangent() {
+        let mut input = Input::new();
+        input.begin_frame();
+        input.key_handler(Action::Press, Key::LeftControl);
+        input.key_handler(Action::Press, Key::T);
+
+        assert_eq!(requested_view(&input), Some(TangentView::Dual));
+    }
+
+    #[test]
+    fn dual_view_hides_grid_once_transition_completes() {
+        let mut tangent_space = TangentSpace::new();
+        tangent_space.dive.mode = DiveMode::Tangent;
+        tangent_space.dive.alpha = 1.0;
+        tangent_space.dive.view = TangentView::Dual;
+
+        assert!(!tangent_space.show_grid());
+        assert!(tangent_space.show_form_samples());
+        assert!(!tangent_space.show_vector_field());
+    }
+
+    #[test]
+    fn geometric_tangent_vector_uses_anchor_basis_orientation() {
+        let anchor = DiveAnchor {
+            abstract_pos: vector![0.0, 0.0, 0.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![0.0, 0.0, 1.0],
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        };
+
+        assert_eq!(
+            anchor.geometric_tangent_vector(vector![1.0, 0.0, 0.0]),
+            vector![0.0, 0.0, 1.0]
+        );
+    }
+
+    #[test]
+    fn dual_form_render_uses_anchor_basis_for_sample_positions() {
+        let mut tangent_space = TangentSpace::new();
+        tangent_space.dive.anchor = Some(DiveAnchor {
+            abstract_pos: vector![0.0, 0.0, 0.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![0.0, 0.0, 1.0],
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        });
+
+        let render = tangent_space
+            .build_dual_form_render(vector![1.0, 0.0, 0.0])
+            .expect("dual render");
+
+        let expected = vector![0.0, 0.0, DUAL_FORM_GRID_STEP * DUAL_FORM_GRID_RADIUS as f64];
+        assert!(render
+            .samples
+            .iter()
+            .any(|sample| sample.position == expected));
     }
 }

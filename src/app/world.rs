@@ -2,7 +2,7 @@ use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::{Grid, GridConfig};
 use crate::app::grid_world::{GridSample, GridWorld};
 use crate::app::tangent_space::{SceneSpaceTransform, TangentSpace};
-use crate::app::ui::{GridUiState, SpacialEqs};
+use crate::app::ui::{DualLegendState, GridUiState, SpacialEqs};
 use crate::graphics::model::{RenderVField, Sphere};
 use crate::maths::differential::Form;
 use crate::maths::field::VectorField;
@@ -14,13 +14,11 @@ use crate::toolbox::input::Input;
 use crate::toolbox::opengl::display_manager::DisplayManager;
 use mathhook_core::formatter::simple::SimpleContext;
 use mathhook_core::SimpleFormatter;
-use nalgebra::{vector, Matrix4, Vector3, Vector4};
+use nalgebra::{Matrix4, Vector3, Vector4};
 use std::sync::{Arc, Mutex};
 use typed_floats::NonNaN;
 
 const SPHERE_SIZE: f64 = 0.1;
-const FORM_SAMPLE_BASE_SIZE: f64 = 0.03;
-const FORM_SAMPLE_SIZE_SCALE: f64 = 0.08;
 
 #[derive(Clone, PartialEq)]
 struct AppliedConfig {
@@ -102,7 +100,6 @@ pub struct World {
     render_form_samples: Vec<Sphere>,
     field_samples: Vec<FieldSample>,
     cached_field_components: Vec<Vector3<f64>>,
-    cached_dual_components: Vec<Vector3<f64>>,
     cached_field_vectors: Vec<Vector3<f64>>,
     normalize_field: bool,
     renderer: MasterRenderer,
@@ -114,6 +111,7 @@ pub struct World {
     sphere: Option<Sphere>,
     tangent_space: TangentSpace,
     applied_config: AppliedConfig,
+    dual_legend: Option<DualLegendState>,
 }
 
 impl World {
@@ -127,7 +125,6 @@ impl World {
             render_form_samples: Vec::new(),
             field_samples,
             cached_field_components: Vec::new(),
-            cached_dual_components: Vec::new(),
             cached_field_vectors: Vec::new(),
             normalize_field: initial_state.normalize_field,
             renderer: MasterRenderer::new(
@@ -142,6 +139,7 @@ impl World {
             sphere: None,
             tangent_space: TangentSpace::new(),
             applied_config,
+            dual_legend: None,
         };
         world.recompute_cached_field_vectors();
         world.rebuild_render_field();
@@ -282,6 +280,7 @@ impl World {
         );
         //self.renderer.set_zoom_mix(self.tangent_space.scene_mix());
         self.rebuild_render_field();
+        self.sync_overlay_state();
         self.update_sphere();
     }
 
@@ -290,6 +289,8 @@ impl World {
             &self.grid,
             &self.render_field,
             &self.render_form_samples,
+            self.tangent_space.show_grid(),
+            self.tangent_space.show_vector_field(),
             camera,
             &self.sphere,
             &self.scene_transform(),
@@ -314,11 +315,8 @@ impl World {
 
     fn recompute_cached_field_vectors(&mut self) {
         self.cached_field_components.clear();
-        self.cached_dual_components.clear();
         self.cached_field_vectors.clear();
         self.cached_field_components
-            .reserve(self.field_samples.len());
-        self.cached_dual_components
             .reserve(self.field_samples.len());
         self.cached_field_vectors.reserve(self.field_samples.len());
 
@@ -329,60 +327,59 @@ impl World {
                 z: sample.abstract_pos.z,
             };
             let vec_res = self.field.at(point);
-            let dual_res = self.field.dual_at(point);
             let vector_components = Vector3::new(vec_res.x, vec_res.y, vec_res.z);
-            let dual_components = Vector3::new(dual_res.x, dual_res.y, dual_res.z);
             self.cached_field_components.push(vector_components);
-            self.cached_dual_components.push(dual_components);
             self.cached_field_vectors
                 .push(sample.vector_to_world(vector_components));
         }
     }
 
     fn rebuild_render_field(&mut self) {
-        let dual_scale = self.max_dual_abs_component();
         let show_form_samples = self.tangent_space.show_form_samples();
+        let show_vector_field = self.tangent_space.show_vector_field();
 
         self.render_field.clear();
         self.render_form_samples.clear();
+        self.dual_legend = None;
         self.render_field.reserve(self.field_samples.len());
-        self.render_form_samples.reserve(self.field_samples.len());
+        self.render_form_samples
+            .reserve(self.tangent_space.dual_form_sample_capacity());
+        let anchor_field_components = self.anchor_field_components();
 
-        for (((sample, field_components), dual_components), world_vector) in self
-            .field_samples
-            .iter()
-            .zip(self.cached_field_components.iter().copied())
-            .zip(self.cached_dual_components.iter().copied())
-            .zip(self.cached_field_vectors.iter().copied())
-        {
-            let render_position = self
-                .tangent_space
-                .blend_position(sample.world_pos, sample.abstract_pos);
-            let mut render_vector = self
-                .tangent_space
-                .blend_vector(world_vector, field_components);
+        if show_vector_field {
+            for ((sample, field_components), world_vector) in self
+                .field_samples
+                .iter()
+                .zip(self.cached_field_components.iter().copied())
+                .zip(self.cached_field_vectors.iter().copied())
+            {
+                let tangent_components = self
+                    .tangent_space
+                    .blend_field_components(field_components, anchor_field_components);
+                let render_position = self
+                    .tangent_space
+                    .blend_position(sample.world_pos, sample.abstract_pos);
+                let mut render_vector = self
+                    .tangent_space
+                    .blend_vector(world_vector, tangent_components);
 
-            if self.normalize_field {
-                let magnitude = render_vector.norm();
-                if magnitude > 1e-6 {
-                    render_vector /= magnitude;
+                if self.normalize_field {
+                    let magnitude = render_vector.norm();
+                    if magnitude > 1e-6 {
+                        render_vector /= magnitude;
+                    }
                 }
-            }
 
-            self.render_field.push(RenderVField::new(
-                render_position,
-                render_vector,
-                Vector4::new(1.0, 1.0, 0.0, 1.0),
-            ));
-
-            if show_form_samples {
-                let normalized_dual = dual_components / dual_scale;
-                let size = FORM_SAMPLE_BASE_SIZE
-                    + FORM_SAMPLE_SIZE_SCALE * (dual_components.norm() / dual_scale).sqrt();
-                let color = differential_form_color(normalized_dual);
-                self.render_form_samples
-                    .push(Sphere::from_rgba(render_position, color, size));
+                self.render_field.push(RenderVField::new(
+                    render_position,
+                    render_vector,
+                    Vector4::new(1.0, 1.0, 0.0, 1.0),
+                ));
             }
+        }
+
+        if show_form_samples {
+            self.rebuild_dual_form_samples(anchor_field_components);
         }
     }
 
@@ -390,39 +387,39 @@ impl World {
         self.renderer.projection
     }
 
-    fn max_dual_abs_component(&self) -> f64 {
-        self.cached_dual_components
-            .iter()
-            .flat_map(|value| [value.x.abs(), value.y.abs(), value.z.abs()])
-            .fold(0.0, f64::max)
-            .max(1.0e-6)
+    fn rebuild_dual_form_samples(&mut self, anchor_field_components: Option<Vector3<f64>>) {
+        let Some(dual_components) = anchor_field_components else {
+            return;
+        };
+        let Some(render) = self.tangent_space.build_dual_form_render(dual_components) else {
+            return;
+        };
+
+        self.dual_legend = Some(render.legend);
+        self.render_form_samples = render.samples;
     }
-}
 
-fn differential_form_color(normalized_dual: Vector3<f64>) -> Vector4<f64> {
-    let abs = normalized_dual.map(|value| value.abs().clamp(0.0, 1.0));
-    let sign_balance =
-        ((normalized_dual.x + normalized_dual.y + normalized_dual.z) / 3.0).clamp(-1.0, 1.0);
+    fn sync_overlay_state(&self) {
+        let mut shared = self.shared_ui_state.lock().unwrap();
+        shared.dual_legend = self.dual_legend;
+    }
 
-    let warm = vector![1.0, 0.72, 0.22];
-    let cool = vector![0.15, 0.72, 1.0];
-    let axis_color = vector![
-        0.15 + 0.85 * abs.x,
-        0.15 + 0.85 * abs.y,
-        0.15 + 0.85 * abs.z
-    ];
-
-    let tint = if sign_balance >= 0.0 { warm } else { cool };
-    let tint_strength = sign_balance.abs() * 0.35;
-    let color = axis_color * (1.0 - tint_strength) + tint * tint_strength;
-    Vector4::new(color.x, color.y, color.z, 0.95)
+    fn anchor_field_components(&self) -> Option<Vector3<f64>> {
+        let anchor_abstract = self.tangent_space.anchor_abstract_position()?;
+        let point = Point {
+            x: anchor_abstract.x,
+            y: anchor_abstract.y,
+            z: anchor_abstract.z,
+        };
+        let field_res = self.field.at(point);
+        Some(Vector3::new(field_res.x, field_res.y, field_res.z))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{differential_form_color, AppliedConfig};
+    use super::AppliedConfig;
     use crate::app::ui::GridUiState;
-    use nalgebra::vector;
 
     #[test]
     fn apply_diff_is_scoped_to_field_changes() {
@@ -452,13 +449,5 @@ mod tests {
         assert!(!diff.field_changed);
         assert!(!diff.coords_changed);
         assert!(!diff.normalize_changed);
-    }
-
-    #[test]
-    fn differential_form_color_uses_axis_energy() {
-        let color = differential_form_color(vector![1.0, 0.0, 0.0]);
-
-        assert!(color.x > color.y);
-        assert!(color.x > color.z);
     }
 }

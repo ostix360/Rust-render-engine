@@ -1,3 +1,4 @@
+use crate::app::ui::legend::show_dual_legend_window;
 use crate::app::ui::state::{ControlTab, GridUiState};
 use crate::app::ui::theme::{
     self, ACCENT, BORDER, CRAYOLA_BLUE, JET_BLACK, MUTED, PANEL, RASPBERRY, SHADOW_GREY, TEXT,
@@ -265,16 +266,24 @@ impl eframe::App for ControlApp {
             theme::apply_style(ctx);
             self.styled = true;
         }
+        let legend = self.state.lock().expect("UI state poisoned").dual_legend;
+        show_dual_legend_window(ctx, legend);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Frame::central_panel(ui.style()).show(ui, |ui| {
-            self.render_ui(ui);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    self.render_ui(ui);
+                });
         });
         self.show_error_popup(ui.ctx());
     }
 
-    fn update(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {}
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+    }
 }
 
 fn info_dot(ui: &mut egui::Ui) {

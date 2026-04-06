@@ -53,6 +53,13 @@ pub struct GridUiState {
     pub bounds_y: (f64, f64),
     pub bounds_z: (f64, f64),
     pub apply_counter: u64,
+    pub dual_legend: Option<DualLegendState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DualLegendState {
+    pub min_value: f64,
+    pub max_value: f64,
 }
 
 impl GridUiState {
@@ -95,6 +102,7 @@ impl Default for GridUiState {
             bounds_y: (0.0, 6.28),
             bounds_z: (0.0, 3.14),
             apply_counter: 0,
+            dual_legend: None,
         }
     }
 }
@@ -125,6 +133,7 @@ mod tests {
         assert_eq!(state.bounds_x, (-0.1, 15.0));
         assert_eq!(state.bounds_y, (0.0, 6.28));
         assert_eq!(state.bounds_z, (0.0, 3.14));
+        assert_eq!(state.dual_legend, None);
     }
 
     #[test]

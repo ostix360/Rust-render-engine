@@ -67,15 +67,19 @@ impl MasterRenderer {
         grid: &Grid,
         field_vectors: &[RenderVField],
         form_samples: &[Sphere],
+        show_grid: bool,
+        show_vector_field: bool,
         camera: &Camera,
         sphere: &Option<Sphere>,
         scene_transform: &SceneSpaceTransform,
     ) {
         clear_gl();
         let view_matrix = camera.get_view_matrix();
-        self.grid_renderer
-            .render(&grid, &view_matrix, scene_transform);
-        if scene_transform.tangent_mix < 0.5 {
+        if show_grid {
+            self.grid_renderer
+                .render(&grid, &view_matrix, scene_transform);
+        }
+        if show_vector_field {
             self.field_renderer.render(field_vectors, &view_matrix);
         } else {
             self.renderer.draw_points(form_samples, &view_matrix);

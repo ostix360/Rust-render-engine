@@ -1,10 +1,11 @@
 mod app;
+mod legend;
 mod state;
 mod theme;
 mod validation;
 
 #[allow(unused_imports)]
-pub use state::{EqRender, GridUiState, SpacialEqs};
+pub use state::{DualLegendState, EqRender, GridUiState, SpacialEqs};
 
 use crate::app::ui::app::ControlApp;
 use std::sync::{Arc, Mutex};
