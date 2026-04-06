@@ -27,6 +27,15 @@ pub enum TangentView {
     Dual,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct TangentRenderState {
+    pub scene_mix: f64,
+    pub active_view: Option<TangentView>,
+    pub anchor_abstract_pos: Option<Vector3<f64>>,
+    pub geometric_local_scale: f64,
+    pub geometric_arrow_scale: f64,
+}
+
 pub struct DualFormRender {
     pub samples: Vec<Sphere>,
     pub legend: DualLegendState,
@@ -317,6 +326,16 @@ impl TangentSpace {
         }
     }
 
+    pub fn render_state(&self) -> TangentRenderState {
+        TangentRenderState {
+            scene_mix: self.scene_mix(),
+            active_view: self.active_view(),
+            anchor_abstract_pos: self.anchor_abstract_position(),
+            geometric_local_scale: self.geometric_local_scale,
+            geometric_arrow_scale: self.geometric_arrow_scale,
+        }
+    }
+
     pub fn scene_transform(&self) -> SceneSpaceTransform {
         if let Some(anchor) = &self.dive.anchor {
             anchor.scene_transform(self.dive.scene_mix(), self.geometric_local_scale)
@@ -408,6 +427,11 @@ impl TangentSpace {
     pub fn geometric_local_delta(&self, abstract_pos: Vector3<f64>) -> Option<Vector3<f64>> {
         let anchor = self.dive.anchor.as_ref()?;
         Some(anchor.local_abstract_delta(abstract_pos, self.geometric_local_scale))
+    }
+
+    pub fn abstract_delta(&self, abstract_pos: Vector3<f64>) -> Option<Vector3<f64>> {
+        let anchor = self.dive.anchor.as_ref()?;
+        Some(abstract_pos - anchor.abstract_pos)
     }
 
     pub fn build_dual_form_render(&self, dual_components: Vector3<f64>) -> Option<DualFormRender> {
@@ -598,6 +622,31 @@ mod tests {
     }
 
     #[test]
+    fn abstract_delta_stays_unscaled_when_local_patch_size_changes() {
+        let mut tangent_space = TangentSpace::new();
+        tangent_space.dive.anchor = Some(DiveAnchor {
+            abstract_pos: vector![1.0, 2.0, 3.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        });
+        tangent_space.set_geometric_local_scale(0.1);
+
+        assert_eq!(
+            tangent_space.abstract_delta(vector![3.0, 2.0, 3.0]),
+            Some(vector![2.0, 0.0, 0.0])
+        );
+        assert_eq!(
+            tangent_space.geometric_local_delta(vector![3.0, 2.0, 3.0]),
+            Some(vector![0.2, 0.0, 0.0])
+        );
+    }
+
+    #[test]
     fn camera_endpoints_apply_anchor_translation_and_zoom() {
         let anchor = DiveAnchor {
             abstract_pos: vector![0.0, 0.0, 0.0],
@@ -663,6 +712,17 @@ mod tests {
             tangent_space.geometric_arrow_scale,
             DEFAULT_GEOMETRIC_ARROW_SCALE
         );
+    }
+
+    #[test]
+    fn render_state_tracks_geometric_slider_changes() {
+        let mut tangent_space = TangentSpace::new();
+        let initial = tangent_space.render_state();
+
+        tangent_space.set_geometric_local_scale(0.2);
+        tangent_space.set_geometric_arrow_scale(0.8);
+
+        assert_ne!(tangent_space.render_state(), initial);
     }
 
     #[test]

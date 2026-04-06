@@ -1,7 +1,7 @@
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::{Grid, GridConfig};
 use crate::app::grid_world::{GridSample, GridWorld};
-use crate::app::tangent_space::{SceneSpaceTransform, TangentSpace};
+use crate::app::tangent_space::{SceneSpaceTransform, TangentRenderState, TangentSpace};
 use crate::app::ui::{DualLegendState, GridUiState, SpacialEqs};
 use crate::graphics::model::{RenderVField, Sphere};
 use crate::maths::differential::Form;
@@ -34,13 +34,22 @@ impl AppliedConfig {
         Self {
             grid_config: state.to_grid_config(),
             coord_eqs: [
-                state.coords_sys.x.eq
+                state
+                    .coords_sys
+                    .x
+                    .eq
                     .to_simple(&context)
                     .expect("Error while converting x eq"),
-                state.coords_sys.y.eq
+                state
+                    .coords_sys
+                    .y
+                    .eq
                     .to_simple(&context)
                     .expect("Error while converting y eq"),
-                state.coords_sys.z.eq
+                state
+                    .coords_sys
+                    .z
+                    .eq
                     .to_simple(&context)
                     .expect("Error while converting z eq"),
             ],
@@ -256,6 +265,8 @@ impl World {
         display_manager: &DisplayManager,
         camera: &mut Camera,
     ) {
+        let render_state_before = self.render_state();
+        let mut needs_render_rebuild = false;
         let mut pending_state = self.deferred_apply_state.take();
         {
             let shared = self.shared_ui_state.lock().unwrap();
@@ -276,6 +287,7 @@ impl World {
                 self.force_world_mode(camera);
             } else {
                 self.apply_state(state, next_config, diff);
+                needs_render_rebuild = true;
             }
         }
 
@@ -289,7 +301,9 @@ impl World {
             self.renderer.projection,
         );
         //self.renderer.set_zoom_mix(self.tangent_space.scene_mix()); comment for now do not remove it!!
-        self.rebuild_render_field();
+        if needs_render_rebuild || self.render_state() != render_state_before {
+            self.rebuild_render_field();
+        }
         self.sync_overlay_state();
         self.update_sphere();
     }
@@ -365,7 +379,7 @@ impl World {
             {
                 let tangent_field_components = anchor_point.and_then(|anchor| {
                     self.tangent_space
-                        .geometric_local_delta(sample.abstract_pos)
+                        .abstract_delta(sample.abstract_pos)
                         .map(|delta| {
                             Self::field_linearized_components_at(&self.field, anchor, delta)
                         })
@@ -419,6 +433,10 @@ impl World {
     fn sync_overlay_state(&self) {
         let mut shared = self.shared_ui_state.lock().unwrap();
         shared.dual_legend = self.dual_legend;
+    }
+
+    fn render_state(&self) -> TangentRenderState {
+        self.tangent_space.render_state()
     }
 
     fn anchor_dual_components(&self) -> Option<Vector3<f64>> {
