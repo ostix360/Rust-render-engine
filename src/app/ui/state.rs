@@ -46,6 +46,8 @@ pub struct GridUiState {
     pub coords_sys: SpacialEqs,
     pub field: SpacialEqs,
     pub normalize_field: bool,
+    pub tangent_scale: f64,
+    pub geometric_arrow_scale: f64,
     pub nb_x: f64,
     pub nb_y: f64,
     pub nb_z: f64,
@@ -95,6 +97,8 @@ impl Default for GridUiState {
             coords_sys: SpacialEqs::default_sys(),
             field: SpacialEqs::default_field(),
             normalize_field: false,
+            tangent_scale: 0.12,
+            geometric_arrow_scale: 0.55,
             nb_x: 5.0,
             nb_y: 5.0,
             nb_z: 5.0,
@@ -127,6 +131,8 @@ mod tests {
 
         assert!(state.render_3d);
         assert!(!state.normalize_field);
+        assert_eq!(state.tangent_scale, 0.12);
+        assert_eq!(state.geometric_arrow_scale, 0.55);
         assert_eq!(state.nb_x, 5.0);
         assert_eq!(state.nb_y, 5.0);
         assert_eq!(state.nb_z, 5.0);

@@ -19,6 +19,7 @@ pub struct GridShader {
     tangent_basis_x: Vec3Uniform,
     tangent_basis_y: Vec3Uniform,
     tangent_basis_z: Vec3Uniform,
+    tangent_position_scale: FloatUniform,
 }
 
 impl GridShader {
@@ -37,6 +38,7 @@ impl GridShader {
             tangent_basis_x: Vec3Uniform::new("tangent_basis_x"),
             tangent_basis_y: Vec3Uniform::new("tangent_basis_y"),
             tangent_basis_z: Vec3Uniform::new("tangent_basis_z"),
+            tangent_position_scale: FloatUniform::new("tangent_position_scale"),
         }
     }
 
@@ -82,6 +84,8 @@ impl GridShader {
             .load_vector_to_uniform(scene_transform.tangent_basis[1]);
         self.tangent_basis_z
             .load_vector_to_uniform(scene_transform.tangent_basis[2]);
+        self.tangent_position_scale
+            .load_float_to_uniform(scene_transform.tangent_position_scale);
     }
 
     #[allow(dead_code)]
@@ -121,6 +125,7 @@ impl Shader for GridShader {
                 &mut self.tangent_basis_x.uniform,
                 &mut self.tangent_basis_y.uniform,
                 &mut self.tangent_basis_z.uniform,
+                &mut self.tangent_position_scale.uniform,
             ]);
         self.shader_program.store_all_uniforms(&mut uniforms);
     }

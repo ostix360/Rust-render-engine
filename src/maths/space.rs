@@ -61,15 +61,11 @@ impl Space {
     }
 
     pub fn natural_to_otn(&self) -> Matrix {
-        let expr111 = Expression::matrix(vec![vec![expr!(1), expr!(1), expr!(1)]]);
-        let otn_factor = &expr111.matrix_multiply(&self.vielbein_inv);
-        otn_factor.as_matrix().unwrap()
+        self.vielbein_inv.as_matrix().unwrap().clone()
     }
 
     pub fn otn_to_natural(&self) -> Matrix {
-        let expr111 = Expression::matrix(vec![vec![expr!(1), expr!(1), expr!(1)]]);
-        let otn_factor = &expr111.matrix_multiply(&self.vielbein);
-        otn_factor.as_matrix().unwrap()
+        self.vielbein.as_matrix().unwrap().clone()
     }
 
     pub fn get_metric(&self) -> &Metric {

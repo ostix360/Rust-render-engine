@@ -60,14 +60,20 @@ impl Form {
         match self.n_forms {
             0 => Form::new(vec![self.exprs[0].clone()], 0),
             1 => {
-                let mut new_exprs = Vec::with_capacity(3);
                 let nat_to_otn = space.natural_to_otn();
-                new_exprs.push(self.exprs[0].clone().mul(nat_to_otn.get_element(0, 0)));
-                new_exprs.push(self.exprs[1].clone().mul(nat_to_otn.get_element(1, 0)));
-                new_exprs.push(self.exprs[2].clone().mul(nat_to_otn.get_element(2, 0)));
+                let mut new_exprs = Vec::with_capacity(3);
+                for row in 0..3 {
+                    let transformed = self.exprs[0]
+                        .clone()
+                        .mul(nat_to_otn.get_element(row, 0))
+                        .add(self.exprs[1].clone().mul(nat_to_otn.get_element(row, 1)))
+                        .add(self.exprs[2].clone().mul(nat_to_otn.get_element(row, 2)));
+                    new_exprs.push(transformed);
+                }
                 Form::new(new_exprs, 1)
             }
             2 => {
+                // TODO make compatible with non OTN metrics
                 let mut new_exprs = Vec::with_capacity(3);
                 let nat_to_otn = space.natural_to_otn();
                 new_exprs.push(
@@ -107,11 +113,16 @@ impl Form {
         match self.n_forms {
             0 => Form::new(vec![self.exprs[0].clone()], 0),
             1 => {
-                let mut new_exprs = Vec::with_capacity(3);
                 let otn_to_nat = space.otn_to_natural();
-                new_exprs.push(self.exprs[0].clone().mul(otn_to_nat.get_element(0, 0)));
-                new_exprs.push(self.exprs[1].clone().mul(otn_to_nat.get_element(1, 0)));
-                new_exprs.push(self.exprs[2].clone().mul(otn_to_nat.get_element(2, 0)));
+                let mut new_exprs = Vec::with_capacity(3);
+                for row in 0..3 {
+                    let transformed = self.exprs[0]
+                        .clone()
+                        .mul(otn_to_nat.get_element(row, 0))
+                        .add(self.exprs[1].clone().mul(otn_to_nat.get_element(row, 1)))
+                        .add(self.exprs[2].clone().mul(otn_to_nat.get_element(row, 2)));
+                    new_exprs.push(transformed);
+                }
                 Form::new(new_exprs, 1)
             }
             2 => {

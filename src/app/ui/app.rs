@@ -83,6 +83,27 @@ impl ControlApp {
                 Self::bounds_row(ui, "Bounds (y):", &mut data.bounds_y);
                 Self::bounds_row(ui, "Bounds (z):", &mut data.bounds_z);
             });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(theme::section_heading("Tangent view"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new("Local patch size in geometric tangent mode").color(MUTED),
+                );
+                ui.add(
+                    egui::Slider::new(&mut data.tangent_scale, 0.02..=0.5)
+                        .logarithmic(true)
+                        .text("local scale")
+                        .trailing_fill(true),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "This updates live and only affects tangent-space rendering.",
+                    )
+                    .color(MUTED),
+                );
+            });
     }
 
     fn render_field_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
@@ -100,6 +121,25 @@ impl ControlApp {
                 Self::eq_row(ui, "Equation x:  Fx =", &mut data.field.x.eq_str);
                 Self::eq_row(ui, "Equation y:  Fy =", &mut data.field.y.eq_str);
                 Self::eq_row(ui, "Equation z:  Fz =", &mut data.field.z.eq_str);
+            });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(theme::section_heading("Tangent arrows"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.label(egui::RichText::new("Arrow size in geometric tangent mode").color(MUTED));
+                ui.add(
+                    egui::Slider::new(&mut data.geometric_arrow_scale, 0.1..=1.5)
+                        .logarithmic(true)
+                        .text("arrow scale")
+                        .trailing_fill(true),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "This updates live and only affects geometric tangent-space arrows.",
+                    )
+                    .color(MUTED),
+                );
             });
     }
 

@@ -18,6 +18,8 @@ const MAX_ZOOM_FRACTION: f64 = 0.8;
 const FORM_SAMPLE_SIZE: f64 = 0.06;
 const DUAL_FORM_GRID_RADIUS: i32 = 4;
 const DUAL_FORM_GRID_STEP: f64 = 0.45;
+const DEFAULT_GEOMETRIC_LOCAL_SCALE: f64 = 0.12;
+const DEFAULT_GEOMETRIC_ARROW_SCALE: f64 = 0.55;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TangentView {
@@ -35,6 +37,7 @@ pub struct SceneSpaceTransform {
     pub tangent_mix: f64,
     pub tangent_anchor_abstract: Vector3<f64>,
     pub tangent_basis: [Vector3<f64>; 3],
+    pub tangent_position_scale: f64,
 }
 
 impl SceneSpaceTransform {
@@ -47,6 +50,7 @@ impl SceneSpaceTransform {
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector3::new(0.0, 0.0, 1.0),
             ],
+            tangent_position_scale: DEFAULT_GEOMETRIC_LOCAL_SCALE,
         }
     }
 }
@@ -74,8 +78,16 @@ struct DiveAnchor {
 }
 
 impl DiveAnchor {
-    fn geometric_tangent_position(&self, abstract_pos: Vector3<f64>) -> Vector3<f64> {
-        let delta = abstract_pos - self.abstract_pos;
+    fn local_abstract_delta(&self, abstract_pos: Vector3<f64>, local_scale: f64) -> Vector3<f64> {
+        (abstract_pos - self.abstract_pos) * local_scale
+    }
+
+    fn geometric_tangent_position(
+        &self,
+        abstract_pos: Vector3<f64>,
+        local_scale: f64,
+    ) -> Vector3<f64> {
+        let delta = self.local_abstract_delta(abstract_pos, local_scale);
         self.basis[0] * delta.x + self.basis[1] * delta.y + self.basis[2] * delta.z
     }
 
@@ -90,11 +102,12 @@ impl DiveAnchor {
         }
     }
 
-    fn scene_transform(&self, mix: f64) -> SceneSpaceTransform {
+    fn scene_transform(&self, mix: f64, local_scale: f64) -> SceneSpaceTransform {
         SceneSpaceTransform {
             tangent_mix: mix,
             tangent_anchor_abstract: self.abstract_pos,
             tangent_basis: self.basis,
+            tangent_position_scale: local_scale,
         }
     }
 }
@@ -196,6 +209,8 @@ impl DiveState {
 pub struct TangentSpace {
     hovered_sample: Option<GridSample>,
     dive: DiveState,
+    geometric_local_scale: f64,
+    geometric_arrow_scale: f64,
 }
 
 impl TangentSpace {
@@ -203,7 +218,17 @@ impl TangentSpace {
         Self {
             hovered_sample: None,
             dive: DiveState::new(),
+            geometric_local_scale: DEFAULT_GEOMETRIC_LOCAL_SCALE,
+            geometric_arrow_scale: DEFAULT_GEOMETRIC_ARROW_SCALE,
         }
+    }
+
+    pub fn set_geometric_local_scale(&mut self, scale: f64) {
+        self.geometric_local_scale = scale.max(1.0e-3);
+    }
+
+    pub fn set_geometric_arrow_scale(&mut self, scale: f64) {
+        self.geometric_arrow_scale = scale.max(1.0e-3);
     }
 
     pub fn should_defer_apply(&self) -> bool {
@@ -294,7 +319,7 @@ impl TangentSpace {
 
     pub fn scene_transform(&self) -> SceneSpaceTransform {
         if let Some(anchor) = &self.dive.anchor {
-            anchor.scene_transform(self.dive.scene_mix())
+            anchor.scene_transform(self.dive.scene_mix(), self.geometric_local_scale)
         } else {
             SceneSpaceTransform::identity()
         }
@@ -323,7 +348,7 @@ impl TangentSpace {
     ) -> Vector3<f64> {
         if let Some(anchor) = &self.dive.anchor {
             let tangent_pos = if self.active_view() == Some(TangentView::Geometric) {
-                anchor.geometric_tangent_position(abstract_pos)
+                anchor.geometric_tangent_position(abstract_pos, self.geometric_local_scale)
             } else {
                 abstract_pos - anchor.abstract_pos
             };
@@ -340,7 +365,7 @@ impl TangentSpace {
     ) -> Vector3<f64> {
         if let Some(anchor) = &self.dive.anchor {
             let tangent_vector = if self.active_view() == Some(TangentView::Geometric) {
-                anchor.geometric_tangent_vector(field_components)
+                anchor.geometric_tangent_vector(field_components) * self.geometric_arrow_scale
             } else {
                 field_components
             };
@@ -369,15 +394,20 @@ impl TangentSpace {
     pub fn blend_field_components(
         &self,
         field_components: Vector3<f64>,
-        anchor_field_components: Option<Vector3<f64>>,
+        tangent_field_components: Option<Vector3<f64>>,
     ) -> Vector3<f64> {
         if self.active_view() == Some(TangentView::Geometric) {
-            anchor_field_components
-                .map(|anchor| lerp_vec3(field_components, anchor, self.scene_mix()))
+            tangent_field_components
+                .map(|tangent| lerp_vec3(field_components, tangent, self.scene_mix()))
                 .unwrap_or(field_components)
         } else {
             field_components
         }
+    }
+
+    pub fn geometric_local_delta(&self, abstract_pos: Vector3<f64>) -> Option<Vector3<f64>> {
+        let anchor = self.dive.anchor.as_ref()?;
+        Some(anchor.local_abstract_delta(abstract_pos, self.geometric_local_scale))
     }
 
     pub fn build_dual_form_render(&self, dual_components: Vector3<f64>) -> Option<DualFormRender> {
@@ -521,7 +551,8 @@ fn differential_form_color(value: f64, min_value: f64, max_value: f64) -> Vector
 mod tests {
     use super::{
         compute_zoom_offset, requested_view, smoothstep, DiveAnchor, DiveMode, SceneSpaceTransform,
-        TangentSpace, TangentView, DUAL_FORM_GRID_RADIUS, DUAL_FORM_GRID_STEP,
+        TangentSpace, TangentView, DEFAULT_GEOMETRIC_ARROW_SCALE, DEFAULT_GEOMETRIC_LOCAL_SCALE,
+        DUAL_FORM_GRID_RADIUS, DUAL_FORM_GRID_STEP,
     };
     use crate::toolbox::input::Input;
     use glfw::{Action, Key};
@@ -541,8 +572,28 @@ mod tests {
         };
 
         assert_eq!(
-            anchor.geometric_tangent_position(anchor.abstract_pos),
+            anchor.geometric_tangent_position(anchor.abstract_pos, DEFAULT_GEOMETRIC_LOCAL_SCALE),
             vector![0.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn tangent_positions_are_scaled_to_a_local_patch() {
+        let anchor = DiveAnchor {
+            abstract_pos: vector![1.0, 2.0, 3.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        };
+
+        assert_eq!(
+            anchor
+                .geometric_tangent_position(vector![3.0, 2.0, 3.0], DEFAULT_GEOMETRIC_LOCAL_SCALE),
+            vector![2.0 * DEFAULT_GEOMETRIC_LOCAL_SCALE, 0.0, 0.0]
         );
     }
 
@@ -598,6 +649,20 @@ mod tests {
         let transform = SceneSpaceTransform::identity();
 
         assert_eq!(transform.tangent_mix, 0.0);
+        assert_eq!(
+            transform.tangent_position_scale,
+            DEFAULT_GEOMETRIC_LOCAL_SCALE
+        );
+    }
+
+    #[test]
+    fn tangent_space_defaults_to_expected_arrow_scale() {
+        let tangent_space = TangentSpace::new();
+
+        assert_eq!(
+            tangent_space.geometric_arrow_scale,
+            DEFAULT_GEOMETRIC_ARROW_SCALE
+        );
     }
 
     #[test]

@@ -186,3 +186,78 @@ fn vector_field_dual_at_matches_dual_component_expressions() {
     assert_close(result.y, 0.0, "dual_at y component");
     assert_close(result.z, 0.75, "dual_at z component");
 }
+
+#[test]
+fn vector_field_linearized_at_keeps_constant_field_constant() {
+    let space = Space::new(parse("x"), parse("y"), parse("z"));
+    let field = VectorField::from_otn(
+        Form::new(vec![parse("1"), parse("1"), parse("1")], 1),
+        &space,
+    );
+
+    let result = field.linearized_at(
+        Point {
+            x: 2.0,
+            y: 3.0,
+            z: 4.0,
+        },
+        Point {
+            x: 0.25,
+            y: -0.5,
+            z: 1.5,
+        },
+    );
+
+    assert_close(result.x, 1.0, "linearized constant x");
+    assert_close(result.y, 1.0, "linearized constant y");
+    assert_close(result.z, 1.0, "linearized constant z");
+}
+
+#[test]
+fn vector_field_linearized_at_matches_affine_field_exactly() {
+    let space = Space::new(parse("x"), parse("y"), parse("z"));
+    let field = VectorField::from_otn(
+        Form::new(vec![parse("x + 2*y"), parse("3 - y"), parse("z - 4*x")], 1),
+        &space,
+    );
+    let anchor = Point {
+        x: 1.0,
+        y: -2.0,
+        z: 0.5,
+    };
+    let delta = Point {
+        x: 0.25,
+        y: 0.5,
+        z: -0.75,
+    };
+
+    let linearized = field.linearized_at(anchor, delta);
+    let exact = field.at(Point {
+        x: anchor.x + delta.x,
+        y: anchor.y + delta.y,
+        z: anchor.z + delta.z,
+    });
+
+    assert_close(linearized.x, exact.x, "linearized affine x");
+    assert_close(linearized.y, exact.y, "linearized affine y");
+    assert_close(linearized.z, exact.z, "linearized affine z");
+}
+
+#[test]
+fn vector_field_dual_at_preserves_all_scaled_components() {
+    let space = Space::new(parse("2*x"), parse("3*y"), parse("4*z"));
+    let field = VectorField::from_otn(
+        Form::new(vec![parse("1"), parse("2"), parse("3")], 1),
+        &space,
+    );
+
+    let result = field.dual_at(Point {
+        x: 2.0,
+        y: 0.0,
+        z: 1.0,
+    });
+
+    assert_close(result.x, 2.0, "scaled dual x component");
+    assert_close(result.y, 6.0, "scaled dual y component");
+    assert_close(result.z, 12.0, "scaled dual z component");
+}

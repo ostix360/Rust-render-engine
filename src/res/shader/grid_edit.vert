@@ -9,6 +9,7 @@ uniform vec3 tangent_anchor_abstract;
 uniform vec3 tangent_basis_x;
 uniform vec3 tangent_basis_y;
 uniform vec3 tangent_basis_z;
+uniform float tangent_position_scale;
 
 float f(vec3 pos) {
     float x = pos.x;
@@ -37,7 +38,7 @@ vec3 coordinate_transform(vec3 pos) {
 }
 
 vec3 tangent_transform(vec3 pos) {
-    vec3 delta = pos - tangent_anchor_abstract;
+    vec3 delta = (pos - tangent_anchor_abstract) * tangent_position_scale;
     return tangent_basis_x * delta.x
         + tangent_basis_y * delta.y
         + tangent_basis_z * delta.z;

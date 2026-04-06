@@ -141,6 +141,12 @@ impl World {
             applied_config,
             dual_legend: None,
         };
+        world
+            .tangent_space
+            .set_geometric_local_scale(initial_state.tangent_scale);
+        world
+            .tangent_space
+            .set_geometric_arrow_scale(initial_state.geometric_arrow_scale);
         world.recompute_cached_field_vectors();
         world.rebuild_render_field();
         world
@@ -253,6 +259,10 @@ impl World {
         let mut pending_state = self.deferred_apply_state.take();
         {
             let shared = self.shared_ui_state.lock().unwrap();
+            self.tangent_space
+                .set_geometric_local_scale(shared.tangent_scale);
+            self.tangent_space
+                .set_geometric_arrow_scale(shared.geometric_arrow_scale);
             if pending_state.is_none() && self.last_counter != shared.apply_counter {
                 pending_state = Some(shared.clone());
             }
@@ -278,7 +288,7 @@ impl World {
             self.grid.get_coords(),
             self.renderer.projection,
         );
-        //self.renderer.set_zoom_mix(self.tangent_space.scene_mix());
+        //self.renderer.set_zoom_mix(self.tangent_space.scene_mix()); comment for now do not remove it!!
         self.rebuild_render_field();
         self.sync_overlay_state();
         self.update_sphere();
@@ -344,7 +354,7 @@ impl World {
         self.render_field.reserve(self.field_samples.len());
         self.render_form_samples
             .reserve(self.tangent_space.dual_form_sample_capacity());
-        let anchor_field_components = self.anchor_field_components();
+        let anchor_point = self.anchor_point();
 
         if show_vector_field {
             for ((sample, field_components), world_vector) in self
@@ -353,9 +363,16 @@ impl World {
                 .zip(self.cached_field_components.iter().copied())
                 .zip(self.cached_field_vectors.iter().copied())
             {
+                let tangent_field_components = anchor_point.and_then(|anchor| {
+                    self.tangent_space
+                        .geometric_local_delta(sample.abstract_pos)
+                        .map(|delta| {
+                            Self::field_linearized_components_at(&self.field, anchor, delta)
+                        })
+                });
                 let tangent_components = self
                     .tangent_space
-                    .blend_field_components(field_components, anchor_field_components);
+                    .blend_field_components(field_components, tangent_field_components);
                 let render_position = self
                     .tangent_space
                     .blend_position(sample.world_pos, sample.abstract_pos);
@@ -379,7 +396,7 @@ impl World {
         }
 
         if show_form_samples {
-            self.rebuild_dual_form_samples(anchor_field_components);
+            self.rebuild_dual_form_samples(self.anchor_dual_components());
         }
     }
 
@@ -404,22 +421,59 @@ impl World {
         shared.dual_legend = self.dual_legend;
     }
 
-    fn anchor_field_components(&self) -> Option<Vector3<f64>> {
+    fn anchor_dual_components(&self) -> Option<Vector3<f64>> {
+        let point = self.anchor_point()?;
+        Some(Self::field_dual_components_at(&self.field, point))
+    }
+
+    fn anchor_point(&self) -> Option<Point> {
         let anchor_abstract = self.tangent_space.anchor_abstract_position()?;
-        let point = Point {
+        Some(Point {
             x: anchor_abstract.x,
             y: anchor_abstract.y,
             z: anchor_abstract.z,
-        };
-        let field_res = self.field.at(point);
-        Some(Vector3::new(field_res.x, field_res.y, field_res.z))
+        })
+    }
+
+    #[cfg(test)]
+    fn field_components_at(field: &VectorField, point: Point) -> Vector3<f64> {
+        let field_res = field.at(point);
+        Vector3::new(field_res.x, field_res.y, field_res.z)
+    }
+
+    fn field_dual_components_at(field: &VectorField, point: Point) -> Vector3<f64> {
+        let field_res = field.dual_at(point);
+        Vector3::new(field_res.x, field_res.y, field_res.z)
+    }
+
+    fn field_linearized_components_at(
+        field: &VectorField,
+        anchor: Point,
+        local_delta: Vector3<f64>,
+    ) -> Vector3<f64> {
+        let field_res = field.linearized_at(
+            anchor,
+            Point {
+                x: local_delta.x,
+                y: local_delta.y,
+                z: local_delta.z,
+            },
+        );
+        Vector3::new(field_res.x, field_res.y, field_res.z)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::AppliedConfig;
+    use super::World;
     use crate::app::ui::GridUiState;
+    use crate::maths::differential::Form;
+    use crate::maths::field::VectorField;
+    use crate::maths::space::Space;
+    use crate::maths::Point;
+    use mathhook_core::Parser;
+    use nalgebra::vector;
 
     #[test]
     fn apply_diff_is_scoped_to_field_changes() {
@@ -449,5 +503,26 @@ mod tests {
         assert!(!diff.field_changed);
         assert!(!diff.coords_changed);
         assert!(!diff.normalize_changed);
+    }
+
+    #[test]
+    fn field_dual_components_use_dual_basis_in_transformed_space() {
+        let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+        let space = Space::new(parse("x + 2y"), parse("3y + z"), parse("4z"));
+        let field = VectorField::from_otn(
+            Form::new(vec![parse("1"), parse("0"), parse("0")], 1),
+            &space,
+        );
+        let point = Point {
+            x: 0.5,
+            y: -1.0,
+            z: 2.0,
+        };
+
+        let primal = World::field_components_at(&field, point);
+        let dual = World::field_dual_components_at(&field, point);
+
+        assert_eq!(primal, vector![1.0, 0.0, 0.0]);
+        assert_ne!(dual, primal);
     }
 }
