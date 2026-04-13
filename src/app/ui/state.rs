@@ -1,3 +1,5 @@
+//! Shared UI state exchanged between the control window and the render loop.
+
 use crate::app::grid::GridConfig;
 use crate::maths::Expr;
 use mathhook_core::Parser;
@@ -10,6 +12,7 @@ pub struct EqRender {
 }
 
 impl EqRender {
+    /// Creates one parsed equation together with its editable source string.
     pub fn new(eq: Expr, eq_str: String) -> Self {
         Self { eq, eq_str }
     }
@@ -23,6 +26,10 @@ pub struct SpacialEqs {
 }
 
 impl SpacialEqs {
+    /// Constructs `SpacialEqs` from defaults.
+    ///
+    /// It is part of the egui control window and keeps UI state in sync with the shared runtime
+    /// state.
     pub(crate) fn from_defaults(x: &str, y: &str, z: &str) -> Self {
         Self {
             x: default_eq(x),
@@ -31,10 +38,12 @@ impl SpacialEqs {
         }
     }
 
+    /// Builds the default spherical-style coordinate-system equations.
     pub fn default_sys() -> Self {
         Self::from_defaults("x*cos(y) * sin(z)", "x*sin(y) * sin(z)", "x * cos(z)")
     }
 
+    /// Builds the default constant vector-field equations.
     pub fn default_field() -> Self {
         Self::from_defaults("1", "0", "0")
     }
@@ -65,6 +74,12 @@ pub struct DualLegendState {
 }
 
 impl GridUiState {
+    /// Rounds and normalizes the editable UI bounds into a runtime `GridConfig`.
+    ///
+    /// The control panel stores editable floating-point values because sliders and text fields
+    /// operate in that domain. The runtime grid builder, however, expects stable snapped values
+    /// so cache keys and segment generation do not drift across frames. The special handling for
+    /// `3.14` and `6.28` preserves the common `PI` and `2*PI` intent from the UI.
     pub fn approximate_grid_config(&self) -> GridConfig {
         let normalize_bound = |value: f64| match value {
             value if value == 3.14 => PI,
@@ -85,12 +100,22 @@ impl GridUiState {
         )
     }
 
+    /// Converts the current UI state into the grid configuration used by the runtime.
+    ///
+    /// This is the configuration snapshot compared by `World` when deciding whether geometry and
+    /// lookup caches must be rebuilt.
     pub fn to_grid_config(&self) -> GridConfig {
         self.approximate_grid_config()
     }
 }
 
 impl Default for GridUiState {
+    /// Builds the default `GridUiState`.
+    ///
+    /// The defaults are chosen so the first frame can immediately build a valid grid and vector
+    /// field without any UI interaction. `apply_counter` starts at zero and is only bumped after
+    /// validation succeeds, which lets the render thread cheaply detect committed edits without
+    /// reacting to every intermediate keystroke.
     fn default() -> Self {
         Self {
             render_3d: true,
@@ -117,6 +142,10 @@ pub(crate) enum ControlTab {
     Field,
 }
 
+/// Parses one default equation string into `EqRender`.
+///
+/// Defaults are expected to be valid and panic if they are not, because invalid built-in
+/// equations would make the application fail at startup.
 fn default_eq(expr: &str) -> EqRender {
     EqRender::new(Parser::default().parse(expr).unwrap(), expr.to_string())
 }

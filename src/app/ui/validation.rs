@@ -1,3 +1,5 @@
+//! Parsing and validation helpers for equations entered in the control window.
+
 use crate::app::ui::state::{EqRender, GridUiState, SpacialEqs};
 use mathhook_core::Parser;
 
@@ -7,6 +9,7 @@ pub(crate) struct ValidatedUiState {
     pub field: SpacialEqs,
 }
 
+/// Validates and reparses every editable equation in the UI state before apply.
 pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState, String> {
     let coord_x = validate_equation("Coordinate x", &state.coords_sys.x.eq_str);
     let coord_y = validate_equation("Coordinate y", &state.coords_sys.y.eq_str);
@@ -41,6 +44,7 @@ pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState,
     })
 }
 
+/// Parses one equation string and rejects unsupported variables or empty input.
 fn validate_equation(label: &str, eq: &str) -> Result<EqRender, String> {
     if eq.is_empty() {
         return Err(format!("{label}: Equation cannot be empty"));
@@ -62,12 +66,14 @@ fn validate_equation(label: &str, eq: &str) -> Result<EqRender, String> {
     Ok(EqRender::new(formal_eq, eq.to_string()))
 }
 
+/// Appends one validation error to the aggregated error list when present.
 fn collect_error(result: &Result<EqRender, String>, errors: &mut Vec<String>) {
     if let Err(error) = result {
         errors.push(error.clone());
     }
 }
 
+/// Builds the multiline error message shown by the control window.
 fn format_error_summary(errors: &[String]) -> String {
     format!("Error in equation(s):\n{}", errors.join("\n"))
 }

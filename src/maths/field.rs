@@ -14,6 +14,10 @@ pub struct VectorField {
 }
 
 impl VectorField {
+    /// Builds a vector field from expressions already expressed in the dual basis.
+    ///
+    /// The field caches both dual and orthonormal-tangent representations together with the
+    /// Jacobian needed for local linearization.
     pub fn new(expr: Form, space: &Space) -> Self {
         if expr.n_forms() != 1 && expr.n_forms() != 2 {
             LOGGER.error("Vector field must have 1 or 2 forms");
@@ -32,6 +36,10 @@ impl VectorField {
         }
     }
 
+    /// Builds a vector field from expressions expressed in the orthonormal tangent basis.
+    ///
+    /// The dual representation is derived immediately so both bases stay available for later
+    /// evaluation.
     pub fn from_otn(expr: Form, space: &Space) -> Self {
         if expr.n_forms() != 1 && expr.n_forms() != 2 {
             LOGGER.error(
@@ -56,6 +64,9 @@ impl VectorField {
         }
     }
 
+    /// Compiles the three components of a form into numeric closures.
+    ///
+    /// The components are assumed to follow the axis ordering already enforced by `Form`.
     fn compile_fast_expr(expr: &Form) -> [FastExpr3d; 3] {
         [
             expr_to_fastexpr3d(expr.get_expr(0).clone()),
@@ -64,10 +75,17 @@ impl VectorField {
         ]
     }
 
+    /// Compiles the orthonormal-tangent components of the field into numeric closures.
+    ///
+    /// This is a thin wrapper that exists to keep basis-specific call sites explicit.
     fn compile_fast_otn_expr(otn_expr: &Form) -> [FastExpr3d; 3] {
         Self::compile_fast_expr(otn_expr)
     }
 
+    /// Compiles the Jacobian of the orthonormal-tangent field components.
+    ///
+    /// Each entry stores one partial derivative needed by the local linear approximation used
+    /// in tangent mode.
     fn compile_fast_otn_jacobian(otn_expr: &Form) -> [[FastExpr3d; 3]; 3] {
         let x = "x".to_string();
         let y = "y".to_string();
@@ -92,6 +110,9 @@ impl VectorField {
         ]
     }
 
+    /// Evaluates the field components in the orthonormal tangent basis at one point.
+    ///
+    /// The returned `Point` contains the x, y, and z components in abstract coordinate order.
     pub fn at(&self, point: Point) -> Point {
         Point {
             x: self.fast_otn_expr[0](point.x, point.y, point.z),
@@ -100,6 +121,9 @@ impl VectorField {
         }
     }
 
+    /// Evaluates the field components in the dual basis at one point.
+    ///
+    /// This is used when building dual tangent overlays and other covector-oriented views.
     pub fn dual_at(&self, point: Point) -> Point {
         Point {
             x: self.fast_dual_expr[0](point.x, point.y, point.z),
@@ -108,6 +132,9 @@ impl VectorField {
         }
     }
 
+    /// Evaluates the first-order Taylor approximation of the field around an anchor point.
+    ///
+    /// The `delta` argument is interpreted as an abstract-space offset from `anchor`.
     pub fn linearized_at(&self, anchor: Point, delta: Point) -> Point {
         let anchor_value = self.at(anchor);
 
@@ -124,6 +151,9 @@ impl VectorField {
         }
     }
 
+    /// Returns the symbolic field representation stored in the dual basis.
+    ///
+    /// Callers can use this for further symbolic manipulation or debugging.
     pub fn get_dual(&self) -> &Form {
         &self.dual_expr
     }

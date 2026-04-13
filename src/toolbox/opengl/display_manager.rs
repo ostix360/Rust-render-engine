@@ -1,4 +1,6 @@
 #![allow(unused)]
+//! GLFW window creation, event polling, and frame-timing utilities.
+
 use crate::toolbox::input::Input;
 use crate::toolbox::logging::LOGGER;
 use glfw::ffi::*;
@@ -18,6 +20,7 @@ pub struct DisplayManager {
 }
 
 impl DisplayManager {
+    /// Creates the window manager with the requested initial size and title.
     pub fn new(width: u32, height: u32, title: &'static str) -> DisplayManager {
         DisplayManager {
             width,
@@ -32,6 +35,11 @@ impl DisplayManager {
         }
     }
 
+    /// Initializes GLFW, creates the OpenGL window, and loads GL function pointers.
+    ///
+    /// The created context remains owned by this thread for the rest of the program. Other
+    /// threads may manage UI state, but they do not participate in OpenGL calls through this
+    /// manager.
     pub fn create_display(&mut self) {
         use glfw::fail_on_errors;
 
@@ -97,6 +105,7 @@ impl DisplayManager {
         }
     }
 
+    /// Refreshes the cached window size from GLFW.
     pub fn size_handler(&mut self) {
         let mut width: c_int = 0;
         let mut height: c_int = 0;
@@ -111,6 +120,11 @@ impl DisplayManager {
         self.height = height as u32;
     }
 
+    /// Polls GLFW events and updates the cached keyboard and mouse input state.
+    ///
+    /// `Input::begin_frame` is called here so edge-triggered key state is defined in display
+    /// frames rather than wall-clock time. This function is the only place that mutates the
+    /// per-frame input snapshot.
     fn handle_window_events(&mut self) {
         self.input.begin_frame();
         self.glfw.as_mut().unwrap().poll_events();
@@ -132,9 +146,15 @@ impl DisplayManager {
         }
     }
 
+    /// Returns the current GLFW time in seconds.
     fn get_current_time(&self) -> f32 {
         unsafe { glfwGetTime() as f32 }
     }
+    /// Finishes one frame by polling events, updating timing, resizing the viewport, and
+    /// swapping buffers.
+    ///
+    /// `delta` is computed after event handling, so systems reading it on the next frame observe
+    /// the duration of the frame that just completed.
     pub fn update_display(&mut self) {
         self.handle_window_events();
         self.size_handler();
@@ -147,10 +167,12 @@ impl DisplayManager {
         self.window.as_mut().unwrap().swap_buffers();
     }
 
+    /// Returns whether the window has requested shutdown.
     pub fn is_close_requested(&self) -> bool {
         self.window.as_ref().unwrap().should_close()
     }
 
+    /// Drops the window and event receiver owned by the display manager.
     pub fn close_display(&mut self) {
         println!("Closing display");
         // self.glfw.as_mut().unwrap().unset_error_callback();
@@ -162,40 +184,51 @@ impl DisplayManager {
         self.window.take();
     }
 
+    /// Returns the frame delta computed during the last `update_display` call.
     pub fn get_delta(&self) -> f32 {
         self.delta
     }
 
+    /// Returns the cached window width in pixels.
     pub fn get_width(&self) -> u32 {
         self.width
     }
 
+    /// Returns the cached window height in pixels.
     pub fn get_height(&self) -> u32 {
         self.height
     }
 
+    /// Returns the cached per-frame input state.
     pub fn get_input(&self) -> &Input {
         &self.input
     }
 
+    /// Returns a mutable reference to the GLFW window.
     pub fn get_window(&mut self) -> &mut PWindow {
         self.window.as_mut().unwrap()
     }
 
+    /// Returns a mutable reference to the GLFW window.
+    ///
+    /// This is identical to `get_window` and exists for call-site clarity.
     pub fn get_window_mut(&mut self) -> &mut PWindow {
         self.window.as_mut().unwrap()
     }
 
+    /// Returns the underlying GLFW handle.
     pub fn get_glfw(&self) -> &glfw::Glfw {
         self.glfw.as_ref().unwrap()
     }
 
+    /// Returns a mutable reference to the underlying GLFW handle.
     pub fn get_glfw_mut(&mut self) -> &mut glfw::Glfw {
         self.glfw.as_mut().unwrap()
     }
 }
 
 impl Drop for DisplayManager {
+    /// Cleans up the window and GLFW state owned by the display manager.
     fn drop(&mut self) {
         println!("Cleaning up resources...");
         self.close_display(); // Ensure no manual cleanup is missed

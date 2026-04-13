@@ -1,11 +1,12 @@
 #![allow(unused)]
+//! Symbolic math helpers and fast evaluator compilation used by the runtime.
 
 use crate::maths::space::Metric;
 use egui::TextBuffer;
 use lazy_static::lazy_static;
 use mathhook::prelude::Simplify;
 use mathhook::Expression;
-use mathhook_core::{Derivative, Symbol};
+use mathhook_core::{Derivative, EvalContext, Symbol};
 use nalgebra::Vector3;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
@@ -33,6 +34,10 @@ pub struct Point {
     pub z: f64,
 }
 
+/// Converts a scalar into a mathhook expression node.
+///
+/// This helper keeps numeric literal construction concise throughout the symbolic math code.
+#[inline]
 pub fn num(value: f64) -> Expression {
     Expression::from(value)
 }
@@ -71,6 +76,10 @@ pub fn num(value: f64) -> Expression {
 //     grid.accumulator.avg
 // }
 
+/// Compiles a symbolic expression into a single-variable numeric closure.
+///
+/// The expression is simplified first and must reference exactly one variable.
+#[inline]
 pub fn expr_to_fastexpr1d(mut expr: Expr) -> FastExpr1d {
     let eval_expr = expr.simplify();
     if eval_expr.find_variables().len() > 1 {
@@ -86,10 +95,18 @@ pub fn expr_to_fastexpr1d(mut expr: Expr) -> FastExpr1d {
     Arc::new(eval)
 }
 
+/// Compiles a three-variable expression into a closure that fixes two coordinates and returns a
+/// one-dimensional evaluator.
+///
+/// The `var_name` argument chooses which coordinate remains free in the returned closure.
 #[inline]
 pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1d {
     let eval_expr = expr.simplify();
     let eval_expr = Arc::new(eval_expr);
+    /// Builds the substitution map for the chosen free coordinate.
+    ///
+    /// The remaining two expressions are assigned to the other coordinate names in canonical
+    /// `x/y/z` order.
     #[inline]
     fn select_arg(
         target: &str,
@@ -133,6 +150,10 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
     Arc::new(func)
 }
 
+/// Compiles a symbolic expression into a fast three-variable numeric closure.
+///
+/// The closure evaluates with a numeric context first and falls back to a manual evaluator for
+/// functions not handled by the primary path.
 pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
     let eval_expr = Arc::new(expr.simplify());
     let eval = move |x: f64, y: f64, z: f64| -> f64 {
@@ -140,15 +161,68 @@ pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
         vars.insert("x".to_string(), num(x));
         vars.insert("y".to_string(), num(y));
         vars.insert("z".to_string(), num(z));
-        eval_expr.substitute(&vars).evaluate_to_f64().unwrap()
+        let substituted = eval_expr.substitute(&vars);
+        eval_expr
+            .evaluate_with_context(&EvalContext::numeric(vars))
+            .unwrap()
+            .evaluate_to_f64()
+            .or_else(|_| eval_numeric_fallback(&substituted))
+            .unwrap()
     };
     Arc::new(eval)
 }
 
+/// Recursively evaluates an expression node using a small numeric fallback interpreter.
+///
+/// This path exists to cover common transcendental functions when direct numeric evaluation
+/// leaves symbolic structure behind.
+///
+/// This function will be deleted when the lib will be patched
+#[inline]
+fn eval_numeric_fallback(expr: &Expr) -> Result<f64, mathhook_core::MathError> {
+    match expr {
+        Expression::Add(terms) => terms
+            .iter()
+            .try_fold(0.0, |acc, term| Ok(acc + eval_numeric_fallback(term)?)),
+        Expression::Mul(factors) => factors
+            .iter()
+            .try_fold(1.0, |acc, factor| Ok(acc * eval_numeric_fallback(factor)?)),
+        Expression::Pow(base, exp) => {
+            Ok(eval_numeric_fallback(base)?.powf(eval_numeric_fallback(exp)?))
+        }
+        Expression::Function { name, args } => {
+            let arg = |idx: usize| eval_numeric_fallback(&args[idx]);
+            match name.as_ref() {
+                "sqrt" => Ok(arg(0)?.sqrt()),
+                "sin" => Ok(arg(0)?.sin()),
+                "cos" => Ok(arg(0)?.cos()),
+                "tan" => Ok(arg(0)?.tan()),
+                "asin" | "arcsin" => Ok(arg(0)?.asin()),
+                "acos" | "arccos" => Ok(arg(0)?.acos()),
+                "atan" | "arctan" => Ok(arg(0)?.atan()),
+                "ln" => Ok(arg(0)?.ln()),
+                "log" => Ok(arg(0)?.ln()),
+                "exp" => Ok(arg(0)?.exp()),
+                _ => expr.evaluate_to_f64(),
+            }
+        }
+        _ => expr.evaluate_to_f64(),
+    }
+}
+
+/// Differentiates an expression with respect to one named variable and simplifies the result.
+///
+/// The variable name must match the symbolic names used throughout the coordinate and field
+/// code.
+#[inline]
 pub fn derivate(expr: Expr, variable_name: &String) -> Expr {
     expr.derivative(Symbol::new(variable_name)).simplify()
 }
 
+/// Converts a raw vertex triple into a non-NaN vector.
+///
+/// An error is returned if any component contains `NaN`.
+#[inline]
 pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
     Ok(Vector3::new(
         NonNaN::<f32>::new(v[0]).ok().ok_or("NaN in vertex")?,
@@ -158,9 +232,16 @@ pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
 }
 
 trait Hodge {
+    /// Computes the Hodge dual of the implementing value with respect to the supplied metric.
+    ///
+    /// Implementations are expected to preserve the basis conventions used across the `maths`
+    /// module.
     fn hodge_star(&self, metric: &Metric) -> Self;
 }
 
 trait ExternalDerivative {
+    /// Computes the exterior derivative of the implementing value.
+    ///
+    /// Implementations follow the differential-form conventions established in this module.
     fn d(&mut self) -> Self;
 }

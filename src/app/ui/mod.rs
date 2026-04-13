@@ -1,3 +1,5 @@
+//! Control-window bootstrap and public UI state exports.
+
 mod app;
 mod legend;
 mod state;
@@ -13,6 +15,12 @@ use std::thread;
 use winit::event_loop::EventLoop;
 use winit::platform::x11::EventLoopBuilderExtX11;
 
+/// Spawns the control window on a dedicated thread.
+///
+/// The returned thread owns the `eframe` event loop and only exchanges data with the render loop
+/// through the supplied `Arc<Mutex<GridUiState>>`. That mutex is the only shared-state boundary
+/// between the UI and the renderer; the UI thread does not touch OpenGL resources or camera
+/// state.
 pub fn spawn_control_window(state: Arc<Mutex<GridUiState>>) {
     thread::spawn(move || {
         let options = eframe::NativeOptions {

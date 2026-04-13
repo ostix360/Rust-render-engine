@@ -1,3 +1,5 @@
+//! Runtime world state that bridges UI changes, cached field data, and rendering.
+
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::{Grid, GridConfig};
 use crate::app::grid_world::{GridSample, GridWorld};
@@ -29,6 +31,10 @@ struct AppliedConfig {
 }
 
 impl AppliedConfig {
+    /// Builds the subset of UI state that drives world reconfiguration.
+    ///
+    /// The stored values are normalized into comparable strings and flags so cheap change
+    /// detection can happen frame-to-frame.
     fn from_ui(state: &GridUiState) -> Self {
         let context = SimpleContext::default();
         Self {
@@ -62,6 +68,11 @@ impl AppliedConfig {
         }
     }
 
+    /// Computes which high-level parts of the world would change between two applied
+    /// configurations.
+    ///
+    /// The result is used to decide whether geometry, field caches, or normalization settings
+    /// need to be rebuilt.
     fn diff(&self, next: &Self) -> ApplyDiff {
         ApplyDiff {
             grid_changed: self.grid_config != next.grid_config,
@@ -81,10 +92,17 @@ struct ApplyDiff {
 }
 
 impl ApplyDiff {
+    /// Returns whether the grid geometry or coordinate embedding changed.
+    ///
+    /// Geometry changes force the world to rebuild sampled positions and the grid lookup cache.
     fn geometry_changed(self) -> bool {
         self.grid_changed || self.coords_changed
     }
 
+    /// Returns whether cached field samples must be recomputed.
+    ///
+    /// Any geometry change invalidates the cache in addition to direct field-expression
+    /// changes.
     fn field_cache_changed(self) -> bool {
         self.geometry_changed() || self.field_changed
     }
@@ -98,6 +116,9 @@ struct FieldSample {
 }
 
 impl FieldSample {
+    /// Expands basis components into a world-space vector at this sample.
+    ///
+    /// The sample stores the tangent basis that was evaluated when the cache was built.
     fn vector_to_world(&self, vector: Vector3<f64>) -> Vector3<f64> {
         self.basis[0] * vector.x + self.basis[1] * vector.y + self.basis[2] * vector.z
     }
@@ -124,6 +145,12 @@ pub struct World {
 }
 
 impl World {
+    /// Creates the world, renderer, cached grid samples, and initial field render data.
+    ///
+    /// Construction performs a single blocking lock on the shared UI state to clone the initial
+    /// configuration. After that, the world owns its runtime copies of geometry, field state,
+    /// caches, and renderers on the main thread, so the shared mutex is not held during any
+    /// expensive setup or rendering work.
     pub fn new(shared_ui_state: Arc<Mutex<GridUiState>>, display_manager: &DisplayManager) -> Self {
         let initial_state = shared_ui_state.lock().unwrap().clone();
         let applied_config = AppliedConfig::from_ui(&initial_state);
@@ -161,6 +188,10 @@ impl World {
         world
     }
 
+    /// Builds the initial grid, vector field, and sample caches from UI state.
+    ///
+    /// This is the one-shot bootstrap path shared by world construction before incremental
+    /// updates take over.
     fn init(initial_state: GridUiState) -> (Grid, VectorField, Vec<FieldSample>, Vec<GridSample>) {
         let config = initial_state.to_grid_config();
         let x_eq = initial_state.coords_sys.x.eq;
@@ -174,11 +205,19 @@ impl World {
         (grid, vf, field_samples, grid_samples)
     }
 
+    /// Builds the runtime vector field from the UI equations and the current grid metric.
+    ///
+    /// Field components are interpreted in the grid coordinate basis and converted into the
+    /// dual representation expected by `VectorField`.
     fn build_vector_field(field: &SpacialEqs, grid: &Grid) -> VectorField {
         let field_eqs = vec![field.x.eq.clone(), field.y.eq.clone(), field.z.eq.clone()];
         VectorField::from_otn(Form::new(field_eqs, 1), grid.get_coords().get_space())
     }
 
+    /// Builds cached field and grid samples from the current grid render data.
+    ///
+    /// Each cached sample stores both abstract-space and world-space information so later
+    /// updates can avoid recomputing geometry every frame.
     fn build_grid_cache(grid: &Grid) -> (Vec<FieldSample>, Vec<GridSample>) {
         let data = grid.get_data();
         let coords = grid.get_coords();
@@ -222,11 +261,28 @@ impl World {
         (field_samples, grid_samples)
     }
 
+    /// Applies one segment transform to an abstract-space edge vertex.
+    ///
+    /// This converts the stored homogeneous transform and non-NaN vertex coordinates into a
+    /// plain `Vector3<f64>`.
     fn transform_vertex(transform: &Matrix4<f64>, vertex: &Vector3<NonNaN<f64>>) -> Vector3<f64> {
         let vec4 = Vector4::new(vertex.x.get(), vertex.y.get(), vertex.z.get(), 1.0);
         (transform * vec4).xyz()
     }
 
+    /// Applies validated UI state to the world and refreshes whichever caches changed.
+    ///
+    /// The caller is expected to pass in a fully cloned and validated `GridUiState`, so this
+    /// method does not acquire the shared UI lock itself. That keeps the critical section short:
+    /// lock on the UI thread, clone, unlock, then do the potentially expensive grid, kd-tree,
+    /// shader, and field-cache rebuilds here on the render thread.
+    ///
+    /// Concretely:
+    ///
+    /// - coordinate edits rebuild `CoordsSys` and hot-reload the editable grid vertex shader,
+    /// - geometry edits rebuild sampled grid data and the `GridWorld` picking kd-tree,
+    /// - field edits rebuild the `VectorField`,
+    /// - field-cache changes recompute sampled vectors used by later render rebuilds.
     fn apply_state(&mut self, state: GridUiState, next_config: AppliedConfig, diff: ApplyDiff) {
         if diff.coords_changed {
             let coords = state.coords_sys.clone();
@@ -258,6 +314,17 @@ impl World {
         self.last_counter = state.apply_counter;
     }
 
+    /// Advances the world by one frame.
+    ///
+    /// The shared UI mutex is only held long enough to copy live scalar settings and detect a new
+    /// committed `apply_counter`. If a new configuration is pending while tangent mode is active,
+    /// the state is stashed in `deferred_apply_state` and applied only after tangent mode is
+    /// forced back to world space. This avoids rebuilding geometry or field caches while the dive
+    /// transition still depends on the old anchor and camera endpoints.
+    ///
+    /// Outside of that lock boundary, this method owns the full frame update: applying pending
+    /// state, advancing tangent-space logic, invalidating render buffers when needed, and pushing
+    /// overlay metadata back to the UI.
     pub fn update(
         &mut self,
         input: &Input,
@@ -308,6 +375,10 @@ impl World {
         self.update_sphere();
     }
 
+    /// Renders the current grid, field, tangent overlays, and marker sphere.
+    ///
+    /// Visibility of each layer is delegated to the tangent-space subsystem so world and
+    /// tangent views stay synchronized.
     pub fn render(&self, camera: &Camera) {
         self.renderer.render(
             &self.grid,
@@ -321,14 +392,25 @@ impl World {
         )
     }
 
+    /// Forces the tangent subsystem back to world mode.
+    ///
+    /// This is used when deferred UI changes must be applied but the current tangent transition
+    /// still owns camera state.
     fn force_world_mode(&mut self, camera: &mut Camera) {
         self.tangent_space.force_world_mode(camera);
     }
 
+    /// Returns the scene transform that should be supplied to the grid renderer.
+    ///
+    /// The transform mirrors the blend state maintained by the tangent subsystem.
     fn scene_transform(&self) -> SceneSpaceTransform {
         self.tangent_space.scene_transform()
     }
 
+    /// Refreshes the marker sphere that highlights the hovered or anchored sample.
+    ///
+    /// The marker is derived from tangent-space state each frame instead of being shared through
+    /// the UI mutex, so there is no cross-thread ownership of renderable scene objects.
     fn update_sphere(&mut self) {
         if let Some(position) = self.tangent_space.marker_position() {
             self.sphere = Some(Sphere::new(position, WHITE, SPHERE_SIZE));
@@ -337,6 +419,12 @@ impl World {
         }
     }
 
+    /// Recomputes cached field components and their world-space vectors for every sampled point.
+    ///
+    /// This is one of the more expensive CPU-side rebuild steps: the field is evaluated in
+    /// abstract coordinates, then expanded through the cached tangent basis stored in each
+    /// `FieldSample`. The result is retained so tangent/view-only changes can rebuild renderables
+    /// without reevaluating the field function itself.
     fn recompute_cached_field_vectors(&mut self) {
         self.cached_field_components.clear();
         self.cached_field_vectors.clear();
@@ -358,6 +446,12 @@ impl World {
         }
     }
 
+    /// Rebuilds the current field renderables from the cached samples and tangent state.
+    ///
+    /// This stage is intentionally downstream from `recompute_cached_field_vectors`: cached field
+    /// values are turned into render-oriented arrows or dual-form spheres after tangent blending,
+    /// normalization, and anchor-relative transforms are known. That split keeps camera and
+    /// tangent-view changes cheaper than full field recomputation.
     fn rebuild_render_field(&mut self) {
         let show_form_samples = self.tangent_space.show_form_samples();
         let show_vector_field = self.tangent_space.show_vector_field();
@@ -414,10 +508,18 @@ impl World {
         }
     }
 
+    /// Returns the projection matrix currently owned by the master renderer.
+    ///
+    /// Callers use this when they need to perform picking or other view-dependent calculations
+    /// outside the renderer.
     pub fn get_projection(&self) -> Matrix4<f64> {
         self.renderer.projection
     }
 
+    /// Rebuilds the dual-form sample spheres and legend from anchor-space field data.
+    ///
+    /// If no anchor or no dual-form render can be produced, the previous sample buffer remains
+    /// empty.
     fn rebuild_dual_form_samples(&mut self, anchor_field_components: Option<Vector3<f64>>) {
         let Some(dual_components) = anchor_field_components else {
             return;
@@ -430,20 +532,36 @@ impl World {
         self.render_form_samples = render.samples;
     }
 
+    /// Publishes overlay metadata back to the shared UI state.
+    ///
+    /// The shared lock is taken only for the scalar legend payload; renderables themselves remain
+    /// owned by the main thread. This keeps the UI thread informed without turning the mutex into
+    /// a transport for large scene structures.
     fn sync_overlay_state(&self) {
         let mut shared = self.shared_ui_state.lock().unwrap();
         shared.dual_legend = self.dual_legend;
     }
 
+    /// Returns the tangent render-state snapshot used to detect render-cache invalidation.
+    ///
+    /// The snapshot is compared across frames to decide whether field geometry needs to be
+    /// regenerated.
     fn render_state(&self) -> TangentRenderState {
         self.tangent_space.render_state()
     }
 
+    /// Evaluates the field dual components at the current tangent anchor.
+    ///
+    /// This is only available while tangent mode has a selected anchor point.
     fn anchor_dual_components(&self) -> Option<Vector3<f64>> {
         let point = self.anchor_point()?;
         Some(Self::field_dual_components_at(&self.field, point))
     }
 
+    /// Returns the current tangent anchor as a scalar `Point`.
+    ///
+    /// The conversion keeps the anchor in abstract coordinates so field evaluation stays
+    /// consistent with the grid basis.
     fn anchor_point(&self) -> Option<Point> {
         let anchor_abstract = self.tangent_space.anchor_abstract_position()?;
         Some(Point {
@@ -459,11 +577,18 @@ impl World {
         Vector3::new(field_res.x, field_res.y, field_res.z)
     }
 
+    /// Evaluates the field in the dual basis at one abstract point.
+    ///
+    /// The returned vector is used to build dual tangent overlays and legends.
     fn field_dual_components_at(field: &VectorField, point: Point) -> Vector3<f64> {
         let field_res = field.dual_at(point);
         Vector3::new(field_res.x, field_res.y, field_res.z)
     }
 
+    /// Evaluates the first-order field approximation around an anchor point.
+    ///
+    /// The supplied `local_delta` is interpreted in abstract coordinates relative to the
+    /// anchor.
     fn field_linearized_components_at(
         field: &VectorField,
         anchor: Point,

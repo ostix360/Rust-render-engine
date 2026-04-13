@@ -1,9 +1,12 @@
+//! Detached legend window for the dual tangent color ramp.
+
 use crate::app::ui::state::DualLegendState;
 use crate::app::ui::theme::{self, BORDER, MUTED, SHADOW_GREY, TEXT};
 use eframe::egui::{self, Color32, Stroke, ViewportBuilder, ViewportCommand, ViewportId};
 use eframe::epaint::{CornerRadius, Margin};
 use nalgebra::vector;
 
+/// Shows or closes the detached legend viewport for dual tangent rendering.
 pub(crate) fn show_dual_legend_window(ctx: &egui::Context, legend: Option<DualLegendState>) {
     let Some(legend) = legend else {
         ctx.send_viewport_cmd_to(legend_viewport_id(), ViewportCommand::Close);
@@ -26,6 +29,7 @@ pub(crate) fn show_dual_legend_window(ctx: &egui::Context, legend: Option<DualLe
     });
 }
 
+/// Renders the dual tangent legend contents inside the detached viewport.
 fn render_dual_legend(ui: &mut egui::Ui, legend: DualLegendState) {
     egui::Frame::new()
         .fill(SHADOW_GREY)
@@ -94,6 +98,7 @@ fn render_dual_legend(ui: &mut egui::Ui, legend: DualLegendState) {
         });
 }
 
+/// Maps a normalized legend position onto the dual tangent color ramp.
 fn legend_color(t: f64) -> Color32 {
     let clamped = t.clamp(0.0, 1.0);
     let cold = vector![0.08, 0.22, 1.0];
@@ -114,6 +119,7 @@ fn legend_color(t: f64) -> Color32 {
     )
 }
 
+/// Returns the viewport id reserved for the detached legend window.
 fn legend_viewport_id() -> ViewportId {
     ViewportId::from_hash_of("dual_tangent_legend")
 }

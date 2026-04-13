@@ -1,5 +1,10 @@
+//! Minimal OBJ loader for embedded triangle meshes.
+
 use crate::{TriIndexes, Vertex, RESOURCES};
 
+/// Loads one embedded OBJ mesh and returns its vertex positions and triangulated indices.
+///
+/// Polygon faces are fan-triangulated as they are parsed.
 pub fn load_obj(name: &str) -> (Vec<Vertex>, Vec<TriIndexes>) {
     let mut vertices: Vec<Vertex> = Vec::new();
     let mut indices: Vec<TriIndexes> = Vec::new();
@@ -40,6 +45,7 @@ pub fn load_obj(name: &str) -> (Vec<Vertex>, Vec<TriIndexes>) {
     (vertices, indices)
 }
 
+/// Parses one OBJ face token into a zero-based vertex index.
 fn parse_obj_index(part: &str) -> u32 {
     part.split('/').next().unwrap().parse::<u32>().unwrap() - 1
 }

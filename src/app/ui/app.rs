@@ -1,3 +1,5 @@
+//! egui control panel for editing the grid, field, and tangent-view settings.
+
 use crate::app::ui::legend::show_dual_legend_window;
 use crate::app::ui::state::{ControlTab, GridUiState};
 use crate::app::ui::theme::{
@@ -16,6 +18,7 @@ pub(crate) struct ControlApp {
 }
 
 impl ControlApp {
+    /// Creates the egui control application around the shared UI state.
     pub(crate) fn new(state: Arc<Mutex<GridUiState>>) -> Self {
         Self {
             state,
@@ -25,6 +28,7 @@ impl ControlApp {
         }
     }
 
+    /// Renders the grid or field tab selector.
     fn render_tab_bar(ui: &mut egui::Ui, active_tab: &mut ControlTab) {
         egui::Frame::new()
             .fill(SHADOW_GREY)
@@ -41,6 +45,7 @@ impl ControlApp {
             });
     }
 
+    /// Dispatches to the active tab renderer.
     fn render_active_tab(ui: &mut egui::Ui, active_tab: ControlTab, data: &mut GridUiState) {
         match active_tab {
             ControlTab::Grid => Self::render_grid_tab(ui, data),
@@ -48,6 +53,7 @@ impl ControlApp {
         }
     }
 
+    /// Renders the grid, coordinate-system, and tangent-scale controls.
     fn render_grid_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
         egui::CollapsingHeader::new(theme::section_heading("Coordinate system"))
             .default_open(true)
@@ -106,6 +112,7 @@ impl ControlApp {
             });
     }
 
+    /// Renders the field-equation and tangent-arrow controls.
     fn render_field_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
         egui::CollapsingHeader::new(theme::section_heading("Field equations"))
             .default_open(true)
@@ -143,6 +150,7 @@ impl ControlApp {
             });
     }
 
+    /// Validates the current UI state and bumps the apply counter on success.
     fn handle_apply(data: &mut GridUiState, error_popup: &mut Option<String>) {
         match validate_ui_state(data) {
             Ok(validated) => {
@@ -154,6 +162,7 @@ impl ControlApp {
         }
     }
 
+    /// Renders the Apply button and runs validation when it is clicked.
     fn render_apply_button(
         ui: &mut egui::Ui,
         data: &mut GridUiState,
@@ -175,6 +184,7 @@ impl ControlApp {
         });
     }
 
+    /// Shows the modal popup used to explain equation-validation failures.
     fn show_error_popup(&mut self, ctx: &egui::Context) {
         let Some(message) = self.error_popup.as_ref() else {
             return;
@@ -228,6 +238,7 @@ impl ControlApp {
         }
     }
 
+    /// Renders one tab button and returns whether it was clicked.
     fn tab_button(ui: &mut egui::Ui, selected: bool, label: &str) -> bool {
         let fill = if selected { ACCENT } else { JET_BLACK };
         let stroke = if selected {
@@ -246,6 +257,7 @@ impl ControlApp {
         .clicked()
     }
 
+    /// Renders the density slider for one grid axis.
     fn density_slider(ui: &mut egui::Ui, value: &mut f64, label: &str) {
         ui.add(
             egui::Slider::new(value, 0.0..=20.0)
@@ -255,6 +267,7 @@ impl ControlApp {
         );
     }
 
+    /// Renders one labeled equation input row.
     fn eq_row(ui: &mut egui::Ui, label: &str, value: &mut String) {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(label).color(TEXT));
@@ -269,6 +282,7 @@ impl ControlApp {
         });
     }
 
+    /// Renders the min and max editors for one axis bound pair.
     fn bounds_row(ui: &mut egui::Ui, label: &str, bounds: &mut (f64, f64)) {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(label).color(TEXT));
@@ -286,6 +300,7 @@ impl ControlApp {
         });
     }
 
+    /// Renders the main control window contents against the shared state.
     fn render_ui(&mut self, ui: &mut egui::Ui) {
         let active_tab = &mut self.active_tab;
         let error_popup = &mut self.error_popup;
@@ -301,6 +316,7 @@ impl ControlApp {
 }
 
 impl eframe::App for ControlApp {
+    /// Applies the shared theme and keeps the detached legend window synchronized.
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.styled {
             theme::apply_style(ctx);
@@ -310,6 +326,7 @@ impl eframe::App for ControlApp {
         show_dual_legend_window(ctx, legend);
     }
 
+    /// Renders the central control panel and any active error popup.
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Frame::central_panel(ui.style()).show(ui, |ui| {
             egui::ScrollArea::vertical()
@@ -321,11 +338,13 @@ impl eframe::App for ControlApp {
         self.show_error_popup(ui.ctx());
     }
 
+    /// Requests periodic repainting so the control window stays responsive.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(std::time::Duration::from_millis(33));
     }
 }
 
+/// Renders the small help dot shown beside equation inputs.
 fn info_dot(ui: &mut egui::Ui) {
     ui.add_space(4.0);
     let (rect, _response) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());

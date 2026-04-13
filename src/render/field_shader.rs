@@ -1,3 +1,5 @@
+//! Typed uniform wrapper around the vector-field shader.
+
 use crate::toolbox::opengl::shader::shader_program::{Shader, ShaderProgram};
 use crate::toolbox::opengl::shader::uniform::matrix4uniform::Matrix4Uniform;
 use crate::toolbox::opengl::shader::uniform::uniform::Uniform;
@@ -13,6 +15,7 @@ pub struct FieldShader {
 }
 
 impl FieldShader {
+    /// Creates the field shader wrapper and prepares its typed uniform handles.
     pub fn new(program: ShaderProgram) -> FieldShader {
         program.bind_attrib(0, "position");
         FieldShader {
@@ -24,32 +27,39 @@ impl FieldShader {
         }
     }
 
+    /// Uploads the projection matrix uniform.
     pub fn load_projection_matrix(&self, matrix: &Matrix4<f64>) {
         self.projection_matrix.load_matrix_to_uniform(matrix);
     }
 
+    /// Uploads the arrow transformation matrix uniform.
     pub fn load_transformation_matrix(&self, matrix: &Matrix4<f64>) {
         self.transformation_matrix.load_matrix_to_uniform(matrix);
     }
 
+    /// Uploads the current view matrix uniform.
     pub fn load_view_matrix(&self, matrix: &Matrix4<f64>) {
         self.view_matrix.load_matrix_to_uniform(matrix);
     }
 
+    /// Uploads the arrow color uniform.
     pub fn load_color(&self, color: Vector4<f64>) {
         self.color.load_vector_to_uniform(color);
     }
 }
 
 impl Shader for FieldShader {
+    /// Binds the underlying shader program.
     fn bind(&self) {
         self.shader_program.bind()
     }
 
+    /// Unbinds the underlying shader program.
     fn unbind(&self) {
         self.shader_program.unbind()
     }
 
+    /// Caches all uniform locations needed by the field shader wrapper.
     fn store_all_uniforms(&mut self) {
         let mut uniforms: Box<[&mut Uniform]> = Box::new([
             &mut self.projection_matrix.uniform,

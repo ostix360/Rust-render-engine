@@ -1,3 +1,5 @@
+//! Tangent-space transitions, hover picking, and geometric or dual tangent views.
+
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid_world::{GridSample, GridWorld};
 use crate::app::ui::DualLegendState;
@@ -50,6 +52,10 @@ pub struct SceneSpaceTransform {
 }
 
 impl SceneSpaceTransform {
+    /// Builds the neutral scene-space transform used outside tangent mode.
+    ///
+    /// The returned value represents no blend, a zero anchor, the canonical basis, and the
+    /// default geometric local scale.
     pub fn identity() -> Self {
         Self {
             tangent_mix: 0.0,
@@ -73,6 +79,9 @@ enum DiveMode {
 }
 
 impl DiveMode {
+    /// Returns whether the dive mode represents an active transition.
+    ///
+    /// Only entering and exiting states interpolate camera and scene values over time.
     fn is_animating(self) -> bool {
         matches!(self, Self::Entering | Self::Exiting)
     }
@@ -87,10 +96,17 @@ struct DiveAnchor {
 }
 
 impl DiveAnchor {
+    /// Computes the anchor-relative abstract offset scaled for the local tangent patch.
+    ///
+    /// Geometric tangent rendering uses this scaled delta to shrink the visible neighborhood
+    /// around the anchor.
     fn local_abstract_delta(&self, abstract_pos: Vector3<f64>, local_scale: f64) -> Vector3<f64> {
         (abstract_pos - self.abstract_pos) * local_scale
     }
 
+    /// Projects an abstract position into the anchor-relative geometric tangent view.
+    ///
+    /// The point is first converted into a local delta and then expanded in the anchor basis.
     fn geometric_tangent_position(
         &self,
         abstract_pos: Vector3<f64>,
@@ -100,10 +116,17 @@ impl DiveAnchor {
         self.basis[0] * delta.x + self.basis[1] * delta.y + self.basis[2] * delta.z
     }
 
+    /// Expands tangent-basis components into a world-oriented tangent vector.
+    ///
+    /// This keeps the tangent view aligned with the basis sampled at the dive anchor.
     fn geometric_tangent_vector(&self, vector: Vector3<f64>) -> Vector3<f64> {
         self.basis[0] * vector.x + self.basis[1] * vector.y + self.basis[2] * vector.z
     }
 
+    /// Builds the world and tangent camera positions for a dive transition.
+    ///
+    /// The tangent endpoint keeps the current camera offset relative to the anchor while
+    /// applying the configured zoom offset.
     fn build_camera_endpoints(&self, camera_pos: Vector3<f64>) -> DiveCameraEndpoints {
         DiveCameraEndpoints {
             world_pos: camera_pos,
@@ -111,6 +134,9 @@ impl DiveAnchor {
         }
     }
 
+    /// Returns the scene transform currently implied by the tangent subsystem.
+    ///
+    /// Outside tangent mode this falls back to the identity transform used by the grid shader.
     fn scene_transform(&self, mix: f64, local_scale: f64) -> SceneSpaceTransform {
         SceneSpaceTransform {
             tangent_mix: mix,
@@ -128,10 +154,16 @@ struct DiveCameraEndpoints {
 }
 
 impl DiveCameraEndpoints {
+    /// Interpolates the camera position between the stored world and tangent endpoints.
+    ///
+    /// The interpolation parameter is expected to already be eased by the caller when needed.
     fn position_at(&self, mix: f64) -> Vector3<f64> {
         lerp_vec3(self.world_pos, self.tangent_pos, mix)
     }
 
+    /// Translates both stored camera endpoints by the same world-space delta.
+    ///
+    /// This keeps the dive animation coherent while the user moves inside tangent mode.
     fn shift(&mut self, delta: Vector3<f64>) {
         self.world_pos += delta;
         self.tangent_pos += delta;
@@ -147,6 +179,7 @@ struct DiveState {
 }
 
 impl DiveState {
+    /// Creates a new `DiveState`.
     fn new() -> Self {
         Self {
             mode: DiveMode::World,
@@ -157,10 +190,17 @@ impl DiveState {
         }
     }
 
+    /// Returns the eased scene blend used for rendering and camera interpolation.
+    ///
+    /// The raw animation alpha is passed through `smoothstep` so the transition starts and ends
+    /// gently.
     fn scene_mix(&self) -> f64 {
         smoothstep(self.alpha)
     }
 
+    /// Flips an in-progress dive transition to the opposite direction.
+    ///
+    /// Only entering and exiting states are affected; steady states are left unchanged.
     fn reverse(&mut self) {
         self.mode = match self.mode {
             DiveMode::Entering => DiveMode::Exiting,
@@ -169,6 +209,10 @@ impl DiveState {
         };
     }
 
+    /// Resets the dive state back to the regular world view.
+    ///
+    /// Cached anchors and camera endpoints are discarded so a later dive starts from fresh
+    /// state.
     fn clear(&mut self) {
         self.mode = DiveMode::World;
         self.alpha = 0.0;
@@ -176,6 +220,10 @@ impl DiveState {
         self.camera_endpoints = None;
     }
 
+    /// Advances the dive animation and updates the camera position in place.
+    ///
+    /// The transition alpha is clamped to `[0, 1]`, and the final state snaps cleanly to either
+    /// world or tangent mode.
     fn advance(&mut self, dt: f64, camera_position: &mut Vector3<f64>) {
         if !self.mode.is_animating() {
             return;
@@ -223,6 +271,7 @@ pub struct TangentSpace {
 }
 
 impl TangentSpace {
+    /// Creates a new `TangentSpace`.
     pub fn new() -> Self {
         Self {
             hovered_sample: None,
@@ -232,18 +281,36 @@ impl TangentSpace {
         }
     }
 
+    /// Updates the scale used to shrink geometric tangent-space positions around the anchor.
+    ///
+    /// The value is clamped away from zero to keep the local patch numerically stable.
     pub fn set_geometric_local_scale(&mut self, scale: f64) {
         self.geometric_local_scale = scale.max(1.0e-3);
     }
 
+    /// Updates the multiplier applied to geometric tangent-space field arrows.
+    ///
+    /// The value is clamped away from zero so tangent vectors remain renderable.
     pub fn set_geometric_arrow_scale(&mut self, scale: f64) {
         self.geometric_arrow_scale = scale.max(1.0e-3);
     }
 
+    /// Returns whether configuration changes should be deferred until tangent mode ends.
+    ///
+    /// Deferred application protects the invariants of an active dive: anchor position, tangent
+    /// basis, cached camera endpoints, and picked sample all refer to the currently loaded grid.
+    /// Rebuilding the grid underneath those values would make the transition inconsistent.
     pub fn should_defer_apply(&self) -> bool {
         self.dive.mode != DiveMode::World
     }
 
+    /// Updates hover picking, tangent-mode requests, and dive animation state for the current
+    /// frame.
+    ///
+    /// This code is deliberately self-contained and lock-free: it consumes the already-owned
+    /// camera, display snapshot, grid lookup, and coordinate system, then updates only local
+    /// tangent state. In world mode it performs hover picking; in tangent mode it preserves the
+    /// dive camera relationship while still allowing user translation.
     pub fn update(
         &mut self,
         input: &Input,
@@ -306,6 +373,10 @@ impl TangentSpace {
         self.dive.advance(dt.max(0.0), &mut camera.position);
     }
 
+    /// Cancels any tangent transition and restores the world camera position.
+    ///
+    /// Hover state and anchor state are cleared so the subsystem returns to its neutral world-
+    /// mode state.
     pub fn force_world_mode(&mut self, camera: &mut Camera) {
         if let Some(endpoints) = self.dive.camera_endpoints {
             camera.position = endpoints.world_pos;
@@ -314,10 +385,18 @@ impl TangentSpace {
         self.hovered_sample = None;
     }
 
+    /// Returns the eased scene blend used for rendering and camera interpolation.
+    ///
+    /// The raw animation alpha is passed through `smoothstep` so the transition starts and ends
+    /// gently.
     pub fn scene_mix(&self) -> f64 {
         self.dive.scene_mix()
     }
 
+    /// Returns the currently active tangent view, if the subsystem is not in world mode.
+    ///
+    /// World mode reports `None` so callers can branch cleanly between blended and unblended
+    /// rendering.
     pub fn active_view(&self) -> Option<TangentView> {
         if self.dive.mode == DiveMode::World {
             None
@@ -326,6 +405,9 @@ impl TangentSpace {
         }
     }
 
+    /// Builds a compact snapshot of the tangent rendering state.
+    ///
+    /// The snapshot is used by the world to decide when cached renderables need to be rebuilt.
     pub fn render_state(&self) -> TangentRenderState {
         TangentRenderState {
             scene_mix: self.scene_mix(),
@@ -336,6 +418,11 @@ impl TangentSpace {
         }
     }
 
+    /// Returns the scene transform currently implied by the tangent subsystem.
+    ///
+    /// This compact value is what crosses into the grid renderer and shader. It contains only the
+    /// blend amount, anchor, basis, and local scale needed to morph the grid on the GPU without
+    /// duplicating scene state.
     pub fn scene_transform(&self) -> SceneSpaceTransform {
         if let Some(anchor) = &self.dive.anchor {
             anchor.scene_transform(self.dive.scene_mix(), self.geometric_local_scale)
@@ -344,6 +431,10 @@ impl TangentSpace {
         }
     }
 
+    /// Returns the point marker position that should be shown for the current tangent state.
+    ///
+    /// While diving this interpolates the anchor marker toward the origin; otherwise it shows
+    /// the current hover sample.
     pub fn marker_position(&self) -> Option<Vector3<f64>> {
         if let Some(anchor) = &self.dive.anchor {
             Some(lerp_vec3(
@@ -356,10 +447,17 @@ impl TangentSpace {
         }
     }
 
+    /// Returns the abstract-space position of the active tangent anchor, if any.
+    ///
+    /// Callers use this to sample fields and build tangent-only overlays around the anchor.
     pub fn anchor_abstract_position(&self) -> Option<Vector3<f64>> {
         self.dive.anchor.as_ref().map(|anchor| anchor.abstract_pos)
     }
 
+    /// Blends a world-space position toward its tangent-space representation.
+    ///
+    /// Geometric view uses the anchor basis and local scale, while dual view uses an unscaled
+    /// abstract delta.
     pub fn blend_position(
         &self,
         world_pos: Vector3<f64>,
@@ -377,6 +475,10 @@ impl TangentSpace {
         }
     }
 
+    /// Blends a world-space vector toward its tangent-space representation.
+    ///
+    /// Geometric view rotates and scales tangent components in the anchor basis, while dual
+    /// view keeps the raw components.
     pub fn blend_vector(
         &self,
         world_vector: Vector3<f64>,
@@ -394,22 +496,41 @@ impl TangentSpace {
         }
     }
 
+    /// Returns whether dual-form sample spheres should be rendered for the current blend state.
+    ///
+    /// Samples appear only in dual tangent mode once the transition is at least halfway
+    /// complete.
     pub fn show_form_samples(&self) -> bool {
         self.active_view() == Some(TangentView::Dual) && self.scene_mix() >= 0.5
     }
 
+    /// Returns whether vector arrows should be rendered for the current tangent state.
+    ///
+    /// This is the inverse of `show_form_samples`, because the dual view replaces arrows with
+    /// sampled form values.
     pub fn show_vector_field(&self) -> bool {
         !self.show_form_samples()
     }
 
+    /// Returns whether the grid should remain visible during the current tangent state.
+    ///
+    /// The grid fades out once dual tangent mode is sufficiently blended in.
     pub fn show_grid(&self) -> bool {
         self.active_view() != Some(TangentView::Dual) || self.scene_mix() < 0.5
     }
 
+    /// Returns the number of lattice samples generated for dual-form rendering.
+    ///
+    /// The count is derived from the configured cubic sample radius and is used for buffer
+    /// preallocation.
     pub fn dual_form_sample_capacity(&self) -> usize {
         ((2 * DUAL_FORM_GRID_RADIUS + 1).pow(3)) as usize
     }
 
+    /// Blends field components toward their tangent-linearized approximation when needed.
+    ///
+    /// Only geometric tangent mode interpolates toward the local linearization; other modes
+    /// keep the original components.
     pub fn blend_field_components(
         &self,
         field_components: Vector3<f64>,
@@ -424,16 +545,27 @@ impl TangentSpace {
         }
     }
 
+    /// Returns the scaled abstract-space offset from the active anchor.
+    ///
+    /// This is only available while tangent mode has an anchor selected.
     pub fn geometric_local_delta(&self, abstract_pos: Vector3<f64>) -> Option<Vector3<f64>> {
         let anchor = self.dive.anchor.as_ref()?;
         Some(anchor.local_abstract_delta(abstract_pos, self.geometric_local_scale))
     }
 
+    /// Returns the raw abstract-space offset from the active anchor.
+    ///
+    /// The delta is unscaled so callers can reuse it for dual-view and linearization work.
     pub fn abstract_delta(&self, abstract_pos: Vector3<f64>) -> Option<Vector3<f64>> {
         let anchor = self.dive.anchor.as_ref()?;
         Some(abstract_pos - anchor.abstract_pos)
     }
 
+    /// Builds the sampled spheres and legend metadata for dual tangent rendering.
+    ///
+    /// The supplied dual-form components are sampled on a fixed local lattice centered at the
+    /// active anchor. The resulting min/max range is returned alongside the spheres so the UI can
+    /// render a legend without recomputing any field values itself.
     pub fn build_dual_form_render(&self, dual_components: Vector3<f64>) -> Option<DualFormRender> {
         let anchor = self.dive.anchor.as_ref()?;
 
@@ -479,6 +611,10 @@ impl TangentSpace {
         })
     }
 
+    /// Casts the current mouse ray into the sampled grid and returns the hovered sample.
+    ///
+    /// The display manager and projection matrix are used to convert the cursor position into a
+    /// world-space ray first.
     fn pick_hover_sample(
         &self,
         camera: &Camera,
@@ -490,6 +626,11 @@ impl TangentSpace {
         grid_world.ray_cast(&mouse_info.0, &mouse_info.1, PICK_RADIUS, PICK_LENGTH)
     }
 
+    /// Initializes a new dive from world space into one tangent view.
+    ///
+    /// The picked sample becomes the stable anchor for the entire transition. Its abstract
+    /// coordinates, embedded world position, tangent basis, and camera-relative zoom offset are
+    /// captured up front so later animation frames do not need to repick or rederive them.
     fn start_enter(
         &mut self,
         camera: &Camera,
@@ -512,6 +653,10 @@ impl TangentSpace {
     }
 }
 
+/// Decodes the tangent-view hotkey state for the current frame.
+///
+/// The helper uses edge-triggered keyboard state, so holding `T` does not continuously toggle the
+/// mode. `Ctrl+T` selects the dual view on the same frame the toggle is requested.
 fn requested_view(input: &Input) -> Option<TangentView> {
     if !input.is_key_just_pressed(Key::T) {
         return None;
@@ -524,6 +669,9 @@ fn requested_view(input: &Input) -> Option<TangentView> {
     }
 }
 
+/// Computes the forward camera offset applied when entering tangent mode.
+///
+/// The zoom amount is clamped so the camera moves closer to the anchor without overshooting it.
 fn compute_zoom_offset(camera_pos: Vector3<f64>, anchor_world: Vector3<f64>) -> Vector3<f64> {
     let to_anchor = anchor_world - camera_pos;
     let distance = to_anchor.norm();
@@ -536,15 +684,25 @@ fn compute_zoom_offset(camera_pos: Vector3<f64>, anchor_world: Vector3<f64>) -> 
     to_anchor.normalize() * zoom_amount
 }
 
+/// Linearly interpolates between two vectors.
+///
+/// The interpolation parameter is used directly without additional clamping.
 fn lerp_vec3(from: Vector3<f64>, to: Vector3<f64>, t: f64) -> Vector3<f64> {
     from + (to - from) * t
 }
 
+/// Applies a cubic smoothstep easing curve to a scalar value.
+///
+/// Input values are clamped to `[0, 1]` before the eased blend is computed.
 fn smoothstep(t: f64) -> f64 {
     let clamped = t.clamp(0.0, 1.0);
     clamped * clamped * (3.0 - 2.0 * clamped)
 }
 
+/// Maps a sampled dual-form value onto the blue-white-red legend ramp.
+///
+/// The range is normalized between the provided extrema, with special handling for nearly
+/// constant data.
 fn differential_form_color(value: f64, min_value: f64, max_value: f64) -> Vector4<f64> {
     let mix = if (max_value - min_value).abs() <= 1.0e-6 {
         if value > 1.0e-6 {

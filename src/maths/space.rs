@@ -15,11 +15,19 @@ pub struct Space {
     vielbein_inv: Expr,
 }
 
+/// Adds three symbolic expressions and simplifies the result.
+///
+/// This helper keeps repeated metric-construction code compact and readable.
+#[inline]
 fn sum3(a: &Expr, b: &Expr, c: &Expr) -> Expr {
     a.add(b).add(c).simplify()
 }
 
+/// Builds the symbolic dot product of two 3D vectors.
+///
+/// Each component pair is multiplied and then reduced with `sum3`.
 #[allow(dead_code)]
+#[inline]
 fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Expr {
     sum3(
         &(a0.clone().mul(b0.clone())),
@@ -29,6 +37,10 @@ fn dot3(a0: &Expr, a1: &Expr, a2: &Expr, b0: &Expr, b1: &Expr, b2: &Expr) -> Exp
 }
 
 impl Space {
+    /// Builds the metric and vielbein induced by the supplied embedding expressions.
+    ///
+    /// The resulting `Space` stores both the symbolic metric tensor and the Cholesky-based
+    /// basis transforms used elsewhere in the math layer.
     pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Space {
         // J columns: d(X,Y,Z)/d(x), d(X,Y,Z)/d(y), d(X,Y,Z)/d(z)
         let d_x = Form::new(vec![x_eq], 0).d().square();
@@ -60,18 +72,31 @@ impl Space {
         }
     }
 
+    /// Returns the matrix that maps natural basis components into the orthonormal tangent
+    /// basis.
+    ///
+    /// This is the inverse vielbein derived from the symbolic metric tensor.
     pub fn natural_to_otn(&self) -> Matrix {
         self.vielbein_inv.as_matrix().unwrap().clone()
     }
 
+    /// Returns the matrix that maps orthonormal tangent components back into the natural basis.
+    ///
+    /// This is the vielbein extracted from the metric tensor decomposition.
     pub fn otn_to_natural(&self) -> Matrix {
         self.vielbein.as_matrix().unwrap().clone()
     }
 
+    /// Returns the symbolic metric tensor stored for this space.
+    ///
+    /// The metric is shared by form conversion and future Hodge-star work.
     pub fn get_metric(&self) -> &Metric {
         &self.metric
     }
 
+    /// Returns the symbolic vielbein expression for this space.
+    ///
+    /// The value is exposed mainly for debugging and advanced symbolic manipulation.
     #[allow(dead_code)]
     pub fn get_vielbein(&self) -> &Expr {
         &self.vielbein

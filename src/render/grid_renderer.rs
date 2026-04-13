@@ -1,3 +1,5 @@
+//! Renderer for grid segments under the active scene transform.
+
 use crate::app::grid::Grid;
 use crate::app::grid::SegmentDir;
 use crate::app::tangent_space::SceneSpaceTransform;
@@ -13,6 +15,7 @@ pub struct GridRenderer {
 }
 
 impl GridRenderer {
+    /// Creates the grid renderer with its initial projection matrix.
     pub fn new(mut shader: GridShader, projection: Matrix4<f64>) -> GridRenderer {
         shader.store_all_uniforms();
         shader.bind();
@@ -21,6 +24,7 @@ impl GridRenderer {
         GridRenderer { shader, projection }
     }
 
+    /// Draws every cached grid segment with the current view matrix and scene transform.
     pub fn render(
         &self,
         grid: &Grid,
@@ -49,6 +53,7 @@ impl GridRenderer {
         self.unprepare();
     }
 
+    /// Rebuilds the editable grid vertex shader from the latest coordinate equations.
     pub fn update_shader_eqs(&mut self, new_eqs: &[String; 3]) {
         self.shader.edit_eqs(new_eqs);
         self.shader.bind();
@@ -56,6 +61,7 @@ impl GridRenderer {
         self.shader.unbind();
     }
 
+    /// Updates the projection matrix used by the grid renderer.
     pub fn update_projection(&mut self, projection: Matrix4<f64>) {
         self.projection = projection;
         self.shader.bind();
@@ -63,12 +69,14 @@ impl GridRenderer {
         self.shader.unbind();
     }
 
+    /// Binds the grid shader and loads the current view and scene-transform uniforms.
     fn prepare(&self, view_matrix: &Matrix4<f64>, scene_transform: &SceneSpaceTransform) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);
         self.shader.load_scene_transform(scene_transform);
     }
 
+    /// Unbinds the grid shader after the grid pass.
     fn unprepare(&self) {
         self.shader.unbind();
     }

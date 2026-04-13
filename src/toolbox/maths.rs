@@ -1,6 +1,9 @@
+//! Small debugging helpers for inspecting symbolic matrices.
+
 use mathhook_core::matrices::Matrix;
 use mathhook_core::MathLanguage::LaTeX;
 
+/// Prints every matrix entry in LaTeX form for debugging symbolic calculations.
 #[allow(dead_code)]
 pub fn print_matrix(matrix: &Matrix) {
     let (n, m) = matrix.dimensions();

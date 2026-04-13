@@ -1,3 +1,5 @@
+//! Typed wrapper for one 4x4 matrix shader uniform.
+
 use super::uniform::Uniform;
 use crate::toolbox::logging::LOGGER;
 use nalgebra::Matrix4;
@@ -7,12 +9,14 @@ pub struct Matrix4Uniform {
 }
 
 impl Matrix4Uniform {
+    /// Creates a typed wrapper around one matrix uniform.
     pub fn new(name: &'static str) -> Matrix4Uniform {
         Matrix4Uniform {
             uniform: Uniform::new(name),
         }
     }
 
+    /// Uploads a 4x4 matrix value to the cached uniform location.
     pub fn load_matrix_to_uniform(&self, m: &Matrix4<f64>) {
         let m32 = m.cast::<f32>();
         unsafe {

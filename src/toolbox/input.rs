@@ -1,3 +1,5 @@
+//! Per-frame keyboard and mouse state collected from GLFW events.
+
 use glfw::{Action, Key};
 
 pub struct Input {
@@ -10,6 +12,7 @@ pub struct Input {
 }
 
 impl Input {
+    /// Creates an empty per-frame input snapshot.
     pub fn new() -> Input {
         Input {
             input_keyboard: Vec::new(),
@@ -21,10 +24,17 @@ impl Input {
         }
     }
 
+    /// Clears the edge-triggered keyboard state for the new frame.
+    ///
+    /// Keys that remain held stay in `input_keyboard`; only the one-frame press edges are reset.
     pub fn begin_frame(&mut self) {
         self.pressed_this_frame.clear();
     }
 
+    /// Updates the cached keyboard state from one GLFW key event.
+    ///
+    /// `Action::Repeat` intentionally does not retrigger `pressed_this_frame`, which keeps hotkey
+    /// handlers like tangent-mode toggles edge-triggered.
     pub fn key_handler(&mut self, action: Action, key: Key) {
         if action == Action::Press {
             if !self.input_keyboard.contains(&key) {
@@ -38,11 +48,13 @@ impl Input {
         }
     }
 
+    /// Updates the cached mouse position and stores the per-frame mouse delta.
     pub fn set_mouse_pos(&mut self, x: f64, y: f64) {
         self.d_mouse_pos = (x - self.mouse_pos.0, y - self.mouse_pos.1);
         self.mouse_pos = (x, y);
     }
 
+    /// Updates the cached mouse button state from one GLFW mouse event.
     pub fn mouse_button_handler(&mut self, action: Action, button: glfw::MouseButton) {
         match button {
             glfw::MouseButton::Left => {
@@ -63,14 +75,17 @@ impl Input {
         }
     }
 
+    /// Returns whether the key is currently held down.
     pub fn is_key_pressed(&self, key: Key) -> bool {
         self.input_keyboard.contains(&key)
     }
 
+    /// Returns whether the key transitioned to pressed during the current frame.
     pub fn is_key_just_pressed(&self, key: Key) -> bool {
         self.pressed_this_frame.contains(&key)
     }
 
+    /// Returns whether the requested mouse button is currently held down.
     pub fn is_mouse_button_pressed(&self, button: glfw::MouseButton) -> bool {
         match button {
             glfw::MouseButton::Left => self.left_mouse_button,

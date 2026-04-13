@@ -1,3 +1,5 @@
+//! Renderer for vector-field arrows.
+
 use crate::graphics::model::RenderVField;
 use crate::render::field_shader::FieldShader;
 use crate::toolbox::opengl::shader::shader_program::Shader;
@@ -10,6 +12,7 @@ pub struct FieldRenderer {
     arrow_vao: VAO,
 }
 impl FieldRenderer {
+    /// Creates the vector-field renderer and uploads the shared arrow mesh.
     pub fn new(mut shader: FieldShader, projection: &Matrix4<f64>) -> FieldRenderer {
         let arrow_vao = VAO::create_arrow();
         shader.bind();
@@ -18,6 +21,7 @@ impl FieldRenderer {
         shader.unbind();
         FieldRenderer { shader, arrow_vao }
     }
+    /// Draws all renderable field arrows with minimal redundant color uploads.
     pub fn render(&self, vectors: &[RenderVField], view_matrix: &Matrix4<f64>) {
         self.prepare(view_matrix);
 
@@ -46,16 +50,19 @@ impl FieldRenderer {
         self.finish();
     }
 
+    /// Updates the field shader projection matrix used by subsequent draws.
     pub fn update_projection(&mut self, projection: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_projection_matrix(projection);
         self.shader.unbind();
     }
 
+    /// Binds the field shader and loads the current view matrix.
     fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);
     }
+    /// Unbinds the field shader after the arrow pass.
     fn finish(&self) {
         self.shader.unbind();
     }

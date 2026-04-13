@@ -1,3 +1,5 @@
+//! VBO wrapper for uploading vertex and index buffers.
+
 use crate::{TriIndexes, Vertex};
 use bytemuck;
 use gl::types::{GLint, GLuint};
@@ -12,10 +14,12 @@ pub struct VBO {
 }
 
 impl VBO {
+    /// Creates a VBO wrapper around an existing OpenGL buffer id.
     fn new(id: GLuint) -> VBO {
         VBO { id }
     }
 
+    /// Allocates one OpenGL buffer object and wraps it in `VBO`.
     pub fn create_vbo() -> Result<VBO, String> {
         let mut id = 0;
         unsafe { gl::GenBuffers(1, &mut id) }
@@ -25,6 +29,7 @@ impl VBO {
         Ok(VBO::new(id))
     }
 
+    /// Uploads triangle index data into the element-array buffer target.
     pub fn store_indices(&self, indices: &Vec<TriIndexes>) {
         let buffer: &[u8] = bytemuck::cast_slice(indices);
         unsafe {
@@ -38,6 +43,7 @@ impl VBO {
         }
     }
 
+    /// Uploads line index data into the element-array buffer target.
     pub fn store_indices_line(&self, indices: &Vec<[u32; 2]>) {
         let buffer: &[u8] = bytemuck::cast_slice(indices);
         unsafe {
@@ -51,6 +57,7 @@ impl VBO {
         }
     }
 
+    /// Uploads vertex attribute data and configures the matching vertex attribute pointer.
     pub fn store_data(&self, attrib: GLuint, data_size: GLint, data: &Vec<Vertex>) {
         let buffer: &[u8] = bytemuck::cast_slice(data);
         unsafe {
@@ -66,6 +73,7 @@ impl VBO {
         }
     }
 
+    /// Deletes the OpenGL buffer represented by this wrapper.
     pub fn delete(&self) {
         unsafe { DeleteBuffers(1, &self.id) }
     }

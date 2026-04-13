@@ -1,3 +1,5 @@
+//! Shader wrapper for the editable grid vertex program and tangent blend uniforms.
+
 use crate::app::grid::SegmentDir;
 use crate::app::tangent_space::SceneSpaceTransform;
 use crate::toolbox::logging::LOGGER;
@@ -23,6 +25,7 @@ pub struct GridShader {
 }
 
 impl GridShader {
+    /// Creates the grid shader wrapper and prepares its typed uniform handles.
     pub fn new(program: ShaderProgram) -> GridShader {
         program.bind_attrib(0, "position");
         let vertex_editable_src = ShaderProgram::read_shader("grid_edit.vert".to_string());
@@ -42,6 +45,11 @@ impl GridShader {
         }
     }
 
+    /// Rebuilds the editable grid vertex shader with the latest coordinate expressions.
+    ///
+    /// The grid geometry cache stores abstract-space vertices and per-segment transforms, while
+    /// the actual embedding equations are injected into the vertex shader at runtime. Updating the
+    /// equations here keeps CPU-side segment topology and GPU-side embedding logic in sync.
     pub fn edit_eqs(&mut self, new_eqs: &[String; 3]) {
         let src = self
             .vertex_editable_src
@@ -55,15 +63,19 @@ impl GridShader {
         LOGGER.gl_debug("Shader edited");
     }
 
+    /// Uploads the projection matrix uniform.
     pub fn load_projection_matrix(&self, matrix: &Matrix4<f64>) {
         self.projection_matrix.load_matrix_to_uniform(matrix);
     }
+    /// Uploads the per-segment transformation matrix uniform.
     pub fn load_transformation_matrix(&self, matrix: &Matrix4<f64>) {
         self.transformation_matrix.load_matrix_to_uniform(matrix);
     }
+    /// Uploads the current view matrix uniform.
     pub fn load_view_matrix(&self, matrix: &Matrix4<f64>) {
         self.view_matrix.load_matrix_to_uniform(matrix);
     }
+    /// Uploads the grid-segment color associated with one abstract axis.
     pub fn load_color_from_dir(&self, color: SegmentDir) {
         let color_vec = match color {
             SegmentDir::X => Vector3::new(1.0, 0.0, 0.0),
@@ -73,6 +85,11 @@ impl GridShader {
         self.color.load_vector_to_uniform(color_vec);
     }
 
+    /// Uploads the tangent-blend uniforms used by the grid vertex shader.
+    ///
+    /// These uniforms are the GPU counterpart of `SceneSpaceTransform`: enough information to
+    /// blend the world grid toward the anchor-relative tangent view without rebuilding the grid
+    /// mesh.
     pub fn load_scene_transform(&self, scene_transform: &SceneSpaceTransform) {
         self.tangent_mix
             .load_float_to_uniform(scene_transform.tangent_mix);
@@ -88,11 +105,15 @@ impl GridShader {
             .load_float_to_uniform(scene_transform.tangent_position_scale);
     }
 
+    /// Uploads an explicit segment color.
     #[allow(dead_code)]
     pub fn load_color(&self, color: Vector3<f64>) {
         self.color.load_vector_to_uniform(color);
     }
 
+    /// Builds a random RGB color value for ad hoc shader debugging.
+    ///
+    /// The generated color is currently not sent to the shader.
     #[allow(unused)]
     pub fn load_rng_color(&self) {
         let rng_color = Vector3::new(
@@ -105,14 +126,17 @@ impl GridShader {
 }
 
 impl Shader for GridShader {
+    /// Binds the underlying shader program.
     fn bind(&self) {
         self.shader_program.bind()
     }
 
+    /// Unbinds the underlying shader program.
     fn unbind(&self) {
         self.shader_program.unbind()
     }
 
+    /// Caches all uniform locations needed by the grid shader wrapper.
     fn store_all_uniforms(&mut self) {
         let mut uniforms: Box<[&mut crate::toolbox::opengl::shader::uniform::uniform::Uniform]> =
             Box::new([

@@ -1,3 +1,5 @@
+//! Small OpenGL state helpers and optional debug callback setup.
+
 #[allow(dead_code)]
 
 pub mod open_gl_utils {
@@ -6,6 +8,7 @@ pub mod open_gl_utils {
     use gl::{DebugMessageCallback, Enable, DEBUG_OUTPUT, DEBUG_TYPE_ERROR};
     use std::os::raw::c_void;
 
+    /// Clears the color and depth buffers for the active framebuffer.
     pub fn clear_gl() {
         unsafe {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
@@ -13,6 +16,7 @@ pub mod open_gl_utils {
         LOGGER.gl_debug("Error clearing GL color buffer");
     }
 
+    /// Switches polygon rasterization between wireframe and filled rendering.
     pub fn set_wireframe_mode(wireframe: bool) {
         unsafe {
             if wireframe {
@@ -68,6 +72,7 @@ pub mod open_gl_utils {
         LOGGER.debug(&message);
     }
 
+    /// Enables the OpenGL debug callback for the current context.
     pub fn add_opengl_debug() {
         unsafe {
             Enable(DEBUG_OUTPUT);

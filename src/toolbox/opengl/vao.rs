@@ -1,3 +1,5 @@
+//! VAO wrapper for uploading and reusing mesh geometry.
+
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::obj_loader::load_obj;
 use crate::toolbox::opengl::vbo::VBO;
@@ -14,6 +16,7 @@ pub struct VAO {
 }
 
 impl VAO {
+    /// Creates an empty VAO wrapper around an existing OpenGL vertex-array id.
     fn new(id: u32) -> VAO {
         VAO {
             id,
@@ -23,6 +26,7 @@ impl VAO {
         }
     }
 
+    /// Allocates one OpenGL vertex-array object and wraps it in `VAO`.
     pub fn create_vao() -> Result<VAO, String> {
         let mut id = 0;
         unsafe {
@@ -34,6 +38,7 @@ impl VAO {
         Ok(VAO::new(id))
     }
 
+    /// Uploads one vertex attribute buffer and associates it with this VAO.
     pub fn store_data(&mut self, attrib: GLuint, data_size: GLint, position: Vec<Vertex>) -> () {
         unsafe {
             self.bind();
@@ -46,6 +51,7 @@ impl VAO {
         }
     }
 
+    /// Uploads triangle indices and updates the tracked vertex count.
     pub fn store_indices(&mut self, indices: Vec<TriIndexes>) -> () {
         unsafe {
             self.bind();
@@ -60,6 +66,7 @@ impl VAO {
         }
     }
 
+    /// Uploads line indices and updates the tracked vertex count.
     pub fn store_indices_line(&mut self, indices: Vec<[u32; 2]>) -> () {
         unsafe {
             self.bind();
@@ -73,6 +80,7 @@ impl VAO {
         }
     }
 
+    /// Binds the VAO and enables the requested vertex attribute arrays.
     pub fn binds(&self, attributes: &[u32]) -> () {
         unsafe { self.bind() }
         for i in attributes {
@@ -81,6 +89,7 @@ impl VAO {
         }
     }
 
+    /// Disables the requested vertex attribute arrays and unbinds the VAO.
     pub fn unbinds(&self, attributes: &[u32]) -> () {
         unsafe { self.unbind() }
         for i in attributes {
@@ -89,6 +98,7 @@ impl VAO {
         }
     }
 
+    /// Returns the number of indexed vertices that will be drawn from this VAO.
     pub fn get_vertex_count(&self) -> usize {
         self.vertex_count
     }
@@ -102,6 +112,7 @@ impl VAO {
         BindVertexArray(0)
     }
 
+    /// Builds a VAO for the embedded sphere mesh.
     pub fn create_sphere() -> VAO {
         let model = load_obj("sphere.obj");
         let mut vao = Self::create_vao().expect("Error creating VAO");
@@ -110,6 +121,7 @@ impl VAO {
         vao
     }
 
+    /// Builds a VAO for the embedded arrow mesh.
     pub fn create_arrow() -> VAO {
         let model = load_obj("arrow.obj");
         let mut vao = Self::create_vao().expect("Error creating VAO");
@@ -120,6 +132,7 @@ impl VAO {
 }
 
 impl Drop for VAO {
+    /// Deletes the VAO and all VBOs owned by it.
     fn drop(&mut self) {
         for vbo in self.vbos.iter() {
             vbo.delete();

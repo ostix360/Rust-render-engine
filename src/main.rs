@@ -25,6 +25,14 @@ type Vertex = [f32; 3];
 type TriIndexes = [u32; 3];
 const WIDTH: u32 = 1080;
 const HEIGHT: u32 = 720;
+/// Bootstraps the demo application and runs the main render loop.
+///
+/// The GLFW/OpenGL window and all render resources live on this thread. The control window is
+/// spawned separately and communicates through a shared `Arc<Mutex<GridUiState>>`, but no OpenGL
+/// state crosses that boundary. The loop therefore follows a strict ownership split:
+///
+/// - main thread: display, input polling, camera, world update, rendering,
+/// - UI thread: equation editing and validated state publication.
 fn main() {
     let mut display_manager = display_manager::DisplayManager::new(WIDTH, HEIGHT, "Test Window");
 

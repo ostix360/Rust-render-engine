@@ -1,3 +1,5 @@
+//! Coordinate-system embedding, curvature estimation, and tangent-basis evaluation.
+
 use crate::maths::space::Space;
 use crate::maths::{
     derivate, expr_to_fastexpr2dto1d, expr_to_fastexpr3d, Expr, FastExpr2dto1d, FastExpr3d,
@@ -28,6 +30,10 @@ pub struct CoordsSys {
 }
 
 impl CoordsSys {
+    /// Builds a coordinate system from three embedding expressions.
+    ///
+    /// The expressions are compiled into fast evaluators, tangent bases, curvature integrands,
+    /// and a `Space` descriptor used by field and tangent-space code.
     pub fn new(x_eq: Expr, y_eq: Expr, z_eq: Expr) -> Self {
         let (x_curvature, y_curvature, z_curvature) =
             Self::calculate_curvature(&x_eq, &y_eq, &z_eq);
@@ -55,6 +61,10 @@ impl CoordsSys {
         }
     }
 
+    /// Builds one-dimensional curvature integrands for each coordinate axis.
+    ///
+    /// Each returned closure measures the norm of the second derivative along one abstract axis
+    /// while keeping the other two coordinates fixed.
     #[inline]
     fn calculate_curvature(
         x_eq: &Expr,
@@ -81,6 +91,10 @@ impl CoordsSys {
         )
     }
 
+    /// Compiles the partial derivatives that define one tangent-basis axis.
+    ///
+    /// The resulting closures evaluate the embedded-space direction induced by varying the
+    /// named abstract coordinate.
     fn compile_tangent_axis(
         x_eq: &Expr,
         y_eq: &Expr,
@@ -95,6 +109,10 @@ impl CoordsSys {
         ]
     }
 
+    /// Approximates curvature around an abstract point for each coordinate axis.
+    ///
+    /// The method integrates the precompiled curvature integrands over a symmetric interval of
+    /// length `len` around the supplied point.
     pub fn get_curvature(&self, point: Vector3<f64>, len: f64) -> (f64, f64, f64) {
         let (x, y, z) = (point.x, point.y, point.z);
         let fx = (self.x_curvature)(y, z);
@@ -106,6 +124,10 @@ impl CoordsSys {
         (cx, cy, cz)
     }
 
+    /// Evaluates the embedded coordinate expressions at the supplied abstract coordinates.
+    ///
+    /// The returned tuple contains the world-space `(x, y, z)` position produced by the
+    /// compiled expressions.
     pub fn eval(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
         let x_ = (self.fast_x_eq)(x, y, z);
         let y_ = (self.fast_y_eq)(x, y, z);
@@ -113,11 +135,19 @@ impl CoordsSys {
         (x_, y_, z_)
     }
 
+    /// Evaluates the coordinate system and returns the embedded position as a vector.
+    ///
+    /// This is a convenience wrapper around `eval` for callers that already work with
+    /// `Vector3<f64>` values.
     pub fn eval_position(&self, point: Vector3<f64>) -> Vector3<f64> {
         let (x, y, z) = self.eval(point.x, point.y, point.z);
         vector![x, y, z]
     }
 
+    /// Evaluates one compiled tangent axis and normalizes the result.
+    ///
+    /// When the sampled derivative is numerically degenerate, the provided fallback basis
+    /// vector is returned instead.
     fn eval_compiled_axis(
         point: Vector3<f64>,
         axis: &[FastExpr3d; 3],
@@ -135,6 +165,10 @@ impl CoordsSys {
         }
     }
 
+    /// Evaluates the three normalized tangent directions at an abstract point.
+    ///
+    /// Each basis vector is derived from the compiled partial derivatives of the embedding and
+    /// falls back to the canonical axes when needed.
     pub fn eval_tangent_basis(&self, point: Vector3<f64>) -> [Vector3<f64>; 3] {
         [
             Self::eval_compiled_axis(point, &self.tangent_x, vector![1.0, 0.0, 0.0]),
@@ -143,6 +177,9 @@ impl CoordsSys {
         ]
     }
 
+    /// Converts components expressed in the local tangent basis into world-space coordinates.
+    ///
+    /// The supplied basis is assumed to follow the same axis ordering as `eval_tangent_basis`.
     #[allow(dead_code)]
     pub fn eval_otn_vector_with_basis(
         &self,
@@ -152,12 +189,21 @@ impl CoordsSys {
         basis[0] * vector.x + basis[1] * vector.y + basis[2] * vector.z
     }
 
+    /// Evaluates an abstract-space vector in world space at the supplied point.
+    ///
+    /// This first samples the tangent basis at `point` and then expands the vector components
+    /// in that basis.
     #[allow(dead_code)]
     pub fn eval_otn_vector(&self, point: Vector3<f64>, vector: Vector3<f64>) -> Vector3<f64> {
         let basis = self.eval_tangent_basis(point);
         self.eval_otn_vector_with_basis(&basis, vector)
     }
 
+    /// Checks whether three serialized equations match the expressions stored in this
+    /// coordinate system.
+    ///
+    /// The comparison uses the current string form of the original expressions and is intended
+    /// for cheap UI/config diffing.
     #[allow(dead_code)]
     pub fn is_equivalent(&self, eqs: &[String; 3]) -> bool {
         eqs[0] == self.x_eq.to_string()
@@ -165,6 +211,9 @@ impl CoordsSys {
             && eqs[2] == self.z_eq.to_string()
     }
 
+    /// Returns the metric-space descriptor derived from this coordinate system.
+    ///
+    /// The returned `Space` is reused by differential-form and vector-field code.
     pub fn get_space(&self) -> &Space {
         &self.space
     }

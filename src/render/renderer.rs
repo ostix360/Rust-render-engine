@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+//! Shared mesh renderer used for spheres and other classic shaded draw calls.
+
 use crate::graphics::model::{Model, Sphere};
 use crate::render::classic_shader::ClassicShader;
 use crate::toolbox::opengl::open_gl_utils::open_gl_utils::set_wireframe_mode;
@@ -17,6 +19,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    /// Creates the classic mesh renderer and uploads the shared sphere mesh.
     pub fn new(mut shader: ClassicShader, projection: &Matrix4<f64>) -> Renderer {
         let point_vao = VAO::create_sphere();
         shader.store_all_uniforms();
@@ -30,6 +33,7 @@ impl Renderer {
         }
     }
 
+    /// Draws the supplied mesh instances grouped by VAO using the classic shader.
     pub fn render(&mut self, models: &FxHashMap<&VAO, Vec<&Model>>, view_matrix: &Matrix4<f64>) {
         self.prepare(view_matrix);
         self.time.add_assign(0.01);
@@ -55,6 +59,7 @@ impl Renderer {
         self.finish();
     }
 
+    /// Draws one sphere using the shared sphere VAO and the supplied view matrix.
     pub fn draw_point(&self, point: &Sphere, view_matrix: &Matrix4<f64>) {
         self.prepare(view_matrix);
 
@@ -74,6 +79,7 @@ impl Renderer {
         self.finish();
     }
 
+    /// Draws a batch of spheres using the shared sphere VAO.
     pub fn draw_points(&self, points: &[Sphere], view_matrix: &Matrix4<f64>) {
         if points.is_empty() {
             return;
@@ -100,17 +106,20 @@ impl Renderer {
         self.finish();
     }
 
+    /// Updates the classic shader projection matrix used by subsequent draws.
     pub fn update_projection(&mut self, projection: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_projection_matrix(projection);
         self.shader.unbind();
     }
 
+    /// Binds the classic shader and loads the current view matrix.
     fn prepare(&self, view_matrix: &Matrix4<f64>) {
         self.shader.bind();
         self.shader.load_view_matrix(view_matrix);
     }
 
+    /// Unbinds the classic shader after a draw pass.
     fn finish(&self) {
         self.shader.unbind();
     }

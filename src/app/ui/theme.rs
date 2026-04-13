@@ -1,4 +1,5 @@
 #![allow(unused)]
+//! Shared egui colors and styling helpers for the control window.
 
 use eframe::egui::{self, Color32, RichText, Stroke};
 use eframe::epaint::{CornerRadius, Margin};
@@ -18,6 +19,7 @@ pub(crate) const ACCENT: Color32 = CRAYOLA_BLUE;
 pub(crate) const TEXT: Color32 = Color32::from_rgb(0xE9, 0xEF, 0xFE);
 pub(crate) const MUTED: Color32 = Color32::from_rgb(175, 182, 195);
 
+/// Applies the shared egui theme used by the control window.
 pub(crate) fn apply_style(ctx: &egui::Context) {
     ctx.set_visuals(egui::Visuals::dark());
     let mut style = (*ctx.global_style()).clone();
@@ -49,6 +51,7 @@ pub(crate) fn apply_style(ctx: &egui::Context) {
     ctx.set_global_style(style);
 }
 
+/// Builds a styled section heading for collapsible UI groups.
 pub(crate) fn section_heading(text: &str) -> RichText {
     RichText::new(text).strong()
 }

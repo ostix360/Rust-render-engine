@@ -1,3 +1,5 @@
+//! Shader compilation, linking, and uniform-registration helpers.
+
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::shader::uniform::uniform::Uniform;
 use crate::RESOURCES;
@@ -7,8 +9,11 @@ use std::ops::Deref;
 use std::process;
 
 pub trait Shader {
+    /// Binds this shader program for subsequent OpenGL draw calls.
     fn bind(&self);
+    /// Unbinds any currently active shader program.
     fn unbind(&self);
+    /// Caches the uniform locations required by the concrete shader wrapper.
     fn store_all_uniforms(&mut self);
 }
 
@@ -18,6 +23,7 @@ pub struct ShaderProgram {
 }
 
 impl ShaderProgram {
+    /// Reads one embedded shader source file from `src/res/shader`.
     pub fn read_shader<'b>(file: String) -> String {
         let file = RESOURCES
             .get_file("shader/".to_string() + file.as_str())
@@ -27,6 +33,7 @@ impl ShaderProgram {
             .to_string()
     }
 
+    /// Compiles one shader object and aborts the process if compilation fails.
     fn process_shader(shader_id: GLuint, source: &str) {
         unsafe {
             ShaderSource(
@@ -53,6 +60,7 @@ impl ShaderProgram {
         };
     }
 
+    /// Loads and compiles the vertex and fragment shader sources for one named shader pair.
     fn load_shader(shader_name: &str) -> (GLuint, GLuint) {
         let vertex_src = {
             let name = shader_name.to_string() + ".vert";
@@ -78,6 +86,7 @@ impl ShaderProgram {
         (vertex_id, fragment_id)
     }
 
+    /// Links one vertex and fragment shader into a program object and validates the result.
     fn process_program(vertex: GLuint, fragment: GLuint) -> GLuint {
         let program = { unsafe { CreateProgram() } };
         LOGGER.gl_debug("Error while creating Program shader");
@@ -108,6 +117,7 @@ impl ShaderProgram {
         program
     }
 
+    /// Creates, links, and stores one shader program from the named shader pair.
     pub fn new(name: &str) -> ShaderProgram {
         let shaders = Self::load_shader(name);
         let vertex_shader = shaders.0;
@@ -120,6 +130,7 @@ impl ShaderProgram {
         }
     }
 
+    /// Recompiles and relinks the program with a replacement vertex shader source.
     pub fn edit_vert_src(&mut self, new_src: String) {
         let vertex_id;
         unsafe { vertex_id = CreateShader(VERTEX_SHADER) };
@@ -131,20 +142,24 @@ impl ShaderProgram {
         self.id = id;
     }
 
+    /// Binds this shader program for subsequent OpenGL draw calls.
     pub fn bind(&self) {
         unsafe { UseProgram(self.id) }
         LOGGER.gl_debug(format!("Error while binding shader program {}", self.id).as_str())
     }
 
+    /// Associates one attribute index with a named vertex shader input before linking.
     pub fn bind_attrib(&self, attrib: u32, variable_name: &str) {
         unsafe { BindAttribLocation(self.id, attrib, variable_name.as_ptr().cast()) }
         LOGGER.gl_debug("Error while binding attribute")
     }
 
+    /// Unbinds any currently active shader program.
     pub fn unbind(&self) {
         unsafe { UseProgram(0) }
     }
 
+    /// Caches the uniform locations required by the concrete shader wrapper.
     pub fn store_all_uniforms(&self, uniforms: &mut Box<[&mut Uniform]>) {
         for uniform in uniforms.iter_mut() {
             uniform.store_uniform(self.id.clone())
@@ -152,6 +167,7 @@ impl ShaderProgram {
         self.validate_program()
     }
 
+    /// Validates the linked program and panics if OpenGL reports a validation error.
     fn validate_program(&self) {
         unsafe {
             ValidateProgram(self.id as GLuint);
@@ -174,6 +190,7 @@ impl ShaderProgram {
 }
 
 impl Drop for ShaderProgram {
+    /// Releases the linked shader program when the wrapper is dropped.
     fn drop(&mut self) {
         self.unbind();
         unsafe { DeleteProgram(self.id) };

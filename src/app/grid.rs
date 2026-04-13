@@ -1,3 +1,5 @@
+//! Grid geometry generation and cached segment transforms used by the renderers.
+
 use crate::app::coords_sys::CoordsSys;
 use crate::toolbox::logging::LOGGER;
 use crate::toolbox::opengl::vao::VAO;
@@ -17,6 +19,9 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Builds the line-index list for an edge with the requested vertex count.
+    ///
+    /// Each pair connects consecutive vertices so the edge can be rendered as a polyline.
     fn build_indices(nb_vertices: usize) -> Vec<[u32; 2]> {
         let segment_count = nb_vertices.saturating_sub(1);
         let mut indices = Vec::with_capacity(segment_count);
@@ -26,6 +31,10 @@ impl Edge {
         indices
     }
 
+    /// Creates an empty value for the surrounding grid subsystem.
+    ///
+    /// Callers are expected to populate the returned value or derive its cached render data
+    /// before rendering it.
     fn new(nb_vertices: usize) -> Self {
         Self {
             nb_vertices,
@@ -35,6 +44,10 @@ impl Edge {
         }
     }
 
+    /// Creates a unit edge sampled along the positive x axis.
+    ///
+    /// The generated vertices live in abstract edge space and are later transformed into curved
+    /// grid segments.
     pub fn create_edge(nb_vertices: usize) -> Result<Self, String> {
         if nb_vertices < 2 {
             return Err("Edge must have at least 2 vertices".to_string());
@@ -50,10 +63,17 @@ impl Edge {
         Ok(edge)
     }
 
+    /// Appends one abstract-space vertex to the edge definition.
+    ///
+    /// This only updates CPU-side storage; OpenGL buffers are created later by `create_vao`.
     fn add_vertex(&mut self, vertex: Vector3<NonNaN<f64>>) {
         self.vertices.push(vertex);
     }
 
+    /// Uploads this edge to a VAO so it can be rendered repeatedly.
+    ///
+    /// The method validates the vertex count, creates vertex/index buffers, and stores the
+    /// resulting VAO on the edge.
     pub fn create_vao(&mut self) -> Result<(), String> {
         if self.nb_vertices != self.vertices.len() {
             return Err(format!(
@@ -77,14 +97,24 @@ impl Edge {
         Ok(())
     }
 
+    /// Returns the number of vertices expected by this edge.
+    ///
+    /// This is the sampling density used to build the polyline representation.
     pub fn get_nb_vertices(&self) -> usize {
         self.nb_vertices
     }
 
+    /// Returns the abstract-space vertices that define this edge.
+    ///
+    /// The points are kept in the unit edge coordinate system before per-segment transforms are
+    /// applied.
     pub fn get_vertices(&self) -> &[Vector3<NonNaN<f64>>] {
         &self.vertices
     }
 
+    /// Returns the uploaded VAO for this edge, if one has been created.
+    ///
+    /// Callers should handle `None` as a sign that the edge has not been uploaded yet.
     pub fn get_vao(&self) -> Option<&VAO> {
         self.vao.as_ref()
     }
@@ -128,6 +158,10 @@ pub struct GridConfig {
 }
 
 impl GridConfig {
+    /// Creates an empty value for the surrounding grid subsystem.
+    ///
+    /// Callers are expected to populate the returned value or derive its cached render data
+    /// before rendering it.
     pub fn new(
         u_min: f64,
         u_max: f64,
@@ -154,6 +188,7 @@ impl GridConfig {
 }
 
 impl Default for GridConfig {
+    /// Builds the default `GridConfig`.
     fn default() -> Self {
         Self::new(0.0, 7.0, 2.0, 0.0, 7.0, 2.0, 0.0, 7.0, 2.0)
     }
@@ -166,6 +201,10 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Creates an empty value for the surrounding grid subsystem.
+    ///
+    /// Callers are expected to populate the returned value or derive its cached render data
+    /// before rendering it.
     pub fn new(coordinates: CoordsSys) -> Self {
         Self {
             coordinates,
@@ -174,6 +213,10 @@ impl Grid {
         }
     }
 
+    /// Builds the set of segment keys implied by a grid configuration.
+    ///
+    /// Each key captures one axis-aligned abstract segment together with its start coordinates
+    /// and effective length.
     #[inline]
     fn build_keys_for_indices(indices: &GridConfig) -> FxHashSet<SegmentKey> {
         let mut keys = FxHashSet::default();
@@ -249,6 +292,10 @@ impl Grid {
         keys
     }
 
+    /// Builds the render transform and sampling key for one abstract grid segment.
+    ///
+    /// The returned tuple contains the edge sampling density, the model transform, and the
+    /// segment direction used for coloring.
     #[inline]
     fn build_segment(&self, key: SegmentKey) -> Option<(usize, Matrix4<f64>, SegmentDir)> {
         const THICKNESS: f64 = 0.02;
@@ -307,6 +354,10 @@ impl Grid {
         Some((edge_key, transform, segment_dir))
     }
 
+    /// Rebuilds the edge-to-transform cache used by the renderer.
+    ///
+    /// Existing edge meshes are reused when their sampling density still matches the required
+    /// vertex count.
     #[inline]
     fn rebuild_render_data(&mut self) {
         // Group all segments by their edge_key (nb of vertices).
@@ -350,6 +401,10 @@ impl Grid {
         self.render_data = new_render_data;
     }
 
+    /// Synchronizes the cached segment map with a new set of abstract segment keys.
+    ///
+    /// Removed keys are dropped, missing keys are generated, and the render cache is rebuilt
+    /// afterward.
     #[inline]
     fn update_segments_from_keys(&mut self, new_keys: &FxHashSet<SegmentKey>) {
         self.segments.retain(|key, _| new_keys.contains(key));
@@ -366,20 +421,34 @@ impl Grid {
         self.rebuild_render_data();
     }
 
+    /// Applies a new grid configuration to the cached segment set.
+    ///
+    /// This recomputes the abstract segment keys and refreshes the render data that backs the
+    /// line renderer.
     pub fn update_config(&mut self, new_config: &GridConfig) {
         let new_keys = Grid::build_keys_for_indices(&new_config);
         self.update_segments_from_keys(&new_keys);
     }
 
+    /// Replaces the coordinate system used by this grid.
+    ///
+    /// Cached segments are cleared so the next configuration update can rebuild them against
+    /// the new embedding.
     pub fn set_coordinates(&mut self, coordinates: CoordsSys) {
         self.coordinates = coordinates;
         self.segments.clear();
     }
 
+    /// Returns the coordinate system currently used to embed the grid.
+    ///
+    /// Callers use this to evaluate world-space positions and tangent bases for cached samples.
     pub fn get_coords(&self) -> &CoordsSys {
         &self.coordinates
     }
 
+    /// Returns the grouped render data for the current grid.
+    ///
+    /// Each entry maps one edge mesh to the transforms and axis metadata that reuse it.
     pub fn get_data(&self) -> &FxHashMap<Edge, Vec<(Matrix4<f64>, SegmentDir)>> {
         &self.render_data
     }

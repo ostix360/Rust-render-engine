@@ -1,3 +1,5 @@
+//! Free-flight camera controls and cursor-ray helpers for the 3D scene.
+
 use crate::toolbox::input::Input;
 use crate::toolbox::opengl::display_manager::DisplayManager;
 use glfw::{Key, MouseButton};
@@ -14,6 +16,8 @@ pub struct Camera {
 }
 
 impl Camera {
+    /// Creates the free-flight camera with the supplied world position and the crate's default
+    /// orientation.
     pub fn new(position: Vector3<f64>) -> Camera {
         Camera {
             position,
@@ -22,11 +26,18 @@ impl Camera {
         }
     }
 
+    /// Applies mouse rotation and keyboard movement for one frame.
+    ///
+    /// Rotation is processed first so keyboard movement uses the latest orientation within the
+    /// same frame.
     pub fn update(&mut self, input: &Input) {
         self.update_angles(input);
         self.position += self.get_dp(input) * CAMERA_SPEED;
     }
 
+    /// Builds a world-space picking ray from the current cursor position.
+    ///
+    /// The returned tuple contains the ray origin and a normalized world-space direction.
     pub fn mouse_pos_to_world_pos(
         &self,
         dp: &DisplayManager,
@@ -45,6 +56,7 @@ impl Camera {
         (self.position, dir)
     }
 
+    /// Applies mouse-driven camera rotation while the primary mouse button is held.
     #[inline]
     fn update_angles(&mut self, input: &Input) {
         if input.is_mouse_button_pressed(MouseButton::Button1) {
@@ -59,6 +71,9 @@ impl Camera {
         }
     }
 
+    /// Applies yaw in world space and pitch around the camera's current right axis.
+    ///
+    /// Pitch is clamped so the camera cannot flip past straight up or straight down.
     fn rotate_yaw_pitch(&mut self, dx: f64, dy: f64) {
         let yaw = dx * CAMERA_ROTATION_SPEED;
         let mut pitch = dy * CAMERA_ROTATION_SPEED;
@@ -83,6 +98,7 @@ impl Camera {
         self.quat.renormalize();
     }
 
+    /// Applies an additional rotation around an arbitrary unit axis.
     #[allow(unused)]
     pub fn increase_rotation(&mut self, dir: &Unit<Vector3<f64>>, angle: f64) {
         let rot_quat = UnitQuaternion::from_axis_angle(dir, angle);
@@ -90,6 +106,11 @@ impl Camera {
         self.quat.renormalize();
     }
 
+    /// Computes the per-frame movement direction from the current keyboard state.
+    ///
+    /// Horizontal motion is projected onto the ground plane, while `Space` and `LeftShift` move
+    /// along the z axis. The current implementation picks a single dominant movement branch
+    /// rather than accumulating multiple simultaneous directions.
     #[inline]
     fn get_dp(&self, input: &Input) -> Vector3<f64> {
         // Use quaternion to remember previous rotation
@@ -129,6 +150,7 @@ impl Camera {
         }
     }
 
+    /// Builds the camera view matrix from the current position and orientation.
     pub fn get_view_matrix(&self) -> Matrix4<f64> {
         let translation = Translation3::from(-self.position);
         let result = self.quat.inverse().to_homogeneous() * translation.to_homogeneous();

@@ -20,6 +20,9 @@ pub struct Form {
 }
 
 impl Form {
+    /// Builds a differential form from its component expressions and degree.
+    ///
+    /// Component ordering follows the conventions documented at the top of this module.
     pub fn new(exprs: Vec<Expr>, n_forms: usize) -> Self {
         Self { exprs, n_forms }
     }
@@ -56,6 +59,10 @@ impl Form {
         out
     }
 
+    /// Transforms this form from the natural basis into the orthonormal tangent basis.
+    ///
+    /// The exact transformation depends on the degree of the form and the vielbein stored in
+    /// `Space`.
     pub fn to_otn_base(&self, space: &Space) -> Form {
         match self.n_forms {
             0 => Form::new(vec![self.exprs[0].clone()], 0),
@@ -109,6 +116,10 @@ impl Form {
         }
     }
 
+    /// Transforms this form from the orthonormal tangent basis back into the natural dual
+    /// basis.
+    ///
+    /// The transformation mirrors `to_otn_base` using the inverse basis conversion.
     pub fn to_dual_base(&self, space: &Space) -> Form {
         match self.n_forms {
             0 => Form::new(vec![self.exprs[0].clone()], 0),
@@ -161,28 +172,47 @@ impl Form {
         }
     }
 
+    /// Packs the form components into a one-row matrix expression.
+    ///
+    /// This is primarily used when symbolic matrix operations are more convenient than working
+    /// with raw vectors.
     pub fn to_vec(&self) -> Expression {
         let mut vec = Vec::new();
         vec.push(self.exprs.clone());
         Expression::matrix(vec)
     }
 
+    /// Returns the degree of this differential form.
+    ///
+    /// The value ranges from 0 through 3 for the three-dimensional spaces modeled by this
+    /// crate.
     pub fn n_forms(&self) -> usize {
         self.n_forms
     }
 
+    /// Returns one component expression from the form.
+    ///
+    /// The caller is responsible for using an index that matches the component ordering for the
+    /// current degree.
     pub fn get_expr(&self, i: usize) -> &Expr {
         &self.exprs[i]
     }
 }
 
 impl Hodge for Form {
+    /// Computes the Hodge dual of this form for the supplied metric.
+    ///
+    /// This operation is not implemented yet and currently delegates to `todo!()`.
     fn hodge_star(&self, metric: &Metric) -> Form {
         todo!()
     }
 }
 
 impl ExternalDerivative for Form {
+    /// Computes the exterior derivative of this form.
+    ///
+    /// The implementation follows the standard 3D coordinate ordering used by the rest of the
+    /// symbolic math layer.
     fn d(&mut self) -> Form {
         if self.n_forms == 0 {
             let dx = derivate(self.exprs[0].clone(), &"x".to_string());
