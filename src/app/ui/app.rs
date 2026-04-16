@@ -1,7 +1,7 @@
 //! egui control panel for editing the grid, field, and tangent-view settings.
 
-use crate::app::ui::legend::show_dual_legend_window;
-use crate::app::ui::state::{ControlTab, GridUiState};
+use crate::app::ui::legend::show_legend_window;
+use crate::app::ui::state::{ControlTab, FieldKind, GridUiState};
 use crate::app::ui::theme::{
     self, ACCENT, BORDER, CRAYOLA_BLUE, JET_BLACK, MUTED, PANEL, RASPBERRY, SHADOW_GREY, TEXT,
 };
@@ -117,17 +117,57 @@ impl ControlApp {
         egui::CollapsingHeader::new(theme::section_heading("Field equations"))
             .default_open(true)
             .show(ui, |ui| {
-                ui.checkbox(
-                    &mut data.normalize_field,
-                    egui::RichText::new("Normalize field").color(TEXT),
-                );
+                Self::render_field_kind_selector(ui, &mut data.field_kind);
+                ui.add_space(8.0);
+                ui.checkbox(&mut data.render_d, egui::RichText::new("Apply d").color(TEXT));
                 ui.separator();
-                ui.label(
-                    egui::RichText::new("Vector components in the active coordinates").color(MUTED),
-                );
-                Self::eq_row(ui, "Equation x:  Fx =", &mut data.field.x.eq_str);
-                Self::eq_row(ui, "Equation y:  Fy =", &mut data.field.y.eq_str);
-                Self::eq_row(ui, "Equation z:  Fz =", &mut data.field.z.eq_str);
+
+                match data.field_kind {
+                    FieldKind::Scalar => {
+                        ui.label(
+                            egui::RichText::new("Scalar field in the active coordinates")
+                                .color(MUTED),
+                        );
+                        Self::eq_row(ui, "Equation:  f =", &mut data.scalar_field.eq_str);
+                        ui.label(
+                            egui::RichText::new(
+                                "Base render uses colored samples. Enabling d renders the gradient.",
+                            )
+                            .color(MUTED),
+                        );
+                    }
+                    FieldKind::Vector => {
+                        ui.label(
+                            egui::RichText::new("Vector components in the active coordinates")
+                                .color(MUTED),
+                        );
+                        Self::eq_row(ui, "Equation x:  Fx =", &mut data.field.x.eq_str);
+                        Self::eq_row(ui, "Equation y:  Fy =", &mut data.field.y.eq_str);
+                        Self::eq_row(ui, "Equation z:  Fz =", &mut data.field.z.eq_str);
+                        ui.label(
+                            egui::RichText::new(
+                                "Base render uses arrows. Enabling d renders the associated curl field.",
+                            )
+                            .color(MUTED),
+                        );
+                    }
+                }
+
+                ui.add_space(8.0);
+                ui.add_enabled_ui(data.renders_vector_field(), |ui| {
+                    ui.checkbox(
+                        &mut data.normalize_field,
+                        egui::RichText::new("Normalize field").color(TEXT),
+                    );
+                });
+                if data.renders_scalar_samples() {
+                    ui.label(
+                        egui::RichText::new(
+                            "Normalization is available only when the current render uses arrows.",
+                        )
+                        .color(MUTED),
+                    );
+                }
             });
 
         ui.add_space(8.0);
@@ -155,6 +195,7 @@ impl ControlApp {
         match validate_ui_state(data) {
             Ok(validated) => {
                 data.coords_sys = validated.coords_sys;
+                data.scalar_field = validated.scalar_field;
                 data.field = validated.field;
                 data.apply_counter += 1;
             }
@@ -257,6 +298,19 @@ impl ControlApp {
         .clicked()
     }
 
+    /// Renders the scalar/vector selector for the editable field input.
+    fn render_field_kind_selector(ui: &mut egui::Ui, field_kind: &mut FieldKind) {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Input type").color(TEXT));
+            if Self::tab_button(ui, *field_kind == FieldKind::Scalar, "Scalar") {
+                *field_kind = FieldKind::Scalar;
+            }
+            if Self::tab_button(ui, *field_kind == FieldKind::Vector, "Vector") {
+                *field_kind = FieldKind::Vector;
+            }
+        });
+    }
+
     /// Renders the density slider for one grid axis.
     fn density_slider(ui: &mut egui::Ui, value: &mut f64, label: &str) {
         ui.add(
@@ -322,8 +376,8 @@ impl eframe::App for ControlApp {
             theme::apply_style(ctx);
             self.styled = true;
         }
-        let legend = self.state.lock().expect("UI state poisoned").dual_legend;
-        show_dual_legend_window(ctx, legend);
+        let legend = self.state.lock().expect("UI state poisoned").legend;
+        show_legend_window(ctx, legend);
     }
 
     /// Renders the central control panel and any active error popup.

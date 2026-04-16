@@ -1,8 +1,31 @@
 use crate::maths::differential::Form;
 use crate::maths::space::Space;
-use crate::maths::{derivate, expr_to_fastexpr3d, FastExpr3d, Point};
+use crate::maths::{derivate, expr_to_fastexpr3d, Expr, ExternalDerivative, FastExpr3d, Point};
 use crate::toolbox::logging::LOGGER;
-use std::ops::Mul;
+
+#[derive(Clone)]
+pub struct ScalarField {
+    expr: Expr,
+    fast_expr: FastExpr3d,
+}
+
+impl ScalarField {
+    /// Builds a scalar field from one symbolic expression.
+    pub fn new(expr: Expr) -> Self {
+        let fast_expr = expr_to_fastexpr3d(expr.clone());
+        Self { expr, fast_expr }
+    }
+
+    /// Evaluates the scalar field at one abstract coordinate.
+    pub fn at(&self, point: Point) -> f64 {
+        (self.fast_expr)(point.x, point.y, point.z)
+    }
+
+    /// Returns the stored symbolic expression.
+    pub fn get_expr(&self) -> &Expr {
+        &self.expr
+    }
+}
 
 #[derive(Clone)]
 pub struct VectorField {
@@ -19,8 +42,8 @@ impl VectorField {
     /// The field caches both dual and orthonormal-tangent representations together with the
     /// Jacobian needed for local linearization.
     pub fn new(expr: Form, space: &Space) -> Self {
-        if expr.n_forms() != 1 && expr.n_forms() != 2 {
-            LOGGER.error("Vector field must have 1 or 2 forms");
+        if expr.n_forms() != 1 {
+            LOGGER.error("Vector field must be built from a 1-form");
         }
         let dual_expr = expr;
         let otn_expr = dual_expr.to_otn_base(space);
@@ -41,10 +64,10 @@ impl VectorField {
     /// The dual representation is derived immediately so both bases stay available for later
     /// evaluation.
     pub fn from_otn(expr: Form, space: &Space) -> Self {
-        if expr.n_forms() != 1 && expr.n_forms() != 2 {
+        if expr.n_forms() != 1 {
             LOGGER.error(
                 format!(
-                    "Vector field must have 1 or 2 forms but got {}",
+                    "Vector field must be built from a 1-form but got {}",
                     expr.n_forms()
                 )
                 .as_str(),
@@ -62,6 +85,24 @@ impl VectorField {
             fast_otn_expr,
             fast_otn_jacobian,
         }
+    }
+
+    /// Builds the gradient field associated with one scalar expression.
+    pub fn gradient_from_scalar(expr: Expr, space: &Space) -> Self {
+        let mut scalar_form = Form::new(vec![expr], 0);
+        Self::new(scalar_form.d(), space)
+    }
+
+    /// Builds the rendered curl field associated with one vector input expressed in the OTN basis.
+    pub fn curl_from_otn(expr: Form, space: &Space) -> Self {
+        if expr.n_forms() != 1 {
+            LOGGER.error("Curl input must be a 1-form");
+        }
+
+        let mut dual_input = expr.to_dual_base(space);
+        let curl_dual = dual_input.d();
+        let curl_otn = curl_dual.to_otn_base(space).hodge_star_otn_3d();
+        Self::from_otn(curl_otn, space)
     }
 
     /// Compiles the three components of a form into numeric closures.

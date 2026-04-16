@@ -158,7 +158,11 @@ impl CoordsSys {
             axis[1](point.x, point.y, point.z),
             axis[2](point.x, point.y, point.z)
         ];
-        if tangent.norm() <= 1e-9 {
+        if !tangent.x.is_finite()
+            || !tangent.y.is_finite()
+            || !tangent.z.is_finite()
+            || tangent.norm() <= 1e-9
+        {
             fallback
         } else {
             tangent.normalize()

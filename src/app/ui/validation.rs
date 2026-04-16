@@ -1,11 +1,12 @@
 //! Parsing and validation helpers for equations entered in the control window.
 
-use crate::app::ui::state::{EqRender, GridUiState, SpacialEqs};
+use crate::app::ui::state::{EqRender, FieldKind, GridUiState, SpacialEqs};
 use mathhook_core::Parser;
 
 #[derive(Debug)]
 pub(crate) struct ValidatedUiState {
     pub coords_sys: SpacialEqs,
+    pub scalar_field: EqRender,
     pub field: SpacialEqs,
 }
 
@@ -14,14 +15,28 @@ pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState,
     let coord_x = validate_equation("Coordinate x", &state.coords_sys.x.eq_str);
     let coord_y = validate_equation("Coordinate y", &state.coords_sys.y.eq_str);
     let coord_z = validate_equation("Coordinate z", &state.coords_sys.z.eq_str);
-    let field_x = validate_equation("Field Fx", &state.field.x.eq_str);
-    let field_y = validate_equation("Field Fy", &state.field.y.eq_str);
-    let field_z = validate_equation("Field Fz", &state.field.z.eq_str);
+    let scalar_field = match state.field_kind {
+        FieldKind::Scalar => validate_equation("Scalar field", &state.scalar_field.eq_str),
+        FieldKind::Vector => Ok(state.scalar_field.clone()),
+    };
+    let field_x = match state.field_kind {
+        FieldKind::Vector => validate_equation("Field Fx", &state.field.x.eq_str),
+        FieldKind::Scalar => Ok(state.field.x.clone()),
+    };
+    let field_y = match state.field_kind {
+        FieldKind::Vector => validate_equation("Field Fy", &state.field.y.eq_str),
+        FieldKind::Scalar => Ok(state.field.y.clone()),
+    };
+    let field_z = match state.field_kind {
+        FieldKind::Vector => validate_equation("Field Fz", &state.field.z.eq_str),
+        FieldKind::Scalar => Ok(state.field.z.clone()),
+    };
 
     let mut errors = Vec::new();
     collect_error(&coord_x, &mut errors);
     collect_error(&coord_y, &mut errors);
     collect_error(&coord_z, &mut errors);
+    collect_error(&scalar_field, &mut errors);
     collect_error(&field_x, &mut errors);
     collect_error(&field_y, &mut errors);
     collect_error(&field_z, &mut errors);
@@ -36,6 +51,7 @@ pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState,
             y: coord_y?,
             z: coord_z?,
         },
+        scalar_field: scalar_field?,
         field: SpacialEqs {
             x: field_x?,
             y: field_y?,
@@ -81,7 +97,7 @@ fn format_error_summary(errors: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{format_error_summary, validate_ui_state};
-    use crate::app::ui::GridUiState;
+    use crate::app::ui::{FieldKind, GridUiState};
 
     #[test]
     fn validate_ui_state_accepts_polynomial_expression() {
@@ -107,6 +123,16 @@ mod tests {
         let error = validate_ui_state(&state).unwrap_err();
 
         assert!(error.contains("Coordinate x: Equation cannot be empty"));
+    }
+
+    #[test]
+    fn validate_ui_state_uses_scalar_equation_in_scalar_mode() {
+        let mut state = GridUiState::default();
+        state.field_kind = FieldKind::Scalar;
+        state.scalar_field.eq_str = "x * y + z".to_string();
+        state.field.x.eq_str = "x + t".to_string();
+
+        assert!(validate_ui_state(&state).is_ok());
     }
 
     #[test]

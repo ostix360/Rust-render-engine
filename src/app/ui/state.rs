@@ -49,11 +49,20 @@ impl SpacialEqs {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    Scalar,
+    Vector,
+}
+
 #[derive(Debug, Clone)]
 pub struct GridUiState {
     pub render_3d: bool,
     pub coords_sys: SpacialEqs,
+    pub field_kind: FieldKind,
+    pub scalar_field: EqRender,
     pub field: SpacialEqs,
+    pub render_d: bool,
     pub normalize_field: bool,
     pub tangent_scale: f64,
     pub geometric_arrow_scale: f64,
@@ -64,11 +73,18 @@ pub struct GridUiState {
     pub bounds_y: (f64, f64),
     pub bounds_z: (f64, f64),
     pub apply_counter: u64,
-    pub dual_legend: Option<DualLegendState>,
+    pub legend: Option<LegendState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegendKind {
+    ScalarField,
+    DualTangent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DualLegendState {
+pub struct LegendState {
+    pub kind: LegendKind,
     pub min_value: f64,
     pub max_value: f64,
 }
@@ -107,6 +123,16 @@ impl GridUiState {
     pub fn to_grid_config(&self) -> GridConfig {
         self.approximate_grid_config()
     }
+
+    /// Returns whether the active field render path should draw arrows.
+    pub fn renders_vector_field(&self) -> bool {
+        self.field_kind == FieldKind::Vector || self.render_d
+    }
+
+    /// Returns whether the active field render path should draw sampled scalar spheres.
+    pub fn renders_scalar_samples(&self) -> bool {
+        self.field_kind == FieldKind::Scalar && !self.render_d
+    }
 }
 
 impl Default for GridUiState {
@@ -120,7 +146,10 @@ impl Default for GridUiState {
         Self {
             render_3d: true,
             coords_sys: SpacialEqs::default_sys(),
+            field_kind: FieldKind::Vector,
+            scalar_field: default_eq("x"),
             field: SpacialEqs::default_field(),
+            render_d: false,
             normalize_field: false,
             tangent_scale: 0.12,
             geometric_arrow_scale: 0.55,
@@ -131,7 +160,7 @@ impl Default for GridUiState {
             bounds_y: (0.0, 6.28),
             bounds_z: (0.0, 3.14),
             apply_counter: 0,
-            dual_legend: None,
+            legend: None,
         }
     }
 }
@@ -152,13 +181,15 @@ fn default_eq(expr: &str) -> EqRender {
 
 #[cfg(test)]
 mod tests {
-    use super::{ControlTab, GridUiState};
+    use super::{ControlTab, FieldKind, GridUiState};
 
     #[test]
     fn grid_ui_state_defaults_match_expected_values() {
         let state = GridUiState::default();
 
         assert!(state.render_3d);
+        assert_eq!(state.field_kind, FieldKind::Vector);
+        assert!(!state.render_d);
         assert!(!state.normalize_field);
         assert_eq!(state.tangent_scale, 0.12);
         assert_eq!(state.geometric_arrow_scale, 0.55);
@@ -168,12 +199,31 @@ mod tests {
         assert_eq!(state.bounds_x, (-0.1, 15.0));
         assert_eq!(state.bounds_y, (0.0, 6.28));
         assert_eq!(state.bounds_z, (0.0, 3.14));
-        assert_eq!(state.dual_legend, None);
+        assert_eq!(state.legend, None);
     }
 
     #[test]
     fn control_tab_defaults_to_grid_in_callers() {
         let tab = ControlTab::Grid;
         assert!(matches!(tab, ControlTab::Grid));
+    }
+
+    #[test]
+    fn scalar_mode_without_d_renders_samples() {
+        let mut state = GridUiState::default();
+        state.field_kind = FieldKind::Scalar;
+
+        assert!(state.renders_scalar_samples());
+        assert!(!state.renders_vector_field());
+    }
+
+    #[test]
+    fn scalar_mode_with_d_renders_vectors() {
+        let mut state = GridUiState::default();
+        state.field_kind = FieldKind::Scalar;
+        state.render_d = true;
+
+        assert!(!state.renders_scalar_samples());
+        assert!(state.renders_vector_field());
     }
 }

@@ -164,10 +164,11 @@ pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
         let substituted = eval_expr.substitute(&vars);
         eval_expr
             .evaluate_with_context(&EvalContext::numeric(vars))
-            .unwrap()
-            .evaluate_to_f64()
-            .or_else(|_| eval_numeric_fallback(&substituted))
-            .unwrap()
+            .ok()
+            .and_then(|value| value.evaluate_to_f64().ok())
+            .or_else(|| eval_numeric_fallback(&substituted).ok())
+            .filter(|value| value.is_finite())
+            .unwrap_or(f64::NAN)
     };
     Arc::new(eval)
 }
@@ -244,4 +245,20 @@ trait ExternalDerivative {
     ///
     /// Implementations follow the differential-form conventions established in this module.
     fn d(&mut self) -> Self;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expr_to_fastexpr3d;
+    use mathhook_core::Parser;
+
+    #[test]
+    fn expr_to_fastexpr3d_returns_nan_on_singular_eval() {
+        let expr = Parser::default().parse("1 / x").unwrap();
+        let eval = expr_to_fastexpr3d(expr);
+
+        let result = eval(0.0, 0.0, 0.0);
+
+        assert!(result.is_nan());
+    }
 }

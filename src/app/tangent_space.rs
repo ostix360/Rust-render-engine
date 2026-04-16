@@ -2,13 +2,14 @@
 
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid_world::{GridSample, GridWorld};
-use crate::app::ui::DualLegendState;
+use crate::app::ui::legend::sampled_value_color;
+use crate::app::ui::{LegendKind, LegendState};
 use crate::graphics::model::Sphere;
 use crate::toolbox::camera::Camera;
 use crate::toolbox::input::Input;
 use crate::toolbox::opengl::display_manager::DisplayManager;
 use glfw::Key;
-use nalgebra::{vector, Matrix4, Vector3, Vector4};
+use nalgebra::{vector, Matrix4, Vector3};
 
 const DIVE_DURATION_SEC: f64 = 0.45;
 const PICK_RADIUS: f64 = 0.45;
@@ -40,7 +41,7 @@ pub struct TangentRenderState {
 
 pub struct DualFormRender {
     pub samples: Vec<Sphere>,
-    pub legend: DualLegendState,
+    pub legend: LegendState,
 }
 
 #[derive(Clone, Copy)]
@@ -598,13 +599,14 @@ impl TangentSpace {
 
         let mut samples = Vec::with_capacity(sampled_values.len());
         for (position, value) in sampled_values {
-            let color = differential_form_color(value, min_value, max_value);
+            let color = sampled_value_color(value, min_value, max_value);
             samples.push(Sphere::from_rgba(position, color, FORM_SAMPLE_SIZE));
         }
 
         Some(DualFormRender {
             samples,
-            legend: DualLegendState {
+            legend: LegendState {
+                kind: LegendKind::DualTangent,
                 min_value,
                 max_value,
             },
@@ -697,36 +699,6 @@ fn lerp_vec3(from: Vector3<f64>, to: Vector3<f64>, t: f64) -> Vector3<f64> {
 fn smoothstep(t: f64) -> f64 {
     let clamped = t.clamp(0.0, 1.0);
     clamped * clamped * (3.0 - 2.0 * clamped)
-}
-
-/// Maps a sampled dual-form value onto the blue-white-red legend ramp.
-///
-/// The range is normalized between the provided extrema, with special handling for nearly
-/// constant data.
-fn differential_form_color(value: f64, min_value: f64, max_value: f64) -> Vector4<f64> {
-    let mix = if (max_value - min_value).abs() <= 1.0e-6 {
-        if value > 1.0e-6 {
-            1.0
-        } else if value < -1.0e-6 {
-            0.0
-        } else {
-            0.5
-        }
-    } else {
-        ((value - min_value) / (max_value - min_value)).clamp(0.0, 1.0)
-    };
-
-    let cold = vector![0.08, 0.22, 1.0];
-    let neutral = vector![0.95, 0.95, 1.0];
-    let warm = vector![1.0, 0.18, 0.08];
-    let color = if mix < 0.5 {
-        let local_mix = mix * 2.0;
-        cold * (1.0 - local_mix) + neutral * local_mix
-    } else {
-        let local_mix = (mix - 0.5) * 2.0;
-        neutral * (1.0 - local_mix) + warm * local_mix
-    };
-    Vector4::new(color.x, color.y, color.z, 0.95)
 }
 
 #[cfg(test)]

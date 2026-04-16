@@ -1,13 +1,13 @@
 //! Control-window bootstrap and public UI state exports.
 
 mod app;
-mod legend;
+pub(crate) mod legend;
 mod state;
 mod theme;
 mod validation;
 
 #[allow(unused_imports)]
-pub use state::{DualLegendState, EqRender, GridUiState, SpacialEqs};
+pub use state::{EqRender, FieldKind, GridUiState, LegendKind, LegendState, SpacialEqs};
 
 use crate::app::ui::app::ControlApp;
 use std::sync::{Arc, Mutex};

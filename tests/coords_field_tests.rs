@@ -4,6 +4,7 @@ use render_engine::app::coords_sys::CoordsSys;
 use render_engine::maths::differential::Form;
 use render_engine::maths::field::VectorField;
 use render_engine::maths::space::Space;
+use render_engine::maths::expr_to_fastexpr3d;
 use render_engine::maths::Point;
 
 const EPS: f64 = 1.0e-6;
@@ -260,4 +261,103 @@ fn vector_field_dual_at_preserves_all_scaled_components() {
     assert_close(result.x, 2.0, "scaled dual x component");
     assert_close(result.y, 6.0, "scaled dual y component");
     assert_close(result.z, 12.0, "scaled dual z component");
+}
+
+#[test]
+fn gradient_from_scalar_matches_cartesian_derivatives() {
+    let space = Space::new(parse("x"), parse("y"), parse("z"));
+    let field = VectorField::gradient_from_scalar(parse("x*y + z*z"), &space);
+
+    let result = field.at(Point {
+        x: 2.0,
+        y: -3.0,
+        z: 0.5,
+    });
+
+    assert_close(result.x, -3.0, "gradient x component");
+    assert_close(result.y, 2.0, "gradient y component");
+    assert_close(result.z, 1.0, "gradient z component");
+}
+
+#[test]
+fn curl_from_otn_matches_cartesian_curl() {
+    let space = Space::new(parse("x"), parse("y"), parse("z"));
+    let field = VectorField::curl_from_otn(
+        Form::new(vec![parse("-y"), parse("x"), parse("0")], 1),
+        &space,
+    );
+
+    let result = field.at(Point {
+        x: 1.0,
+        y: 2.0,
+        z: -3.0,
+    });
+
+    assert_close(result.x, 0.0, "curl x component");
+    assert_close(result.y, 0.0, "curl y component");
+    assert_close(result.z, 2.0, "curl z component");
+}
+
+#[test]
+fn hodge_star_otn_3d_maps_basis_forms() {
+    let one_form = Form::new(vec![parse("1"), parse("2"), parse("3")], 1).hodge_star_otn_3d();
+
+    assert_eq!(one_form.n_forms(), 2);
+    assert_close(
+        expr_to_fastexpr3d(one_form.get_expr(0).clone())(0.0, 0.0, 0.0),
+        3.0,
+        "star one-form xy component",
+    );
+    assert_close(
+        expr_to_fastexpr3d(one_form.get_expr(1).clone())(0.0, 0.0, 0.0),
+        1.0,
+        "star one-form yz component",
+    );
+    assert_close(
+        expr_to_fastexpr3d(one_form.get_expr(2).clone())(0.0, 0.0, 0.0),
+        2.0,
+        "star one-form zx component",
+    );
+
+    let two_form = Form::new(vec![parse("5"), parse("7"), parse("11")], 2).hodge_star_otn_3d();
+
+    assert_eq!(two_form.n_forms(), 1);
+    assert_close(
+        expr_to_fastexpr3d(two_form.get_expr(0).clone())(0.0, 0.0, 0.0),
+        7.0,
+        "star two-form x component",
+    );
+    assert_close(
+        expr_to_fastexpr3d(two_form.get_expr(1).clone())(0.0, 0.0, 0.0),
+        11.0,
+        "star two-form y component",
+    );
+    assert_close(
+        expr_to_fastexpr3d(two_form.get_expr(2).clone())(0.0, 0.0, 0.0),
+        5.0,
+        "star two-form z component",
+    );
+}
+
+#[test]
+fn two_form_to_otn_base_handles_scaled_orthogonal_metric() {
+    let space = Space::new(parse("2*x"), parse("3*y"), parse("4*z"));
+    let transformed = Form::new(vec![parse("1"), parse("0"), parse("0")], 2).to_otn_base(&space);
+    let eval = |index| expr_to_fastexpr3d(transformed.get_expr(index).clone())(0.0, 0.0, 0.0);
+
+    assert_close(
+        eval(0),
+        1.0 / 6.0,
+        "transformed xy component",
+    );
+    assert_close(
+        eval(1),
+        0.0,
+        "transformed yz component",
+    );
+    assert_close(
+        eval(2),
+        0.0,
+        "transformed zx component",
+    );
 }

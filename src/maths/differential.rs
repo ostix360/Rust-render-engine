@@ -5,7 +5,7 @@ use crate::maths::{derivate, Expr, ExternalDerivative, Hodge};
 use crate::toolbox::logging::LOGGER;
 use mathhook::prelude::expr;
 use mathhook_core::matrices::{Matrix, MatrixOperations};
-use mathhook_core::Expression;
+use mathhook_core::{Expression, Simplify};
 use std::ops::{Add, Mul, Sub};
 
 /// Conventions:
@@ -59,6 +59,46 @@ impl Form {
         out
     }
 
+    /// Transforms a 2-form using the supplied one-form basis conversion matrix.
+    /// TODO check this
+    /// The matrix is interpreted as mapping old one-form components into the target basis.
+    /// The resulting antisymmetric 2-form is then projected back into the stored
+    /// `[dx^dy, dy^dz, dz^dx]` ordering.
+    fn transform_two_form(&self, transform: &Matrix) -> Form {
+        if self.n_forms != 2 {
+            panic!("2-form transform only works for 2-forms");
+        }
+
+        let minor = |row_a: usize, row_b: usize, col_i: usize, col_j: usize| {
+            transform
+                .get_element(row_a, col_i)
+                .mul(transform.get_element(row_b, col_j))
+                .sub(
+                    transform
+                        .get_element(row_b, col_i)
+                        .mul(transform.get_element(row_a, col_j)),
+                )
+        };
+
+        let transformed_xy = self.exprs[0].clone().mul(minor(0, 1, 0, 1))
+            .add(self.exprs[1].clone().mul(minor(0, 1, 1, 2)))
+            .add(self.exprs[2].clone().mul(minor(0, 1, 2, 0)))
+            .simplify();
+        let transformed_yz = self.exprs[0].clone().mul(minor(1, 2, 0, 1))
+            .add(self.exprs[1].clone().mul(minor(1, 2, 1, 2)))
+            .add(self.exprs[2].clone().mul(minor(1, 2, 2, 0)))
+            .simplify();
+        let transformed_zx = self.exprs[0].clone().mul(minor(2, 0, 0, 1))
+            .add(self.exprs[1].clone().mul(minor(2, 0, 1, 2)))
+            .add(self.exprs[2].clone().mul(minor(2, 0, 2, 0)))
+            .simplify();
+
+        Form::new(
+            vec![transformed_xy, transformed_yz, transformed_zx],
+            2,
+        )
+    }
+
     /// Transforms this form from the natural basis into the orthonormal tangent basis.
     ///
     /// The exact transformation depends on the degree of the form and the vielbein stored in
@@ -80,28 +120,8 @@ impl Form {
                 Form::new(new_exprs, 1)
             }
             2 => {
-                // TODO make compatible with non OTN metrics
-                let mut new_exprs = Vec::with_capacity(3);
                 let nat_to_otn = space.natural_to_otn();
-                new_exprs.push(
-                    self.exprs[0]
-                        .clone()
-                        .mul(nat_to_otn.get_element(0, 0))
-                        .mul(nat_to_otn.get_element(1, 0)),
-                );
-                new_exprs.push(
-                    self.exprs[1]
-                        .clone()
-                        .mul(nat_to_otn.get_element(1, 0))
-                        .mul(nat_to_otn.get_element(2, 0)),
-                );
-                new_exprs.push(
-                    self.exprs[2]
-                        .clone()
-                        .mul(nat_to_otn.get_element(2, 0))
-                        .mul(nat_to_otn.get_element(0, 0)),
-                );
-                Form::new(new_exprs, 2)
+                self.transform_two_form(&nat_to_otn)
             }
             3 => {
                 let nat_to_otn = space.natural_to_otn();
@@ -137,27 +157,8 @@ impl Form {
                 Form::new(new_exprs, 1)
             }
             2 => {
-                let mut new_exprs = Vec::with_capacity(3);
                 let otn_to_nat = space.otn_to_natural();
-                new_exprs.push(
-                    self.exprs[0]
-                        .clone()
-                        .mul(otn_to_nat.get_element(0, 0))
-                        .mul(otn_to_nat.get_element(1, 0)),
-                );
-                new_exprs.push(
-                    self.exprs[1]
-                        .clone()
-                        .mul(otn_to_nat.get_element(1, 0))
-                        .mul(otn_to_nat.get_element(2, 0)),
-                );
-                new_exprs.push(
-                    self.exprs[2]
-                        .clone()
-                        .mul(otn_to_nat.get_element(2, 0))
-                        .mul(otn_to_nat.get_element(0, 0)),
-                );
-                Form::new(new_exprs, 2)
+                self.transform_two_form(&otn_to_nat)
             }
             3 => {
                 let otn_to_nat = space.otn_to_natural();
@@ -196,6 +197,38 @@ impl Form {
     /// current degree.
     pub fn get_expr(&self, i: usize) -> &Expr {
         &self.exprs[i]
+    }
+
+    /// Applies the 3D Hodge star in a positively oriented orthonormal coframe.
+    ///
+    /// TEMPORARY BEFORE GENERAL IMPLEMENTATION
+    ///
+    /// This follows the local OTN rules:
+    /// `*1 = e1^e2^e3`, `*e1 = e2^e3`, `*e2 = e3^e1`, `*e3 = e1^e2`,
+    /// `*(e1^e2) = e3`, `*(e2^e3) = e1`, `*(e3^e1) = e2`, and
+    /// `*(e1^e2^e3) = 1`.
+    pub fn hodge_star_otn_3d(&self) -> Form {
+        match self.n_forms {
+            0 => Form::new(vec![self.exprs[0].clone()], 3),
+            1 => Form::new(
+                vec![
+                    self.exprs[2].clone(),
+                    self.exprs[0].clone(),
+                    self.exprs[1].clone(),
+                ],
+                2,
+            ),
+            2 => Form::new(
+                vec![
+                    self.exprs[1].clone(),
+                    self.exprs[2].clone(),
+                    self.exprs[0].clone(),
+                ],
+                1,
+            ),
+            3 => Form::new(vec![self.exprs[0].clone()], 0),
+            _ => panic!("Unknown number of forms {}", self.n_forms),
+        }
     }
 }
 
