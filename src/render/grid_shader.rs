@@ -22,6 +22,7 @@ pub struct GridShader {
     tangent_basis_y: Vec3Uniform,
     tangent_basis_z: Vec3Uniform,
     tangent_position_scale: FloatUniform,
+    tangent_local_radius: FloatUniform,
 }
 
 impl GridShader {
@@ -42,6 +43,7 @@ impl GridShader {
             tangent_basis_y: Vec3Uniform::new("tangent_basis_y"),
             tangent_basis_z: Vec3Uniform::new("tangent_basis_z"),
             tangent_position_scale: FloatUniform::new("tangent_position_scale"),
+            tangent_local_radius: FloatUniform::new("tangent_local_radius"),
         }
     }
 
@@ -103,6 +105,8 @@ impl GridShader {
             .load_vector_to_uniform(scene_transform.tangent_basis[2]);
         self.tangent_position_scale
             .load_float_to_uniform(scene_transform.tangent_position_scale);
+        self.tangent_local_radius
+            .load_float_to_uniform(scene_transform.tangent_local_radius);
     }
 
     /// Uploads an explicit segment color.
@@ -150,6 +154,7 @@ impl Shader for GridShader {
                 &mut self.tangent_basis_y.uniform,
                 &mut self.tangent_basis_z.uniform,
                 &mut self.tangent_position_scale.uniform,
+                &mut self.tangent_local_radius.uniform,
             ]);
         self.shader_program.store_all_uniforms(&mut uniforms);
     }

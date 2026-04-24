@@ -1,4 +1,6 @@
+pub mod applied_config;
 pub mod coords_sys;
+pub mod field_render;
 pub mod field_runtime;
 pub mod grid;
 pub mod grid_world;

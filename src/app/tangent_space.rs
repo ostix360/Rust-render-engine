@@ -21,6 +21,8 @@ const MAX_ZOOM_FRACTION: f64 = 0.8;
 const FORM_SAMPLE_SIZE: f64 = 0.06;
 const DUAL_FORM_GRID_RADIUS: i32 = 4;
 const DUAL_FORM_GRID_STEP: f64 = 0.45;
+const DUAL_LOCAL_RADIUS: f64 = DUAL_FORM_GRID_RADIUS as f64 * DUAL_FORM_GRID_STEP;
+const GEOMETRIC_LOCAL_RADIUS: f64 = 4.0;
 const DEFAULT_GEOMETRIC_LOCAL_SCALE: f64 = 0.12;
 const DEFAULT_GEOMETRIC_ARROW_SCALE: f64 = 0.55;
 
@@ -50,6 +52,7 @@ pub struct SceneSpaceTransform {
     pub tangent_anchor_abstract: Vector3<f64>,
     pub tangent_basis: [Vector3<f64>; 3],
     pub tangent_position_scale: f64,
+    pub tangent_local_radius: f64,
 }
 
 impl SceneSpaceTransform {
@@ -67,6 +70,7 @@ impl SceneSpaceTransform {
                 Vector3::new(0.0, 0.0, 1.0),
             ],
             tangent_position_scale: DEFAULT_GEOMETRIC_LOCAL_SCALE,
+            tangent_local_radius: f64::INFINITY,
         }
     }
 }
@@ -144,6 +148,7 @@ impl DiveAnchor {
             tangent_anchor_abstract: self.abstract_pos,
             tangent_basis: self.basis,
             tangent_position_scale: local_scale,
+            tangent_local_radius: GEOMETRIC_LOCAL_RADIUS,
         }
     }
 }
@@ -546,6 +551,33 @@ impl TangentSpace {
         }
     }
 
+    /// Returns whether one abstract-space field sample lies inside the active tangent patch.
+    ///
+    /// Outside tangent mode every sample remains visible. In geometric view the locality check
+    /// is performed in the scaled tangent coordinates so the visible patch stays consistent with
+    /// the rendered tangent grid. In dual view it is performed in the raw anchor-relative
+    /// abstract coordinates.
+    pub fn contains_local_sample(&self, abstract_pos: Vector3<f64>) -> bool {
+        let Some(anchor) = self.dive.anchor.as_ref() else {
+            return true;
+        };
+
+        let local_position = if self.active_view() == Some(TangentView::Geometric) {
+            anchor.local_abstract_delta(abstract_pos, self.geometric_local_scale)
+        } else {
+            abstract_pos - anchor.abstract_pos
+        };
+        let radius = if self.active_view() == Some(TangentView::Geometric) {
+            GEOMETRIC_LOCAL_RADIUS
+        } else {
+            DUAL_LOCAL_RADIUS
+        };
+
+        local_position.x.abs() <= radius
+            && local_position.y.abs() <= radius
+            && local_position.z.abs() <= radius
+    }
+
     /// Returns the scaled abstract-space offset from the active anchor.
     ///
     /// This is only available while tangent mode has an anchor selected.
@@ -774,6 +806,54 @@ mod tests {
             tangent_space.geometric_local_delta(vector![3.0, 2.0, 3.0]),
             Some(vector![0.2, 0.0, 0.0])
         );
+    }
+
+    #[test]
+    fn local_sample_filter_defaults_to_visible_outside_tangent_mode() {
+        let tangent_space = TangentSpace::new();
+
+        assert!(tangent_space.contains_local_sample(vector![100.0, 100.0, 100.0]));
+    }
+
+    #[test]
+    fn local_sample_filter_uses_scaled_geometric_patch() {
+        let mut tangent_space = TangentSpace::new();
+        tangent_space.dive.mode = DiveMode::Tangent;
+        tangent_space.dive.view = TangentView::Geometric;
+        tangent_space.dive.anchor = Some(DiveAnchor {
+            abstract_pos: vector![1.0, 2.0, 3.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        });
+        tangent_space.set_geometric_local_scale(0.5);
+
+        assert!(tangent_space.contains_local_sample(vector![8.0, 2.0, 3.0]));
+        assert!(!tangent_space.contains_local_sample(vector![10.0, 2.0, 3.0]));
+    }
+
+    #[test]
+    fn local_sample_filter_uses_raw_dual_patch() {
+        let mut tangent_space = TangentSpace::new();
+        tangent_space.dive.mode = DiveMode::Tangent;
+        tangent_space.dive.view = TangentView::Dual;
+        tangent_space.dive.anchor = Some(DiveAnchor {
+            abstract_pos: vector![1.0, 2.0, 3.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+            zoom_offset: vector![0.0, 0.0, 0.0],
+        });
+
+        assert!(tangent_space.contains_local_sample(vector![2.7, 2.0, 3.0]));
+        assert!(!tangent_space.contains_local_sample(vector![2.9, 2.0, 3.0]));
     }
 
     #[test]

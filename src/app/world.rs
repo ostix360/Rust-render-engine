@@ -1,12 +1,16 @@
 //! Runtime world state that bridges UI changes, cached field data, and rendering.
 
+use crate::app::applied_config::{AppliedConfig, ApplyDiff};
 use crate::app::coords_sys::CoordsSys;
+use crate::app::field_render::{
+    build_scalar_render, build_vector_render, is_finite_vec3, FieldRenderCache, FieldSample,
+    VectorRenderConfig,
+};
 use crate::app::field_runtime::RuntimeField;
-use crate::app::grid::{Grid, GridConfig};
+use crate::app::grid::Grid;
 use crate::app::grid_world::{GridSample, GridWorld};
 use crate::app::tangent_space::{SceneSpaceTransform, TangentRenderState, TangentSpace};
-use crate::app::ui::legend::sampled_value_color;
-use crate::app::ui::{FieldKind, GridUiState, LegendKind, LegendState};
+use crate::app::ui::{GridUiState, LegendState};
 use crate::graphics::model::{RenderVField, Sphere};
 use crate::maths::field::VectorField;
 use crate::maths::Point;
@@ -15,150 +19,19 @@ use crate::toolbox::camera::Camera;
 use crate::toolbox::color::WHITE;
 use crate::toolbox::input::Input;
 use crate::toolbox::opengl::display_manager::DisplayManager;
-use mathhook_core::formatter::simple::SimpleContext;
-use mathhook_core::SimpleFormatter;
 use nalgebra::{Matrix4, Vector3, Vector4};
+use rustc_hash::FxHashSet;
 use std::sync::{Arc, Mutex};
 use typed_floats::NonNaN;
 
 const SPHERE_SIZE: f64 = 0.1;
-
-#[derive(Clone, PartialEq)]
-struct AppliedConfig {
-    grid_config: GridConfig,
-    coord_eqs: [String; 3],
-    field_kind: FieldKind,
-    scalar_eq: String,
-    vector_eqs: [String; 3],
-    render_d: bool,
-    normalize_field: bool,
-}
-
-impl AppliedConfig {
-    /// Builds the subset of UI state that drives world reconfiguration.
-    ///
-    /// The stored values are normalized into comparable strings and flags so cheap change
-    /// detection can happen frame-to-frame.
-    fn from_ui(state: &GridUiState) -> Self {
-        let context = SimpleContext::default();
-        Self {
-            grid_config: state.to_grid_config(),
-            coord_eqs: [
-                state
-                    .coords_sys
-                    .x
-                    .eq
-                    .to_simple(&context)
-                    .expect("Error while converting x eq"),
-                state
-                    .coords_sys
-                    .y
-                    .eq
-                    .to_simple(&context)
-                    .expect("Error while converting y eq"),
-                state
-                    .coords_sys
-                    .z
-                    .eq
-                    .to_simple(&context)
-                    .expect("Error while converting z eq"),
-            ],
-            field_kind: state.field_kind,
-            scalar_eq: state.scalar_field.eq_str.clone(),
-            vector_eqs: [
-                state.field.x.eq_str.clone(),
-                state.field.y.eq_str.clone(),
-                state.field.z.eq_str.clone(),
-            ],
-            render_d: state.render_d,
-            normalize_field: state.normalize_field,
-        }
-    }
-
-    /// Computes which high-level parts of the world would change between two applied
-    /// configurations.
-    ///
-    /// The result is used to decide whether geometry, field caches, or normalization settings
-    /// need to be rebuilt.
-    fn diff(&self, next: &Self) -> ApplyDiff {
-        ApplyDiff {
-            grid_changed: self.grid_config != next.grid_config,
-            coords_changed: self.coord_eqs != next.coord_eqs,
-            field_kind_changed: self.field_kind != next.field_kind,
-            scalar_changed: self.scalar_eq != next.scalar_eq,
-            vector_changed: self.vector_eqs != next.vector_eqs,
-            render_d_changed: self.render_d != next.render_d,
-            normalize_changed: self.normalize_field != next.normalize_field,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct ApplyDiff {
-    grid_changed: bool,
-    coords_changed: bool,
-    field_kind_changed: bool,
-    scalar_changed: bool,
-    vector_changed: bool,
-    render_d_changed: bool,
-    normalize_changed: bool,
-}
-
-impl ApplyDiff {
-    /// Returns whether the grid geometry or coordinate embedding changed.
-    ///
-    /// Geometry changes force the world to rebuild sampled positions and the grid lookup cache.
-    fn geometry_changed(self) -> bool {
-        self.grid_changed || self.coords_changed
-    }
-
-    /// Returns whether the active runtime field must be rebuilt.
-    fn runtime_field_changed(self) -> bool {
-        self.coords_changed
-            || self.field_kind_changed
-            || self.scalar_changed
-            || self.vector_changed
-            || self.render_d_changed
-    }
-
-    /// Returns whether cached field samples must be recomputed.
-    ///
-    /// Any geometry change invalidates the cache in addition to direct field-expression
-    /// changes.
-    fn field_cache_changed(self) -> bool {
-        self.geometry_changed() || self.runtime_field_changed()
-    }
-}
-
-#[derive(Clone)]
-struct FieldSample {
-    abstract_pos: Vector3<f64>,
-    world_pos: Vector3<f64>,
-    basis: [Vector3<f64>; 3],
-}
-
-impl FieldSample {
-    /// Expands basis components into a world-space vector at this sample.
-    ///
-    /// The sample stores the tangent basis that was evaluated when the cache was built.
-    fn vector_to_world(&self, vector: Vector3<f64>) -> Vector3<f64> {
-        self.basis[0] * vector.x + self.basis[1] * vector.y + self.basis[2] * vector.z
-    }
-}
-
-/// Returns whether every component of the vector is finite.
-fn is_finite_vec3(vector: &Vector3<f64>) -> bool {
-    vector.x.is_finite() && vector.y.is_finite() && vector.z.is_finite()
-}
 
 pub struct World {
     field: RuntimeField,
     render_field: Vec<RenderVField>,
     render_form_samples: Vec<Sphere>,
     field_samples: Vec<FieldSample>,
-    cached_scalar_values: Vec<f64>,
-    cached_field_components: Vec<Vector3<f64>>,
-    cached_field_vectors: Vec<Vector3<f64>>,
+    field_cache: FieldRenderCache,
     normalize_field: bool,
     renderer: MasterRenderer,
     grid: Grid,
@@ -188,9 +61,7 @@ impl World {
             render_field: Vec::new(),
             render_form_samples: Vec::new(),
             field_samples,
-            cached_scalar_values: Vec::new(),
-            cached_field_components: Vec::new(),
-            cached_field_vectors: Vec::new(),
+            field_cache: FieldRenderCache::Scalar(Vec::new()),
             normalize_field: initial_state.normalize_field,
             renderer: MasterRenderer::new(
                 display_manager.get_width() as f64,
@@ -245,12 +116,13 @@ impl World {
         let mut field_sample_capacity = 0usize;
         let mut grid_point_capacity = 0usize;
         for (edge, transforms) in data.iter() {
-            field_sample_capacity += transforms.len();
+            field_sample_capacity += transforms.len() * 2;
             grid_point_capacity += edge.get_nb_vertices() * transforms.len();
         }
 
         let mut field_samples = Vec::with_capacity(field_sample_capacity);
         let mut grid_samples = Vec::with_capacity(grid_point_capacity);
+        let mut seen_field_positions: FxHashSet<(u64, u64, u64)> = FxHashSet::default();
 
         for (edge, transforms) in data.iter() {
             let vertices = edge.get_vertices();
@@ -259,19 +131,32 @@ impl World {
             }
 
             for (transform, _) in transforms.iter() {
-                let abstract_pos = Self::transform_vertex(transform, &vertices[0]);
-                let world_pos = coords.eval_position(abstract_pos);
-                let basis = coords.eval_tangent_basis(abstract_pos);
+                for endpoint in [vertices.first(), vertices.last()] {
+                    let Some(endpoint) = endpoint else {
+                        continue;
+                    };
+                    let abstract_pos = Self::transform_vertex(transform, endpoint);
+                    let world_pos = coords.eval_position(abstract_pos);
+                    let basis = coords.eval_tangent_basis(abstract_pos);
 
-                if !is_finite_vec3(&world_pos) || basis.iter().any(|axis| !is_finite_vec3(axis)) {
-                    continue;
+                    if !is_finite_vec3(&world_pos) || basis.iter().any(|axis| !is_finite_vec3(axis))
+                    {
+                        continue;
+                    }
+
+                    let sample_key = (
+                        abstract_pos.x.to_bits(),
+                        abstract_pos.y.to_bits(),
+                        abstract_pos.z.to_bits(),
+                    );
+                    if seen_field_positions.insert(sample_key) {
+                        field_samples.push(FieldSample {
+                            abstract_pos,
+                            world_pos,
+                            basis,
+                        });
+                    }
                 }
-
-                field_samples.push(FieldSample {
-                    abstract_pos,
-                    world_pos,
-                    basis,
-                });
 
                 for vertex in vertices.iter() {
                     let abstract_vertex = Self::transform_vertex(transform, vertex);
@@ -455,39 +340,7 @@ impl World {
     /// `FieldSample`. The result is retained so tangent/view-only changes can rebuild renderables
     /// without reevaluating the field function itself.
     fn recompute_cached_field_data(&mut self) {
-        self.cached_scalar_values.clear();
-        self.cached_field_components.clear();
-        self.cached_field_vectors.clear();
-        match &self.field {
-            RuntimeField::Scalar(field) => {
-                self.cached_scalar_values.reserve(self.field_samples.len());
-                for sample in &self.field_samples {
-                    let value = field.at(Point {
-                        x: sample.abstract_pos.x,
-                        y: sample.abstract_pos.y,
-                        z: sample.abstract_pos.z,
-                    });
-                    self.cached_scalar_values.push(value);
-                }
-            }
-            RuntimeField::Vector(field) => {
-                self.cached_field_components.reserve(self.field_samples.len());
-                self.cached_field_vectors.reserve(self.field_samples.len());
-
-                for sample in &self.field_samples {
-                    let point = Point {
-                        x: sample.abstract_pos.x,
-                        y: sample.abstract_pos.y,
-                        z: sample.abstract_pos.z,
-                    };
-                    let vec_res = field.at(point);
-                    let vector_components = Vector3::new(vec_res.x, vec_res.y, vec_res.z);
-                    let world_vector = sample.vector_to_world(vector_components);
-                    self.cached_field_components.push(vector_components);
-                    self.cached_field_vectors.push(world_vector);
-                }
-            }
-        }
+        self.field_cache = FieldRenderCache::from_field(&self.field, &self.field_samples);
     }
 
     /// Rebuilds the current field renderables from the cached samples and tangent state.
@@ -503,110 +356,46 @@ impl World {
         self.render_field.reserve(self.field_samples.len());
         self.render_form_samples
             .reserve(self.tangent_space.dual_form_sample_capacity());
-        match self.field.clone() {
-            RuntimeField::Scalar(_) => self.rebuild_scalar_field_samples(),
-            RuntimeField::Vector(field) => {
-                self.rebuild_vector_render_field(&field);
+        match (&self.field, &self.field_cache) {
+            (RuntimeField::Scalar(_), FieldRenderCache::Scalar(values)) => {
+                let render = build_scalar_render(
+                    &self.field_samples,
+                    values,
+                    &self.tangent_space,
+                    SPHERE_SIZE * 0.55,
+                );
+                self.render_form_samples = render.samples;
+                self.legend = render.legend;
+            }
+            (
+                RuntimeField::Vector(field),
+                FieldRenderCache::Vector {
+                    components,
+                    world_vectors,
+                },
+            ) => {
+                self.render_field = build_vector_render(
+                    &self.field_samples,
+                    components,
+                    world_vectors,
+                    field,
+                    &self.tangent_space,
+                    VectorRenderConfig {
+                        normalize_field: self.normalize_field,
+                        anchor_point: self.anchor_point(),
+                    },
+                );
                 if self.tangent_space.show_form_samples() {
                     self.rebuild_dual_form_samples(self.anchor_dual_components());
                 }
             }
+            _ => {}
         }
     }
 
     /// Returns whether arrows should be rendered for the active field mode.
     fn show_vector_field(&self) -> bool {
         self.field.is_vector_like() && self.tangent_space.show_vector_field()
-    }
-
-    /// Rebuilds colored scalar samples from the cached scalar field values.
-    fn rebuild_scalar_field_samples(&mut self) {
-        if self.cached_scalar_values.is_empty() {
-            return;
-        }
-
-        let mut min_value = f64::INFINITY;
-        let mut max_value = f64::NEG_INFINITY;
-        for value in &self.cached_scalar_values {
-            if !value.is_finite() {
-                continue;
-            }
-            min_value = min_value.min(*value);
-            max_value = max_value.max(*value);
-        }
-
-        if !min_value.is_finite() || !max_value.is_finite() {
-            return;
-        }
-
-        for (sample, value) in self
-            .field_samples
-            .iter()
-            .zip(self.cached_scalar_values.iter().copied())
-        {
-            if !value.is_finite() {
-                continue;
-            }
-            let position = self
-                .tangent_space
-                .blend_position(sample.world_pos, sample.abstract_pos);
-            if !is_finite_vec3(&position) {
-                continue;
-            }
-            let color = sampled_value_color(value, min_value, max_value);
-            self.render_form_samples
-                .push(Sphere::from_rgba(position, color, SPHERE_SIZE * 0.55));
-        }
-
-        self.legend = Some(LegendState {
-            kind: LegendKind::ScalarField,
-            min_value,
-            max_value,
-        });
-    }
-
-    /// Rebuilds arrow renderables for the active vector-like field mode.
-    fn rebuild_vector_render_field(&mut self, field: &VectorField) {
-        let anchor_point = self.anchor_point();
-
-        for ((sample, field_components), world_vector) in self
-            .field_samples
-            .iter()
-            .zip(self.cached_field_components.iter().copied())
-            .zip(self.cached_field_vectors.iter().copied())
-        {
-            let tangent_field_components = anchor_point.and_then(|anchor| {
-                self.tangent_space
-                    .abstract_delta(sample.abstract_pos)
-                    .map(|delta| Self::field_linearized_components_at(field, anchor, delta))
-            });
-            let tangent_components = self
-                .tangent_space
-                .blend_field_components(field_components, tangent_field_components);
-            let render_position = self
-                .tangent_space
-                .blend_position(sample.world_pos, sample.abstract_pos);
-            let mut render_vector = self
-                .tangent_space
-                .blend_vector(world_vector, tangent_components);
-
-            if !is_finite_vec3(&render_position) || !is_finite_vec3(&render_vector) {
-                continue;
-            }
-
-            if self.normalize_field {
-                let magnitude = render_vector.norm();
-                if magnitude > 1e-6 {
-                    render_vector /= magnitude;
-                }
-            }
-
-            self.render_field.push(RenderVField::new(
-                render_position,
-                render_vector,
-                Vector4::new(1.0, 1.0, 0.0, 1.0),
-            ));
-        }
     }
 
     /// Returns the projection matrix currently owned by the master renderer.
@@ -656,7 +445,10 @@ impl World {
     /// This is only available while tangent mode has a selected anchor point.
     fn anchor_dual_components(&self) -> Option<Vector3<f64>> {
         let point = self.anchor_point()?;
-        Some(Self::field_dual_components_at(self.field.as_vector()?, point))
+        Some(Self::field_dual_components_at(
+            self.field.as_vector()?,
+            point,
+        ))
     }
 
     /// Returns the current tangent anchor as a scalar `Point`.
@@ -685,32 +477,12 @@ impl World {
         let field_res = field.dual_at(point);
         Vector3::new(field_res.x, field_res.y, field_res.z)
     }
-
-    /// Evaluates the first-order field approximation around an anchor point.
-    ///
-    /// The supplied `local_delta` is interpreted in abstract coordinates relative to the
-    /// anchor.
-    fn field_linearized_components_at(
-        field: &VectorField,
-        anchor: Point,
-        local_delta: Vector3<f64>,
-    ) -> Vector3<f64> {
-        let field_res = field.linearized_at(
-            anchor,
-            Point {
-                x: local_delta.x,
-                y: local_delta.y,
-                z: local_delta.z,
-            },
-        );
-        Vector3::new(field_res.x, field_res.y, field_res.z)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::AppliedConfig;
     use super::World;
+    use crate::app::applied_config::AppliedConfig;
     use crate::app::ui::{FieldKind, GridUiState};
     use crate::maths::differential::Form;
     use crate::maths::field::VectorField;
@@ -770,7 +542,7 @@ mod tests {
         let parse = |expr: &str| Parser::default().parse(expr).unwrap();
         let space = Space::new(parse("x + 2y"), parse("3y + z"), parse("4z"));
         let field = VectorField::from_otn(
-            Form::new(vec![parse("1"), parse("0"), parse("0")], 1),
+            Form::new_otn(vec![parse("1"), parse("0"), parse("0")], 1),
             &space,
         );
         let point = Point {
