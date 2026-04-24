@@ -2,10 +2,10 @@ use mathhook_core::Parser;
 use nalgebra::{vector, Vector3};
 use render_engine::app::coords_sys::CoordsSys;
 use render_engine::maths::differential::Form;
+use render_engine::maths::expr_to_fastexpr3d;
 use render_engine::maths::field::VectorField;
 use render_engine::maths::space::Space;
-use render_engine::maths::expr_to_fastexpr3d;
-use render_engine::maths::Point;
+use render_engine::maths::{ExternalDerivative, Point};
 
 const EPS: f64 = 1.0e-6;
 
@@ -108,7 +108,7 @@ fn eval_otn_vector_matches_expected_spherical_basis_at_y_axis() {
 fn vector_field_from_otn_evaluates_component_expressions() {
     let space = Space::new(parse("x"), parse("y"), parse("z"));
     let field = VectorField::from_otn(
-        Form::new(vec![parse("x + 1"), parse("2*y"), parse("z - 3")], 1),
+        Form::new_otn(vec![parse("x + 1"), parse("2*y"), parse("z - 3")], 1),
         &space,
     );
 
@@ -192,7 +192,7 @@ fn vector_field_dual_at_matches_dual_component_expressions() {
 fn vector_field_linearized_at_keeps_constant_field_constant() {
     let space = Space::new(parse("x"), parse("y"), parse("z"));
     let field = VectorField::from_otn(
-        Form::new(vec![parse("1"), parse("1"), parse("1")], 1),
+        Form::new_otn(vec![parse("1"), parse("1"), parse("1")], 1),
         &space,
     );
 
@@ -218,7 +218,7 @@ fn vector_field_linearized_at_keeps_constant_field_constant() {
 fn vector_field_linearized_at_matches_affine_field_exactly() {
     let space = Space::new(parse("x"), parse("y"), parse("z"));
     let field = VectorField::from_otn(
-        Form::new(vec![parse("x + 2*y"), parse("3 - y"), parse("z - 4*x")], 1),
+        Form::new_otn(vec![parse("x + 2*y"), parse("3 - y"), parse("z - 4*x")], 1),
         &space,
     );
     let anchor = Point {
@@ -248,7 +248,7 @@ fn vector_field_linearized_at_matches_affine_field_exactly() {
 fn vector_field_dual_at_preserves_all_scaled_components() {
     let space = Space::new(parse("2*x"), parse("3*y"), parse("4*z"));
     let field = VectorField::from_otn(
-        Form::new(vec![parse("1"), parse("2"), parse("3")], 1),
+        Form::new_otn(vec![parse("1"), parse("2"), parse("3")], 1),
         &space,
     );
 
@@ -280,10 +280,30 @@ fn gradient_from_scalar_matches_cartesian_derivatives() {
 }
 
 #[test]
+fn gradient_from_scalar_matches_spherical_radial_gradient() {
+    let space = Space::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+    let field = VectorField::gradient_from_scalar(parse("x*x"), &space);
+
+    let result = field.at(Point {
+        x: 2.0,
+        y: 0.7,
+        z: 1.1,
+    });
+
+    assert_close(result.x, 4.0, "spherical radial gradient x component");
+    assert_close(result.y, 0.0, "spherical radial gradient y component");
+    assert_close(result.z, 0.0, "spherical radial gradient z component");
+}
+
+#[test]
 fn curl_from_otn_matches_cartesian_curl() {
     let space = Space::new(parse("x"), parse("y"), parse("z"));
     let field = VectorField::curl_from_otn(
-        Form::new(vec![parse("-y"), parse("x"), parse("0")], 1),
+        Form::new_otn(vec![parse("-y"), parse("x"), parse("0")], 1),
         &space,
     );
 
@@ -299,8 +319,58 @@ fn curl_from_otn_matches_cartesian_curl() {
 }
 
 #[test]
+fn curl_from_otn_radial_spherical_field_is_zero() {
+    let space = Space::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+    let field = VectorField::curl_from_otn(
+        Form::new_otn(vec![parse("x"), parse("0"), parse("0")], 1),
+        &space,
+    );
+
+    let result = field.at(Point {
+        x: 2.0,
+        y: 0.7,
+        z: 1.1,
+    });
+
+    assert_close(result.x, 0.0, "spherical radial curl x component");
+    assert_close(result.y, 0.0, "spherical radial curl y component");
+    assert_close(result.z, 0.0, "spherical radial curl z component");
+}
+
+#[test]
+fn curl_from_otn_spherical_y_ex_matches_metric_scaled_derivative() {
+    let space = Space::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+    let field = VectorField::curl_from_otn(
+        Form::new_otn(vec![parse("y"), parse("0"), parse("0")], 1),
+        &space,
+    );
+
+    let result = field.at(Point {
+        x: 2.0,
+        y: 0.7,
+        z: 1.1,
+    });
+
+    assert_close(result.x, 0.0, "spherical y ex curl x component");
+    assert_close(result.y, 0.0, "spherical y ex curl y component");
+    assert_close(
+        result.z,
+        -1.0 / (2.0 * 1.1f64.sin()),
+        "spherical y ex curl z component",
+    );
+}
+
+#[test]
 fn hodge_star_otn_3d_maps_basis_forms() {
-    let one_form = Form::new(vec![parse("1"), parse("2"), parse("3")], 1).hodge_star_otn_3d();
+    let one_form = Form::new_otn(vec![parse("1"), parse("2"), parse("3")], 1).hodge_star_otn_3d();
 
     assert_eq!(one_form.n_forms(), 2);
     assert_close(
@@ -319,7 +389,7 @@ fn hodge_star_otn_3d_maps_basis_forms() {
         "star one-form zx component",
     );
 
-    let two_form = Form::new(vec![parse("5"), parse("7"), parse("11")], 2).hodge_star_otn_3d();
+    let two_form = Form::new_otn(vec![parse("5"), parse("7"), parse("11")], 2).hodge_star_otn_3d();
 
     assert_eq!(two_form.n_forms(), 1);
     assert_close(
@@ -340,24 +410,26 @@ fn hodge_star_otn_3d_maps_basis_forms() {
 }
 
 #[test]
+#[should_panic(expected = "d expects a Natural form")]
+fn d_rejects_otn_forms() {
+    let mut form = Form::new_otn(vec![parse("x"), parse("0"), parse("0")], 1);
+
+    form.d();
+}
+
+#[test]
+#[should_panic(expected = "hodge_star_otn_3d expects a Orthonormal form")]
+fn hodge_star_otn_rejects_natural_forms() {
+    Form::new(vec![parse("1"), parse("0"), parse("0")], 1).hodge_star_otn_3d();
+}
+
+#[test]
 fn two_form_to_otn_base_handles_scaled_orthogonal_metric() {
     let space = Space::new(parse("2*x"), parse("3*y"), parse("4*z"));
     let transformed = Form::new(vec![parse("1"), parse("0"), parse("0")], 2).to_otn_base(&space);
     let eval = |index| expr_to_fastexpr3d(transformed.get_expr(index).clone())(0.0, 0.0, 0.0);
 
-    assert_close(
-        eval(0),
-        1.0 / 6.0,
-        "transformed xy component",
-    );
-    assert_close(
-        eval(1),
-        0.0,
-        "transformed yz component",
-    );
-    assert_close(
-        eval(2),
-        0.0,
-        "transformed zx component",
-    );
+    assert_close(eval(0), 1.0 / 6.0, "transformed xy component");
+    assert_close(eval(1), 0.0, "transformed yz component");
+    assert_close(eval(2), 0.0, "transformed zx component");
 }

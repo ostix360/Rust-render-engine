@@ -1,4 +1,4 @@
-use crate::maths::differential::Form;
+use crate::maths::differential::{Form, FormBasis};
 use crate::maths::space::Space;
 use crate::maths::{derivate, expr_to_fastexpr3d, Expr, ExternalDerivative, FastExpr3d, Point};
 use crate::toolbox::logging::LOGGER;
@@ -45,6 +45,9 @@ impl VectorField {
         if expr.n_forms() != 1 {
             LOGGER.error("Vector field must be built from a 1-form");
         }
+        if expr.basis() != FormBasis::Natural {
+            panic!("VectorField::new expects a natural-basis 1-form");
+        }
         let dual_expr = expr;
         let otn_expr = dual_expr.to_otn_base(space);
         let fast_dual_expr = Self::compile_fast_expr(&dual_expr);
@@ -72,6 +75,9 @@ impl VectorField {
                 )
                 .as_str(),
             );
+        }
+        if expr.basis() != FormBasis::Orthonormal {
+            panic!("VectorField::from_otn expects an orthonormal-basis 1-form");
         }
         let otn_expr = expr;
         let dual_expr = otn_expr.to_dual_base(space);

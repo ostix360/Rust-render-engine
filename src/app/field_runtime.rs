@@ -32,7 +32,10 @@ impl RuntimeField {
                     state.field.y.eq.clone(),
                     state.field.z.eq.clone(),
                 ];
-                RuntimeField::Vector(VectorField::curl_from_otn(Form::new(field_eqs, 1), space))
+                RuntimeField::Vector(VectorField::curl_from_otn(
+                    Form::new_otn(field_eqs, 1),
+                    space,
+                ))
             }
         }
     }
@@ -54,5 +57,5 @@ impl RuntimeField {
 /// Builds the runtime vector field from UI equations in the current active coordinates.
 fn build_vector_field(field: &SpacialEqs, grid: &Grid) -> VectorField {
     let field_eqs = vec![field.x.eq.clone(), field.y.eq.clone(), field.z.eq.clone()];
-    VectorField::from_otn(Form::new(field_eqs, 1), grid.get_coords().get_space())
+    VectorField::from_otn(Form::new_otn(field_eqs, 1), grid.get_coords().get_space())
 }

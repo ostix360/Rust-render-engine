@@ -232,7 +232,7 @@ pub fn to_nn_vec(v: [f32; 3]) -> Result<Vector3<NonNaN<f32>>, &'static str> {
     ))
 }
 
-trait Hodge {
+pub trait Hodge {
     /// Computes the Hodge dual of the implementing value with respect to the supplied metric.
     ///
     /// Implementations are expected to preserve the basis conventions used across the `maths`
@@ -240,7 +240,7 @@ trait Hodge {
     fn hodge_star(&self, metric: &Metric) -> Self;
 }
 
-trait ExternalDerivative {
+pub trait ExternalDerivative {
     /// Computes the exterior derivative of the implementing value.
     ///
     /// Implementations follow the differential-form conventions established in this module.
