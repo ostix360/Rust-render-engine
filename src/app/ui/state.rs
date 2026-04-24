@@ -82,6 +82,34 @@ pub enum LegendKind {
     DualTangent,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LegendDescriptor {
+    pub window_title: &'static str,
+    pub title: &'static str,
+    pub subtitle: &'static str,
+    pub footer: &'static str,
+}
+
+impl LegendKind {
+    /// Returns the static UI copy associated with this legend source.
+    pub fn descriptor(self) -> LegendDescriptor {
+        match self {
+            Self::ScalarField => LegendDescriptor {
+                window_title: "Scalar Field Legend",
+                title: "Scalar Field Legend",
+                subtitle: "Sampled field values over the current grid",
+                footer: "Visible when rendering the base scalar field.",
+            },
+            Self::DualTangent => LegendDescriptor {
+                window_title: "Dual Tangent Legend",
+                title: "Dual Tangent Legend",
+                subtitle: "alpha(v) over the sampled dual-space lattice",
+                footer: "Visible only in dual tangent mode: Ctrl+T.",
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LegendState {
     pub kind: LegendKind,
