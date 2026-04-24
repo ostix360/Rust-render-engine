@@ -18,9 +18,11 @@ tree is not clean.
 
 - `rtk cargo test -- --skip test_logger` passes.
 - Result: 117 tests passed, 2 tests filtered out.
-- Current warnings are still present for unused projection/tangent helpers and
-  one unused `VectorRenderConfig::anchor_point` field.
-- No graphical `cargo run` smoke test was performed for this status snapshot.
+- `rtk cargo clippy --all-targets` completes with 0 errors and 69 warnings.
+- Current compiler warnings are still present for unused projection/tangent
+  helpers.
+- `rtk cargo run` starts the OpenGL demo, reports OpenGL 3.3.0 NVIDIA
+  580.126.20, and exits cleanly after the window closes.
 
 ## Main Capabilities
 
@@ -38,9 +40,16 @@ tree is not clean.
 
 - `src/main.rs` creates the OpenGL window, starts the control UI, owns the
   camera, and drives the main update/render loop.
-- `src/app/world.rs` is the runtime orchestration point. It consumes UI changes,
-  applies config diffs, refreshes caches, advances tangent state, and dispatches
-  render data.
+- `src/app/world.rs` defines the runtime world facade and owned render-thread
+  state.
+- `src/app/world/apply.rs` consumes validated UI changes and applies config
+  diffs.
+- `src/app/world/frame.rs` advances per-frame tangent/input state, dispatches
+  rendering, and syncs overlay metadata back to the UI.
+- `src/app/world/grid_cache.rs` builds grid-derived world/abstract sample
+  caches.
+- `src/app/world/field_rendering.rs` rebuilds cached field values and
+  renderable field/dual-form overlays.
 - `src/app/applied_config.rs` stores comparable UI snapshots and computes which
   runtime caches need rebuilding.
 - `src/app/field_runtime.rs` builds the active scalar/vector runtime field from
@@ -61,23 +70,15 @@ tree is not clean.
 
 ## Current Working Tree
 
-The repository has uncommitted changes. Important tracked edits include:
+The repository has uncommitted changes. Current tracked edits include:
 
-- `Cargo.toml`
-- `src/app/applied_config.rs`
-- `src/app/field_render.rs`
-- `src/app/field_runtime.rs`
-- `src/app/tangent_space.rs`
-- `src/app/ui/legend.rs`
-- `src/app/ui/state.rs`
-- `src/app/world.rs`
-- `src/maths/differential.rs`
-- `src/maths/field.rs`
-- `src/render/grid_shader.rs`
-- `src/res/shader/grid.vert`
-- `src/res/shader/grid_edit.vert`
-- `tests/coords_field_tests.rs`
-- `tests/matrix_tests.rs`
+- staged `AGENTS.md` changes that predate this refactor pass.
+- unstaged readability refactor changes in `src/app/world.rs` and
+  `src/app/world/`.
+- unstaged cleanup in `src/app/field_render.rs` removing an unused
+  `VectorRenderConfig` field.
+- unstaged narrow Clippy suppression in `src/app/ui/state.rs` for intentional
+  UI shorthand constants `3.14` and `6.28`.
 
 There are also untracked agent/editor/tooling files in the repository root.
 Those appear unrelated to the render-engine runtime itself.
@@ -88,21 +89,27 @@ Those appear unrelated to the render-engine runtime itself.
   the crate portable, but fresh builds still need network access or a populated
   Cargo git cache.
 - The test suite passes, but the current warnings show stale or partially unused
-  API surfaces that should either be wired back in or removed intentionally.
+  projection/tangent API surfaces that should either be wired back in or removed
+  intentionally.
+- `GridWorld::ray_cast` currently selects the nearest candidate relative to the
+  ray origin after a radius hit. That may be wrong for later ray steps and
+  should be reviewed with a targeted regression before changing behavior.
+- The general `Hodge::hodge_star` implementation for `Form` still delegates to
+  `todo!()`. Runtime curl/dual behavior uses `hodge_star_otn_3d`, but direct
+  calls to the trait method will panic until implemented.
 - Runtime rendering behavior was not visually smoke-tested in this snapshot, so
   OpenGL/window-specific regressions are not ruled out by the test command alone.
-- The working tree contains broad refactor-sized edits. Review should separate
-  runtime behavior changes from documentation/tooling noise before committing.
+- The working tree contains both staged instruction-file changes and unstaged
+  runtime refactor edits. Keep those separate when committing.
 
 ## Suggested Next Steps
 
-1. Restore portable `mathhook` dependencies, either with git dependencies or a
-   repository-relative path layout.
-2. Run `rtk cargo run` or `rtk cargo run --release` to smoke-test the render
-   window after the current runtime changes.
-3. Decide whether the unused projection/tangent helpers are future-facing API or
+1. Add a targeted `GridWorld::ray_cast` regression before changing its candidate
+   selection from ray-origin distance to query-point distance.
+2. Decide whether the unused projection/tangent helpers are future-facing API or
    dead code, then either wire them in or annotate/remove them.
+3. Implement or explicitly deprecate the unused `Hodge::hodge_star` trait path.
 4. Review the untracked root tooling files and keep only the ones intended for
    the repository.
-5. Split any large commit into focused changes: dependency portability, field
-   render/cache refactor, tangent-space behavior, tests, and docs/status.
+5. Split any commit into focused changes: staged instruction updates, world
+   readability refactor, lint cleanup, and status documentation.

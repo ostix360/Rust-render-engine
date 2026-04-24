@@ -124,6 +124,7 @@ impl GridUiState {
     /// operate in that domain. The runtime grid builder, however, expects stable snapped values
     /// so cache keys and segment generation do not drift across frames. The special handling for
     /// `3.14` and `6.28` preserves the common `PI` and `2*PI` intent from the UI.
+    #[allow(clippy::approx_constant)]
     pub fn approximate_grid_config(&self) -> GridConfig {
         let normalize_bound = |value: f64| match value {
             value if value == 3.14 => PI,
@@ -170,6 +171,7 @@ impl Default for GridUiState {
     /// field without any UI interaction. `apply_counter` starts at zero and is only bumped after
     /// validation succeeds, which lets the render thread cheaply detect committed edits without
     /// reacting to every intermediate keystroke.
+    #[allow(clippy::approx_constant)]
     fn default() -> Self {
         Self {
             render_3d: true,
@@ -212,6 +214,7 @@ mod tests {
     use super::{ControlTab, FieldKind, GridUiState};
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn grid_ui_state_defaults_match_expected_values() {
         let state = GridUiState::default();
 

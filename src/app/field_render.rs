@@ -77,7 +77,6 @@ pub struct ScalarRender {
 
 pub struct VectorRenderConfig {
     pub normalize_field: bool,
-    pub anchor_point: Option<Point>,
 }
 
 /// Returns whether every component of the vector is finite.
