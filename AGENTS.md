@@ -1,36 +1,44 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/main.rs` bootstraps the engine, assembles the camera, shaders, and render loop.
-- Rendering logic lives in `src/render/`, asset wrappers in `src/graphics/`, math and camera helpers in `src/maths/` and `src/toolbox/`.
-- OpenGL shaders and resources are bundled under `src/res/` and embedded via `include_dir`.
-- Integration tests reside in `tests/`; runtime artifacts compile to `target/`.
+
+`src/main.rs` starts the GLFW/OpenGL demo, spawns the egui control window, and drives the render loop. Runtime application state lives in `src/app/`, including world orchestration, UI state, field runtime code, and tangent-space behavior. Rendering code is under `src/render/`, OpenGL wrappers and camera/input helpers are under `src/toolbox/`, math and differential-geometry logic is under `src/maths/`, and model wrappers live in `src/graphics/`. GLSL shaders and embedded assets are stored in `src/res/`. Integration tests belong in `tests/*.rs`.
 
 ## Build, Test, and Development Commands
-- `cargo build` compiles the engine and validates dependencies.
-- `cargo run --release` launches the demo window with optimized settings; use `cargo run` during iterative debugging.
-- `cargo test` executes the integration suites in `tests/`; add `-- --nocapture` to view println output.
-- `mathhook` and `mathhook-core` are configured as git dependencies in `Cargo.toml`; fresh builds need network access or a populated Cargo git cache.
-- `cargo fmt` enforces standard Rust formatting before submitting changes.
+
+- `cargo build`: compile the engine and validate dependencies.
+- `cargo run`: launch the interactive demo in debug mode.
+- `cargo run --release`: launch the optimized demo for smoother rendering checks.
+- `cargo test`: run unit and integration tests.
+- `cargo test -- --nocapture`: run tests while showing test output.
+- `cargo fmt`: format Rust code before committing.
+
+`mathhook` and `mathhook-core` are git dependencies in `Cargo.toml`; fresh checkouts need network access or a populated Cargo git cache.
 
 ## Coding Style & Naming Conventions
-- Follow Rust’s default style: four-space indentation, `snake_case` for functions/modules, `CamelCase` for types, and `SCREAMING_SNAKE_CASE` constants.
-- Keep modules small and group OpenGL bindings under `toolbox::opengl`; new shader uniforms should mirror the pattern in `src/render/classic_shader.rs`.
-- Document non-obvious math with brief inline comments; prefer nalgebra abstractions (`Matrix4`, `UnitQuaternion`) over manual arrays.
+
+Follow standard Rust formatting: four-space indentation, `snake_case` for functions/modules, `CamelCase` for types, and `SCREAMING_SNAKE_CASE` for constants. Prefer small modules with clear ownership boundaries. Keep OpenGL bindings grouped under `toolbox::opengl`, and mirror existing shader-uniform patterns in `src/render/grid_shader.rs` and `src/render/classic_shader.rs`. Document non-obvious math or cache invalidation rules with short comments.
+
+Everything done in `grid.vert` should be done in `grid_edit.vert`.
+
+Files should remain small to make it easier to review.
 
 ## Testing Guidelines
-- Place integration tests in `tests/*.rs` (see `tests/matrix_tests.rs`, `tests/trig_tests.rs`); reuse existing fixtures and avoid window creation where possible.
-- Gate numerical assertions with tolerances (`assert!((a - b).abs() < 1e-6)`) when comparing floating-point results.
-- Run `cargo test` locally before publishing to ensure GPU-free logic (camera, matrix math, parsers) remains stable.
+
+Use Rust’s built-in test framework. Put integration coverage in `tests/`, with descriptive names such as `matrix_tests.rs` or `coords_field_tests.rs`. Avoid opening windows in tests; focus on GPU-free logic like coordinate transforms, field evaluation, camera matrices, and parser validation. Use tolerances for floating-point assertions, for example `assert!((actual - expected).abs() < 1e-6)`.
 
 ## Commit & Pull Request Guidelines
-- Write commit subjects in imperative mood (`Add camera orbit control`) with optional scope tags when helpful.
-- Reference related issues in the body using `Closes #nn` and summarize behavior changes.
-- Pull requests should list testing performed (`cargo run`, `cargo test`), describe rendering impacts, and attach screenshots or logs when the output changes visibly.
-- Keep PRs focused: separate large refactors from feature work to simplify reviews.
+
+Use imperative commit subjects, for example `Add matrix transform regression tests`. Keep commits focused by responsibility: math behavior, rendering changes, UI changes, tests, or docs. Pull requests should summarize behavior changes, list commands run, link issues with `Closes #nn` when relevant, and include screenshots or logs for visible rendering changes.
+
+Mark you as co-author of the commit
 
 ## Shader & Asset Notes
-- Store GLSL assets under `src/res/shader/`; match uniform names with the Rust-side loaders before shipping.
-- Update the VAO/VBO bindings when adding vertex attributes and document the layout alongside the shader changes.
+
+Store GLSL files in `src/res/shader/`. When adding vertex attributes or uniforms, update both the shader and Rust-side loader code, and document any layout assumptions near the relevant renderer.
+
+## At the end
+
+`PROJECT_STATUS.md` should be updated with the current status of the project.
 
 @RTK.md
