@@ -21,8 +21,8 @@ egui = "0.34.1"
 eframe = { version = "0.34.1", features = ["glow"] }
 winit = "0.30.13"
 kd-tree = { version="0.6.2", features = ["rayon"] }
-mathhook = { git = "https://github.com/ostix360/mathhook"}
-mathhook-core = { git = "https://github.com/ostix360/mathhook"}
+mathhook = { git = "https://github.com/ostix360/mathhook" }
+mathhook-core = { git = "https://github.com/ostix360/mathhook" }
 
 
 [dev-dependencies]
