@@ -1,4 +1,13 @@
 #![allow(unused)]
+//! Differential-form primitives used by scalar, vector, curl, and dual tangent rendering.
+//!
+//! Component ordering is fixed throughout this module:
+//! - 0-forms and 3-forms store one scalar expression.
+//! - 1-forms store `[dx, dy, dz]` components.
+//! - 2-forms store `[dx^dy, dy^dz, dz^dx]` components.
+//!
+//! Forms also carry the basis they are expressed in. `Natural` means the coordinate coframe,
+//! while `Orthonormal` means the local orthonormal tangent coframe derived from `Space`.
 
 use crate::maths::space::{Metric, Space};
 use crate::maths::{derivate, Expr, ExternalDerivative, Hodge};
@@ -7,11 +16,6 @@ use mathhook::prelude::expr;
 use mathhook_core::matrices::{Matrix, MatrixOperations};
 use mathhook_core::{Expression, Simplify};
 use std::ops::{Add, Mul, Sub};
-
-/// Conventions:
-/// exprs contains the expression in front of each dx, dx^dy ... and only one expr if it's 0-form or 3-form
-/// if it's a 1-form the order is dx, dy, dz
-/// if it's a 2-form the order is dx^dy, dy^dz, dz^dx
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FormBasis {
@@ -69,8 +73,10 @@ impl Form {
         }
     }
 
-    /// This square function has a sense only for a 1-form and calculates the square of the 1 form treated like a simple expression
-    /// Return a vec of expr containing is this order dx^2 dxdy dy^2 dxdz dydz dz^2
+    /// Computes the symmetric square terms of a 1-form.
+    ///
+    /// The result is ordered for metric construction as
+    /// `[dx^2, 2 dx dy, dy^2, 2 dx dz, 2 dy dz, dz^2]`.
     pub fn square(&self) -> Vec<Expr> {
         if self.n_forms != 1 {
             panic!("Square only works for 1-form")

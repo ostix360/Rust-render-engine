@@ -1,3 +1,10 @@
+//! Scalar and vector field runtime representations.
+//!
+//! Field values are stored symbolically for basis conversion and compiled into numeric closures
+//! for per-frame sampling. Vector fields keep both dual-basis and orthonormal-tangent-basis
+//! representations because geometric tangent view, dual tangent view, gradient, and curl render
+//! paths need different bases.
+
 use crate::maths::differential::{Form, FormBasis};
 use crate::maths::space::Space;
 use crate::maths::{derivate, expr_to_fastexpr3d, Expr, ExternalDerivative, FastExpr3d, Point};

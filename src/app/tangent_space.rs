@@ -185,7 +185,10 @@ struct DiveState {
 }
 
 impl DiveState {
-    /// Creates a new `DiveState`.
+    /// Creates a new `DiveState` in ordinary world mode.
+    ///
+    /// No anchor or camera endpoints are captured until the user requests a tangent dive over a
+    /// picked grid sample.
     fn new() -> Self {
         Self {
             mode: DiveMode::World,
@@ -277,7 +280,10 @@ pub struct TangentSpace {
 }
 
 impl TangentSpace {
-    /// Creates a new `TangentSpace`.
+    /// Creates a new tangent-space controller.
+    ///
+    /// The controller starts in world mode and uses the default geometric patch and arrow scales
+    /// until live UI settings overwrite them during `World::update`.
     pub fn new() -> Self {
         Self {
             hovered_sample: None,

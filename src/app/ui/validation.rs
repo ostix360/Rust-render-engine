@@ -11,6 +11,10 @@ pub(crate) struct ValidatedUiState {
 }
 
 /// Validates and reparses every editable equation in the UI state before apply.
+///
+/// Only equations that can affect the active render mode are reparsed. Inactive scalar/vector
+/// fields keep their previous parsed expression so the user can switch modes without losing a
+/// temporarily invalid draft in the hidden section.
 pub(crate) fn validate_ui_state(state: &GridUiState) -> Result<ValidatedUiState, String> {
     let coord_x = validate_equation("Coordinate x", &state.coords_sys.x.eq_str);
     let coord_y = validate_equation("Coordinate y", &state.coords_sys.y.eq_str);

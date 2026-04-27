@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-04-24
+Generated: 2026-04-27
 
 ## Summary
 
@@ -11,18 +11,16 @@ publishes validated grid and field settings through shared UI state, while the
 render thread owns OpenGL resources, cached geometry, field samples, tangent
 state, and rendering.
 
-The current checkout builds and the test suite passes locally, but the working
-tree is not clean.
+The current checkout builds and the test suite passes locally. The working tree
+contains the current documentation pass plus unrelated untracked root files.
 
 ## Current Verification
 
 - `rtk cargo test -- --skip test_logger` passes.
 - Result: 117 tests passed, 2 tests filtered out.
-- `rtk cargo clippy --all-targets` completes with 0 errors and 69 warnings.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
-- `rtk cargo run` starts the OpenGL demo, reports OpenGL 3.3.0 NVIDIA
-  580.126.20, and exits cleanly after the window closes.
+- `rtk cargo fmt` completed successfully after the documentation update.
 
 ## Main Capabilities
 
@@ -72,13 +70,11 @@ tree is not clean.
 
 The repository has uncommitted changes. Current tracked edits include:
 
-- staged `AGENTS.md` changes that predate this refactor pass.
-- unstaged readability refactor changes in `src/app/world.rs` and
-  `src/app/world/`.
-- unstaged cleanup in `src/app/field_render.rs` removing an unused
-  `VectorRenderConfig` field.
-- unstaged narrow Clippy suppression in `src/app/ui/state.rs` for intentional
-  UI shorthand constants `3.14` and `6.28`.
+- unstaged documentation improvements in `src/maths/differential.rs`,
+  `src/maths/field.rs`, `src/maths/space.rs`, `src/app/field_render.rs`,
+  `src/app/field_runtime.rs`, `src/app/tangent_space.rs`, and
+  `src/app/ui/validation.rs`.
+- unstaged `PROJECT_STATUS.md` updates for the current documentation pass.
 
 There are also untracked agent/editor/tooling files in the repository root.
 Those appear unrelated to the render-engine runtime itself.
@@ -97,10 +93,11 @@ Those appear unrelated to the render-engine runtime itself.
 - The general `Hodge::hodge_star` implementation for `Form` still delegates to
   `todo!()`. Runtime curl/dual behavior uses `hodge_star_otn_3d`, but direct
   calls to the trait method will panic until implemented.
-- Runtime rendering behavior was not visually smoke-tested in this snapshot, so
-  OpenGL/window-specific regressions are not ruled out by the test command alone.
-- The working tree contains both staged instruction-file changes and unstaged
-  runtime refactor edits. Keep those separate when committing.
+- Runtime rendering behavior was not visually smoke-tested in this snapshot.
+  This pass only changed comments and rustdoc, so OpenGL/window-specific
+  behavior was not rechecked.
+- The working tree contains documentation edits and unrelated untracked root
+  files. Keep those separate when committing.
 
 ## Suggested Next Steps
 

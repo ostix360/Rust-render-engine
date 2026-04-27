@@ -1,3 +1,9 @@
+//! Coordinate-space metric and basis conversion helpers.
+//!
+//! `Space` derives a symbolic metric from the coordinate embedding and stores the vielbein
+//! matrices used to move differential forms between the natural coordinate coframe and the
+//! orthonormal tangent coframe.
+
 use crate::maths::differential::Form;
 use crate::maths::{Expr, ExternalDerivative};
 use mathhook_core::matrices::{Matrix, MatrixOperations};

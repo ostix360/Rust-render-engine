@@ -32,6 +32,11 @@ pub enum FieldRenderCache {
 
 impl FieldRenderCache {
     /// Evaluates the active runtime field at all cached samples.
+    ///
+    /// Scalar caches store only the sampled value. Vector caches store both the field components
+    /// in the local orthonormal tangent basis and the same vector expanded into world-space
+    /// directions, because tangent blending needs the former and regular rendering needs the
+    /// latter.
     pub fn from_field(field: &RuntimeField, samples: &[FieldSample]) -> Self {
         match field {
             RuntimeField::Scalar(field) => {
@@ -84,6 +89,10 @@ pub fn is_finite_vec3(vector: &Vector3<f64>) -> bool {
     vector.x.is_finite() && vector.y.is_finite() && vector.z.is_finite()
 }
 
+/// Normalizes a vector when it has a stable non-zero magnitude.
+///
+/// Zero, near-zero, and non-finite vectors are returned unchanged so callers can apply their
+/// usual finite-value filtering without introducing `NaN` components here.
 fn normalized_or_original(vector: Vector3<f64>) -> Vector3<f64> {
     let magnitude = vector.norm();
     if magnitude > 1.0e-6 && magnitude.is_finite() {
@@ -94,6 +103,10 @@ fn normalized_or_original(vector: Vector3<f64>) -> Vector3<f64> {
 }
 
 /// Builds colored scalar sample spheres and their legend.
+///
+/// The scalar range is computed only from finite samples currently visible in the active tangent
+/// patch. This keeps the legend aligned with what is actually rendered instead of stale hidden
+/// samples outside the local view.
 pub fn build_scalar_render(
     samples: &[FieldSample],
     values: &[f64],
@@ -149,6 +162,10 @@ pub fn build_scalar_render(
 }
 
 /// Builds vector-field arrow renderables from cached field values.
+///
+/// The function filters samples through the tangent-space locality rules, optionally normalizes
+/// both cached component and world vectors, then blends positions and directions into the active
+/// tangent representation.
 pub fn build_vector_render(
     samples: &[FieldSample],
     components: &[Vector3<f64>],
