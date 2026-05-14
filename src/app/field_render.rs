@@ -8,6 +8,10 @@ use crate::app::ui::{LegendKind, LegendState};
 use crate::graphics::model::{RenderVField, Sphere};
 use crate::maths::Point;
 use nalgebra::{Vector3, Vector4};
+use std::f64::consts::TAU;
+
+const EM_TIME_NORMALIZATION_STEPS: usize = 32;
+const MIN_NORMALIZATION_AMPLITUDE: f64 = 1.0e-6;
 
 #[derive(Clone)]
 pub struct FieldSample {
@@ -82,7 +86,12 @@ pub struct ScalarRender {
 }
 
 pub struct VectorRenderConfig {
-    pub normalize_field: bool,
+    pub normalization: VectorNormalization,
+}
+
+pub enum VectorNormalization {
+    None,
+    Unit,
 }
 
 pub struct EmRenderCache {
@@ -98,7 +107,12 @@ pub struct CachedVectorLayer {
 }
 
 impl EmRenderCache {
-    pub fn from_runtime(runtime: &EmRuntime, samples: &[FieldSample], time: f64) -> Self {
+    pub fn from_runtime(
+        runtime: &EmRuntime,
+        samples: &[FieldSample],
+        time: f64,
+        normalize_vectors_by_time: bool,
+    ) -> Self {
         let layers = runtime.active_layers();
         let mut phi = layers
             .scalar_potential
@@ -123,16 +137,37 @@ impl EmRenderCache {
                 phi.push(runtime.phi_at(point, time));
             }
             if let Some(layer) = &mut electric {
-                layer.push(sample, runtime.electric_at(point, time));
+                let component = runtime.electric_at(point, time);
+                let scale = normalize_vectors_by_time
+                    .then(|| {
+                        time_normalization_scale(sample, time, |time| {
+                            runtime.electric_at(point, time)
+                        })
+                    })
+                    .unwrap_or(1.0);
+                layer.push_scaled(sample, component, scale);
             }
             if let Some(layer) = &mut magnetic {
-                layer.push(
-                    sample,
-                    runtime.magnetic_at(point, time) * runtime.magnetic_render_scale(),
-                );
+                let component = runtime.magnetic_at(point, time) * runtime.magnetic_render_scale();
+                let scale = normalize_vectors_by_time
+                    .then(|| {
+                        time_normalization_scale(sample, time, |time| {
+                            runtime.magnetic_at(point, time) * runtime.magnetic_render_scale()
+                        })
+                    })
+                    .unwrap_or(1.0);
+                layer.push_scaled(sample, component, scale);
             }
             if let Some(layer) = &mut vector_potential {
-                layer.push(sample, runtime.vector_potential_at(point, time));
+                let component = runtime.vector_potential_at(point, time);
+                let scale = normalize_vectors_by_time
+                    .then(|| {
+                        time_normalization_scale(sample, time, |time| {
+                            runtime.vector_potential_at(point, time)
+                        })
+                    })
+                    .unwrap_or(1.0);
+                layer.push_scaled(sample, component, scale);
             }
         }
 
@@ -153,9 +188,37 @@ impl CachedVectorLayer {
         }
     }
 
-    fn push(&mut self, sample: &FieldSample, component: Vector3<f64>) {
+    fn push_scaled(&mut self, sample: &FieldSample, component: Vector3<f64>, scale: f64) {
+        let component = component * scale;
         self.components.push(component);
         self.world_vectors.push(sample.vector_to_world(component));
+    }
+}
+
+fn time_normalization_scale(
+    sample: &FieldSample,
+    current_time: f64,
+    mut eval: impl FnMut(f64) -> Vector3<f64>,
+) -> f64 {
+    let mut max_amplitude: f64 = 0.0;
+    for step in 0..EM_TIME_NORMALIZATION_STEPS {
+        let progress = step as f64 / EM_TIME_NORMALIZATION_STEPS as f64;
+        let time = current_time + TAU * (progress - 0.5);
+        let world_vector = sample.vector_to_world(eval(time));
+        let magnitude = world_vector.norm();
+        if magnitude.is_finite() {
+            max_amplitude = max_amplitude.max(magnitude);
+        }
+    }
+    let current_magnitude = sample.vector_to_world(eval(current_time)).norm();
+    if current_magnitude.is_finite() {
+        max_amplitude = max_amplitude.max(current_magnitude);
+    }
+
+    if max_amplitude > MIN_NORMALIZATION_AMPLITUDE {
+        1.0 / max_amplitude
+    } else {
+        1.0
     }
 }
 
@@ -239,8 +302,8 @@ pub fn build_scalar_render(
 /// Builds vector-field arrow renderables from cached field values.
 ///
 /// The function filters samples through the tangent-space locality rules, optionally normalizes
-/// both cached component and world vectors, then blends positions and directions into the active
-/// tangent representation.
+/// cached component and world vectors according to the configured mode, then blends positions and
+/// directions into the active tangent representation.
 pub fn build_vector_render(
     samples: &[FieldSample],
     components: &[Vector3<f64>],
@@ -267,6 +330,7 @@ pub fn build_vector_render_with_color(
     color: Vector4<f64>,
 ) -> Vec<RenderVField> {
     let mut render_field = Vec::with_capacity(samples.len());
+    let mut pending_vectors = Vec::with_capacity(samples.len());
 
     for ((sample, field_components), world_vector) in samples
         .iter()
@@ -276,15 +340,12 @@ pub fn build_vector_render_with_color(
         if !tangent_space.contains_local_sample(sample.abstract_pos) {
             continue;
         }
-        let base_components = if config.normalize_field {
-            normalized_or_original(field_components)
-        } else {
-            field_components
-        };
-        let base_world_vector = if config.normalize_field {
-            normalized_or_original(world_vector)
-        } else {
-            world_vector
+        let (base_components, base_world_vector) = match config.normalization {
+            VectorNormalization::None => (field_components, world_vector),
+            VectorNormalization::Unit => (
+                normalized_or_original(field_components),
+                normalized_or_original(world_vector),
+            ),
         };
         // Tangent mode should display exact local samples, not a first-order approximation of
         // the field around the anchor. The previous linearization path made derived fields flip
@@ -297,13 +358,17 @@ pub fn build_vector_render_with_color(
             continue;
         }
 
-        if config.normalize_field {
+        if matches!(config.normalization, VectorNormalization::Unit) {
             let magnitude = render_vector.norm();
             if magnitude > 1e-6 {
                 render_vector /= magnitude;
             }
         }
 
+        pending_vectors.push((render_position, render_vector));
+    }
+
+    for (render_position, render_vector) in pending_vectors {
         render_field.push(RenderVField::new(render_position, render_vector, color));
     }
 
@@ -313,8 +378,8 @@ pub fn build_vector_render_with_color(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_scalar_render, build_vector_render_with_color, normalized_or_original, FieldSample,
-        VectorRenderConfig,
+        build_scalar_render, build_vector_render_with_color, normalized_or_original,
+        time_normalization_scale, FieldSample, VectorNormalization, VectorRenderConfig,
     };
     use crate::app::tangent_space::TangentSpace;
     use nalgebra::{vector, Vector3, Vector4};
@@ -351,7 +416,7 @@ mod tests {
             &[Vector3::new(1.0, 0.0, 0.0)],
             &tangent_space,
             VectorRenderConfig {
-                normalize_field: false,
+                normalization: VectorNormalization::None,
             },
             Vector4::new(0.0, 0.8, 1.0, 1.0),
         );
@@ -359,5 +424,42 @@ mod tests {
 
         assert_eq!(vectors.len(), 1);
         assert_eq!(scalars.samples.len(), 1);
+    }
+
+    #[test]
+    fn time_normalization_scale_uses_each_vectors_temporal_amplitude() {
+        let sample = FieldSample {
+            abstract_pos: vector![0.0, 0.0, 0.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+        };
+
+        let scale = time_normalization_scale(&sample, 0.0, |time| {
+            Vector3::new(0.0, 4.0 * time.sin(), 0.0)
+        });
+
+        assert!((scale - 0.25).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn time_normalization_scale_includes_current_time_for_non_periodic_fields() {
+        let sample = FieldSample {
+            abstract_pos: vector![0.0, 0.0, 0.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+        };
+
+        let scale =
+            time_normalization_scale(&sample, 10.0, |time| Vector3::new(time.abs(), 0.0, 0.0));
+
+        assert!(scale <= 0.1);
     }
 }

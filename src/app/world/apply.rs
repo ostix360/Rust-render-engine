@@ -63,6 +63,7 @@ impl World {
         }
 
         self.normalize_field = next_config.normalize_field;
+        self.em_normalize_vectors = state.em.normalize_vectors;
 
         if diff.field_cache_changed() {
             self.recompute_cached_field_data();

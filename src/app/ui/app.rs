@@ -288,6 +288,10 @@ impl ControlApp {
                         .text("B vector scale")
                         .trailing_fill(true),
                 );
+                ui.checkbox(
+                    &mut data.em.normalize_vectors,
+                    egui::RichText::new("Normalize EM vectors").color(TEXT),
+                );
             });
 
         ui.add_space(8.0);

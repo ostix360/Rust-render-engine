@@ -33,6 +33,7 @@ pub struct World {
     em_time: f64,
     last_em_reset_counter: u64,
     normalize_field: bool,
+    em_normalize_vectors: bool,
     renderer: MasterRenderer,
     grid: Grid,
     grid_world: GridWorld,
@@ -70,6 +71,7 @@ impl World {
             em_time: 0.0,
             last_em_reset_counter: initial_state.em.reset_counter,
             normalize_field: initial_state.normalize_field,
+            em_normalize_vectors: initial_state.em.normalize_vectors,
             renderer: MasterRenderer::new(
                 display_manager.get_width() as f64,
                 display_manager.get_height() as f64,
@@ -194,6 +196,20 @@ mod tests {
         assert!(diff.em_enabled_changed);
         assert!(diff.em_mode_changed);
         assert!(diff.em_equations_changed);
+    }
+
+    #[test]
+    fn apply_diff_tracks_em_vector_normalization() {
+        let current = AppliedConfig::from_ui(&GridUiState::default());
+        let mut next_state = GridUiState::default();
+        next_state.em.normalize_vectors = true;
+        let next = AppliedConfig::from_ui(&next_state);
+
+        let diff = current.diff(&next);
+
+        assert!(diff.em_normalize_changed);
+        assert!(!diff.em_runtime_changed());
+        assert!(diff.em_render_changed());
     }
 
     #[test]

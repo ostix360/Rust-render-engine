@@ -20,6 +20,7 @@ pub(crate) struct AppliedConfig {
     em_a_eqs: [String; 3],
     em_e_eqs: [String; 3],
     em_b_eqs: [String; 3],
+    em_normalize_vectors: bool,
     em_light_speed_bits: u64,
     em_magnetic_vector_scale_bits: u64,
     em_layers: EmLayerVisibility,
@@ -78,6 +79,7 @@ impl AppliedConfig {
                 state.em.magnetic_field.y.eq_str.clone(),
                 state.em.magnetic_field.z.eq_str.clone(),
             ],
+            em_normalize_vectors: state.em.normalize_vectors,
             em_light_speed_bits: state.em.light_speed.to_bits(),
             em_magnetic_vector_scale_bits: state.em.magnetic_vector_scale.to_bits(),
             em_layers: state.em.layers.clone(),
@@ -102,6 +104,7 @@ impl AppliedConfig {
                 || self.em_b_eqs != next.em_b_eqs
                 || self.em_light_speed_bits != next.em_light_speed_bits
                 || self.em_magnetic_vector_scale_bits != next.em_magnetic_vector_scale_bits,
+            em_normalize_changed: self.em_normalize_vectors != next.em_normalize_vectors,
             em_layers_changed: self.em_layers != next.em_layers,
         }
     }
@@ -119,6 +122,7 @@ pub(crate) struct ApplyDiff {
     pub(crate) em_enabled_changed: bool,
     pub(crate) em_mode_changed: bool,
     pub(crate) em_equations_changed: bool,
+    pub(crate) em_normalize_changed: bool,
     pub(crate) em_layers_changed: bool,
 }
 
@@ -146,7 +150,10 @@ impl ApplyDiff {
     }
 
     pub(crate) fn em_render_changed(self) -> bool {
-        self.geometry_changed() || self.em_runtime_changed() || self.em_layers_changed
+        self.geometry_changed()
+            || self.em_runtime_changed()
+            || self.em_normalize_changed
+            || self.em_layers_changed
     }
 
     /// Returns whether cached field samples must be recomputed.

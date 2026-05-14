@@ -12,24 +12,37 @@ through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
 The current checkout builds and the CPU-safe EM/runtime validation tests pass
-locally. This pass fixes reviewed EM source-mode issues: potential mode keeps
-`B` derived from `*dA`, electric source mode rejects mixed static terms before
-using the plane-wave shortcut, and EM apply no longer fails because of hidden
-normal-field drafts. The working tree contains EM visualizer changes plus
+locally. This pass adds analytical Maxwell regression coverage for potential,
+direct electric, and direct magnetic EM source families, including travelling
+plane waves, standing waves, damped waves, and metric-aware potential gradients
+in identity, scaled Cartesian, and spherical coordinate systems. Direct electric
+source mode now recognizes transverse travelling waves along `x`, `y`, or `z`,
+and direct magnetic source mode has the symmetric analytic shortcut for the
+paired electric field. Earlier EM source-mode and vector-normalization fixes
+remain in the tree. The working tree contains EM visualizer changes plus
 unrelated untracked root files.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test apply_diff_tracks_em_vector_normalization -- --skip test_logger`
+  passes.
+- `rtk cargo test time_normalization_scale_uses_each_vectors_temporal_amplitude -- --skip test_logger`
+  passes.
+- `rtk cargo test time_normalization_scale -- --skip test_logger` passes.
+- `rtk cargo test grid_ui_state_defaults_match_expected_values -- --skip test_logger`
+  passes.
+- `rtk cargo test em_vectors_remain_visible -- --skip test_logger` passes.
 - `rtk cargo test potential_mode_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
   passes.
 - `rtk cargo test electric_source_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
   passes.
-- `rtk cargo test em_runtime -- --skip test_logger` passes.
+- `rtk cargo test em_runtime -- --skip test_logger` includes
+  `tests/em_runtime_tests.rs` analytical Maxwell regressions and passes with
+  41 EM-filtered tests.
 - `rtk cargo test validate_ui_state -- --skip test_logger` passes.
-- `rtk cargo test em_vectors_remain_visible -- --skip test_logger` passes.
 - `rtk cargo test -- --skip test_logger` passes.
-- Result: 163 tests passed, 2 tests filtered out.
+- Result: 180 tests passed, 2 tests filtered out.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
 - `rtk cargo run` was not rerun in this pass.
@@ -46,15 +59,19 @@ unrelated untracked root files.
   magnetic-field source families.
 - EM can render all four measures (`V/phi`, `A`, `E`, and `B`) from any source
   family. Potential source uses `E = -dV - partial_t A` and `B = *dA`. Electric
-  source resolves pure `z` plane waves with `B = k x E / c`, then falls back to
-  `curl(B) = (1/c^2) partial_t(E)` with `div(B)=0` for non-plane-wave inputs;
-  magnetic source resolves `E` through `curl(E) = -partial_t(B)` in the same
-  divergence-free Coulomb-gauge reconstruction. Scalar/vector potentials remain
-  reconstructed visualization layers for direct source modes.
+  source resolves pure transverse `x`-, `y`-, and `z`-travelling plane waves
+  with `B = k x E / c`, then falls back to `curl(B) = (1/c^2) partial_t(E)` with
+  `div(B)=0` for non-plane-wave inputs; magnetic source handles the symmetric
+  travelling-wave case with `E = -c k x B` before falling back to
+  `curl(E) = -partial_t(B)` in the same divergence-free Coulomb-gauge
+  reconstruction. Scalar/vector potentials remain reconstructed visualization
+  layers for direct source modes.
 - Electric source mode keeps the visible `A` layer responsive by using a local
   vector-potential visualization from the derived `B` instead of nesting another
   inverse-curl solve.
-- EM exposes a configurable `c` and a separate `B vector scale` control.
+- EM exposes a configurable `c`, a separate `B vector scale` control, and an
+  EM-specific per-vector time-amplitude normalization checkbox for `E`, `B`,
+  and `A` arrows.
 - Uses a dedicated field render path and field shaders for field arrows.
 - Provides scalar and dual-tangent legends through auxiliary UI windows.
 - Supports geometric tangent view and dual tangent view, with smooth transition
@@ -111,8 +128,10 @@ The repository has uncommitted changes. Current tracked edits include:
 - Direct electric source mode now derives `B` from the Ampere-Maxwell source
   `(1/c^2) partial_t(E)` instead of `curl(E)` for general inputs.
 - Direct electric source mode now detects transverse plane waves travelling
-  along `z` and derives `B` analytically from `k x E / c`, preventing the
-  default `E = (0, cos(z - t), 0)` case from rotating during animation.
+  along `x`, `y`, or `z` and derives `B` analytically from `k x E / c`,
+  preventing simple travelling-wave cases from rotating during animation.
+- Direct magnetic source mode now detects the same travelling-wave family and
+  derives `E` analytically from `-c k x B`.
 - Potential source mode keeps magnetic reconstruction anchored to `B = *dA`,
   including static curl terms mixed into travelling-wave vector potentials.
 - Electric source mode rejects mixed static spatial terms before using the
@@ -132,10 +151,22 @@ The repository has uncommitted changes. Current tracked edits include:
   substitution maps for common arithmetic and transcendental expressions.
 - Added Coulomb-style scalar-potential reconstruction for `E` and `B` source
   modes, and reconstructs `A` from the derived or supplied `B` field.
+- Added `tests/em_runtime_tests.rs` with CPU-only analytical Maxwell coverage
+  for the spatial-amplitude potential example `A = x * sin(z - t) e_y`,
+  standing waves, damped waves, direct `E`/`B` all-axis plane waves, finite
+  difference Maxwell residuals, direct-source preservation, and scaled
+  Cartesian/spherical potential gradients.
 - Configurable `c` and `B vector scale` controls.
 - EM cache/render optimizations that skip hidden layers, avoid time rebuilds
   when the clock is effectively paused, and reserve vector render buffers for
   the active layer count.
+- EM vector normalization is now a dedicated EM-tab setting. It divides each EM
+  vector by that vector's sampled maximum world-space magnitude over a
+  `current_time - pi..current_time + pi` window, with the exact current
+  magnitude included in the maximum. This preserves temporal oscillation while
+  bounding arrow size for non-periodic expressions such as `E = (t, 0, 0)`. It
+  updates the EM cache/render path for `E`, `B`, and `A` without changing the
+  Field-tab unit-vector normalization flag.
 - EM vector layers remain visible in dual tangent mode because there is not yet
   an EM-specific dual-form replacement layer.
 - Timed expression evaluation in `src/maths/mod.rs`.
@@ -160,8 +191,8 @@ Those appear unrelated to the render-engine runtime itself.
 - Direct `E`/`B` source modes still need a boundary/gauge choice because a
   single field does not uniquely determine the complementary field. The current
   general fallback is a finite-domain Coulomb/Biot-Savart inverse over the
-  active grid bounds; electric `z`-travelling plane waves use an analytic
-  transverse shortcut instead.
+  active grid bounds; pure transverse `x`-, `y`-, and `z`-travelling plane waves
+  use analytic transverse shortcuts instead.
 - Recovering potentials from `E` or `B` uses visualization conventions rather
   than a full boundary-value solve. The gauge is intentionally local to the EM
   runtime so it can become editable later.

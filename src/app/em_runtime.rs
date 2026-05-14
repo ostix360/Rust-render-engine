@@ -207,10 +207,17 @@ impl EmRuntime {
 
     fn from_magnetic(state: &EmUiState, maxwell_config: MaxwellSolveConfig) -> Self {
         let magnetic_exprs = exprs_from_spacial(&state.magnetic_field);
-        let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
-        let magnetic_field = TimedVectorField::from_exprs(magnetic_exprs);
-        let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
-        let electric_field = maxwell_inverse_curl(faraday_source, maxwell_config.clone());
+        let c = state.light_speed.max(1.0e-6);
+
+        let magnetic_field = TimedVectorField::from_exprs(magnetic_exprs.clone());
+        let electric_field =
+            if let Some(electric_exprs) = plane_wave_electric_exprs(&magnetic_exprs, c) {
+                TimedVectorField::from_exprs(electric_exprs)
+            } else {
+                let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
+                let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
+                maxwell_inverse_curl(faraday_source, maxwell_config.clone())
+            };
         let phi = local_scalar_potential_from_e(electric_field.clone());
         let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
 
@@ -277,10 +284,6 @@ fn maxwell_faraday_source_exprs(magnetic_exprs: &[Expr; 3]) -> [Expr; 3] {
 }
 
 fn plane_wave_magnetic_exprs(electric_exprs: &[Expr; 3], c: f64) -> Option<[Expr; 3]> {
-    if !is_near_zero_expr(&electric_exprs[2]) {
-        return None;
-    }
-
     if !electric_exprs
         .iter()
         .any(|expr| !is_near_zero_expr(&partial_t(expr.clone())))
@@ -288,41 +291,99 @@ fn plane_wave_magnetic_exprs(electric_exprs: &[Expr; 3], c: f64) -> Option<[Expr
         return None;
     }
 
-    if is_plane_wave_direction(electric_exprs, c, 1.0) {
-        return Some([
-            scale_expr(electric_exprs[1].clone(), -1.0 / c),
-            scale_expr(electric_exprs[0].clone(), 1.0 / c),
-            Expr::number(0.0),
-        ]);
-    }
+    for axis in 0..3 {
+        if !is_near_zero_expr(&electric_exprs[axis]) {
+            continue;
+        }
 
-    if is_plane_wave_direction(electric_exprs, c, -1.0) {
-        return Some([
-            scale_expr(electric_exprs[1].clone(), 1.0 / c),
-            scale_expr(electric_exprs[0].clone(), -1.0 / c),
-            Expr::number(0.0),
-        ]);
+        for direction in [1.0, -1.0] {
+            if is_plane_wave_direction(electric_exprs, axis, c, direction) {
+                return Some(scale_exprs(
+                    cross_axis_exprs(axis, direction, electric_exprs),
+                    1.0 / c,
+                ));
+            }
+        }
     }
 
     None
 }
 
-fn is_plane_wave_direction(electric_exprs: &[Expr; 3], c: f64, direction: f64) -> bool {
-    electric_exprs.iter().all(|expr| {
-        if !is_near_zero_expr(&derivate(expr.clone(), &"x".to_string()))
-            || !is_near_zero_expr(&derivate(expr.clone(), &"y".to_string()))
-        {
-            return false;
+fn plane_wave_electric_exprs(magnetic_exprs: &[Expr; 3], c: f64) -> Option<[Expr; 3]> {
+    if !magnetic_exprs
+        .iter()
+        .any(|expr| !is_near_zero_expr(&partial_t(expr.clone())))
+    {
+        return None;
+    }
+
+    for axis in 0..3 {
+        if !is_near_zero_expr(&magnetic_exprs[axis]) {
+            continue;
         }
 
-        let wave_residual = partial_t(expr.clone())
-            .add(scale_expr(
-                derivate(expr.clone(), &"z".to_string()),
-                direction * c,
-            ))
-            .simplify();
-        is_near_zero_expr(&wave_residual)
+        for direction in [1.0, -1.0] {
+            if is_plane_wave_direction(magnetic_exprs, axis, c, direction) {
+                return Some(scale_exprs(
+                    cross_axis_exprs(axis, direction, magnetic_exprs),
+                    -c,
+                ));
+            }
+        }
+    }
+
+    None
+}
+
+fn is_plane_wave_direction(exprs: &[Expr; 3], axis: usize, c: f64, direction: f64) -> bool {
+    exprs.iter().all(|expr| {
+        (0..3)
+            .filter(|sample_axis| *sample_axis != axis)
+            .all(|sample_axis| is_near_zero_expr(&derivate_axis(expr.clone(), sample_axis)))
+            && {
+                let wave_residual = partial_t(expr.clone())
+                    .add(scale_expr(derivate_axis(expr.clone(), axis), direction * c))
+                    .simplify();
+                is_near_zero_expr(&wave_residual)
+            }
     })
+}
+
+fn derivate_axis(expr: Expr, axis: usize) -> Expr {
+    derivate(expr, &axis_name(axis).to_string())
+}
+
+fn axis_name(axis: usize) -> &'static str {
+    match axis {
+        0 => "x",
+        1 => "y",
+        2 => "z",
+        _ => panic!("plane wave axis must be 0, 1, or 2"),
+    }
+}
+
+fn cross_axis_exprs(axis: usize, direction: f64, rhs: &[Expr; 3]) -> [Expr; 3] {
+    let zero = Expr::number(0.0);
+    let signed = |expr: Expr, sign: f64| scale_expr(expr, direction * sign);
+
+    match axis {
+        0 => [
+            zero,
+            signed(rhs[2].clone(), -1.0),
+            signed(rhs[1].clone(), 1.0),
+        ],
+        1 => [
+            signed(rhs[2].clone(), 1.0),
+            zero,
+            signed(rhs[0].clone(), -1.0),
+        ],
+        2 => [
+            signed(rhs[1].clone(), -1.0),
+            signed(rhs[0].clone(), 1.0),
+            zero,
+        ],
+        _ => panic!("plane wave axis must be 0, 1, or 2"),
+    }
 }
 
 fn is_near_zero_expr(expr: &Expr) -> bool {

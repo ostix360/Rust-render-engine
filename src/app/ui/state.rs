@@ -93,6 +93,7 @@ pub struct EmUiState {
     pub mode: EmMode,
     pub light_speed: f64,
     pub magnetic_vector_scale: f64,
+    pub normalize_vectors: bool,
     pub phi: EqRender,
     pub vector_potential: SpacialEqs,
     pub electric_field: SpacialEqs,
@@ -110,6 +111,7 @@ impl Default for EmUiState {
             mode: EmMode::Potentials,
             light_speed: 1.0,
             magnetic_vector_scale: 1.0,
+            normalize_vectors: false,
             phi: default_eq("0"),
             vector_potential: SpacialEqs::from_defaults("0", "sin(z - t)", "0"),
             electric_field: SpacialEqs::from_defaults("0", "cos(z - t)", "0"),
@@ -296,6 +298,7 @@ mod tests {
         assert_eq!(state.em.mode, EmMode::Potentials);
         assert_eq!(state.em.light_speed, 1.0);
         assert_eq!(state.em.magnetic_vector_scale, 1.0);
+        assert!(!state.em.normalize_vectors);
         assert!(state.em.layers.electric);
         assert!(state.em.layers.magnetic);
         assert!(state.em.layers.scalar_potential);

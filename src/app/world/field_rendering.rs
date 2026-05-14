@@ -3,7 +3,7 @@
 use super::{World, SPHERE_SIZE};
 use crate::app::field_render::{
     build_scalar_render, build_vector_render, build_vector_render_with_color, EmRenderCache,
-    FieldRenderCache, VectorRenderConfig,
+    FieldRenderCache, VectorNormalization, VectorRenderConfig,
 };
 use crate::app::field_runtime::RuntimeField;
 use crate::maths::field::VectorField;
@@ -27,10 +27,14 @@ impl World {
     }
 
     pub(super) fn recompute_cached_em_data(&mut self) {
-        self.em_cache = self
-            .em_runtime
-            .as_ref()
-            .map(|runtime| EmRenderCache::from_runtime(runtime, &self.field_samples, self.em_time));
+        self.em_cache = self.em_runtime.as_ref().map(|runtime| {
+            EmRenderCache::from_runtime(
+                runtime,
+                &self.field_samples,
+                self.em_time,
+                self.em_normalize_vectors,
+            )
+        });
     }
 
     /// Rebuilds the current field renderables from the cached samples and tangent state.
@@ -71,7 +75,11 @@ impl World {
                     world_vectors,
                     &self.tangent_space,
                     VectorRenderConfig {
-                        normalize_field: self.normalize_field,
+                        normalization: if self.normalize_field {
+                            VectorNormalization::Unit
+                        } else {
+                            VectorNormalization::None
+                        },
                     },
                 );
 
@@ -112,7 +120,7 @@ impl World {
                 &electric.world_vectors,
                 &self.tangent_space,
                 VectorRenderConfig {
-                    normalize_field: self.normalize_field,
+                    normalization: VectorNormalization::None,
                 },
                 ELECTRIC_COLOR,
             ));
@@ -127,7 +135,7 @@ impl World {
                 &magnetic.world_vectors,
                 &self.tangent_space,
                 VectorRenderConfig {
-                    normalize_field: self.normalize_field,
+                    normalization: VectorNormalization::None,
                 },
                 MAGNETIC_COLOR,
             ));
@@ -142,7 +150,7 @@ impl World {
                 &vector_potential.world_vectors,
                 &self.tangent_space,
                 VectorRenderConfig {
-                    normalize_field: self.normalize_field,
+                    normalization: VectorNormalization::None,
                 },
                 VECTOR_POTENTIAL_COLOR,
             ));
