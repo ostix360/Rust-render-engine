@@ -12,19 +12,30 @@ through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
 The current checkout builds and the CPU-safe EM/runtime validation tests pass
-locally. This pass adds analytical Maxwell regression coverage for potential,
-direct electric, and direct magnetic EM source families, including travelling
-plane waves, standing waves, damped waves, and metric-aware potential gradients
-in identity, scaled Cartesian, and spherical coordinate systems. Direct electric
-source mode now recognizes transverse travelling waves along `x`, `y`, or `z`,
-and direct magnetic source mode has the symmetric analytic shortcut for the
-paired electric field. Earlier EM source-mode and vector-normalization fixes
-remain in the tree. The working tree contains EM visualizer changes plus
-unrelated untracked root files.
+locally. This pass adds standard-parameter buttons to the Grid, Field, and EM
+tabs. Grid presets cover Cartesian, spherical, cylindrical, and polar
+coordinates with matching sampling counts and bounds. Field presets cover
+constant/non-constant scalar and vector inputs. EM presets cover plane,
+standing, and damped waves, and the default EM layer visibility now leaves
+`V/phi` and `A` unchecked while keeping `E` and `B` visible. Applying an EM
+preset also restores `E` and `B` visibility if the user previously hid all EM
+layers. Earlier EM
+source-mode and vector-normalization fixes remain in the tree. This pass also
+fixes field-arrow transforms for vectors that point exactly opposite the mesh
+up axis, so the default plane-wave `E` arrow flips direction instead of
+shrinking and growing in place. The working tree contains UI preset changes,
+this render-vector fix, plus unrelated untracked root files.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test render_vfield -- --skip test_logger` passes with 5
+  render-vector transform tests.
+- `rtk cargo test plane_wave -- --skip test_logger` passes with 12
+  plane-wave-filtered tests.
+- `rtk cargo test presets -- --skip test_logger` passes with 6 preset-filtered
+  tests.
+- `rtk cargo test ui:: -- --skip test_logger` passes with 32 UI-filtered tests.
 - `rtk cargo test apply_diff_tracks_em_vector_normalization -- --skip test_logger`
   passes.
 - `rtk cargo test time_normalization_scale_uses_each_vectors_temporal_amplitude -- --skip test_logger`
@@ -42,7 +53,7 @@ unrelated untracked root files.
   41 EM-filtered tests.
 - `rtk cargo test validate_ui_state -- --skip test_logger` passes.
 - `rtk cargo test -- --skip test_logger` passes.
-- Result: 180 tests passed, 2 tests filtered out.
+- Result: 187 tests passed, 2 tests filtered out.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
 - `rtk cargo run` was not rerun in this pass.
@@ -52,6 +63,10 @@ unrelated untracked root files.
 - Renders a sampled coordinate grid with editable coordinate-system equations.
 - Supports a separate egui control window with Grid, Field, and EM tabs.
 - Validates edited equations before publishing them to the render thread.
+- Provides standard-parameter buttons in the Grid, Field, and EM tabs. Presets
+  only edit the UI draft state; the existing Apply path still validates and
+  parses equations before the render thread sees them. EM presets reset the
+  visible layer set to `E` and `B` so they always produce a visible setup.
 - Supports vector fields, scalar fields, exterior derivative rendering, and
   optional vector normalization.
 - Supports an optional electromagnetism render mode over animated 3D slices,
@@ -72,7 +87,11 @@ unrelated untracked root files.
 - EM exposes a configurable `c`, a separate `B vector scale` control, and an
   EM-specific per-vector time-amplitude normalization checkbox for `E`, `B`,
   and `A` arrows.
+- EM defaults to showing `E` and `B` while hiding `V/phi` and `A`; users can
+  re-enable the potential layers from the EM Layers section.
 - Uses a dedicated field render path and field shaders for field arrows.
+- Field arrows now handle exact 180-degree direction flips, including negative
+  `Y` vectors produced by oscillating plane-wave `E` layers.
 - Provides scalar and dual-tangent legends through auxiliary UI windows.
 - Supports geometric tangent view and dual tangent view, with smooth transition
   logic and local tangent patch controls. EM layers use the same sample
@@ -106,7 +125,7 @@ unrelated untracked root files.
   dive transitions, local sample filtering, geometric tangent display, and dual
   tangent display.
 - `src/app/ui/` contains the egui application, shared UI state, validation,
-  theme, and legend UI.
+  standard presets, theme, validation, and legend UI.
 - `src/render/` contains shader wrappers and renderers for grids, classic sphere
   drawing, field arrows, and master renderer projection control.
 - `src/maths/` contains expression evaluation, coordinate-space math,
@@ -117,9 +136,17 @@ unrelated untracked root files.
 
 ## Current Working Tree
 
-The repository has uncommitted changes. Current tracked edits include:
+The repository has uncommitted changes. Current feature edits include:
 
-- EM UI state, tab rendering, and validation updates in `src/app/ui/`.
+- EM UI state, tab rendering, default layer visibility, and validation updates
+  in `src/app/ui/`.
+- New `src/app/ui/presets.rs` hard-codes standard Grid, Field, and EM
+  configurations, with regression tests that route every preset through the
+  normal UI validation path and verify EM presets restore visible `E`/`B`
+  layers after a user hides them.
+- Field-arrow model transforms now use a deterministic half-turn when a vector
+  points opposite the arrow mesh's local `Y` axis, with regression coverage in
+  `tests/render_vfield_tests.rs`.
 - EM runtime/cache wiring in `src/app/em_runtime.rs`, `src/app/world.rs`,
   `src/app/world/apply.rs`, `src/app/world/frame.rs`, and
   `src/app/world/field_rendering.rs`.

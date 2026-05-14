@@ -81,8 +81,8 @@ impl Default for EmLayerVisibility {
         Self {
             electric: true,
             magnetic: true,
-            scalar_potential: true,
-            vector_potential: true,
+            scalar_potential: false,
+            vector_potential: false,
         }
     }
 }
@@ -301,8 +301,8 @@ mod tests {
         assert!(!state.em.normalize_vectors);
         assert!(state.em.layers.electric);
         assert!(state.em.layers.magnetic);
-        assert!(state.em.layers.scalar_potential);
-        assert!(state.em.layers.vector_potential);
+        assert!(!state.em.layers.scalar_potential);
+        assert!(!state.em.layers.vector_potential);
         assert_eq!(state.tangent_scale, 0.12);
         assert_eq!(state.geometric_arrow_scale, 0.55);
         assert_eq!(state.nb_x, 5.0);

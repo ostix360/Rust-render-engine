@@ -74,3 +74,20 @@ fn render_vfield_transform_rotates_arrow_toward_vector_direction() {
     assert_close(direction.y, 0.0, "direction y");
     assert_close(direction.z, 0.0, "direction z");
 }
+
+#[test]
+fn render_vfield_transform_rotates_arrow_toward_opposite_y_direction() {
+    let field = RenderVField::new(
+        vector![0.0, 0.0, 0.0],
+        vector![0.0, -2.0, 0.0],
+        Vector4::new(1.0, 1.0, 0.0, 1.0),
+    );
+
+    let transform = field.get_transformation_matrix();
+    let transformed_axis = transform * Vector4::new(0.0, 1.0, 0.0, 0.0);
+    let direction = transformed_axis.xyz().normalize();
+
+    assert_close(direction.x, 0.0, "direction x");
+    assert_close(direction.y, -1.0, "direction y");
+    assert_close(direction.z, 0.0, "direction z");
+}

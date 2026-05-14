@@ -3,6 +3,7 @@
 use crate::toolbox::color::Color;
 use crate::toolbox::opengl::vao::VAO;
 use nalgebra::{Matrix4, Rotation3, Translation3, UnitQuaternion, Vector3, Vector4};
+use std::f64::consts::PI;
 
 #[derive(PartialEq)]
 pub struct Model<'a> {
@@ -173,7 +174,7 @@ impl RenderVField {
         let up = Vector3::y_axis();
 
         let rotation = UnitQuaternion::rotation_between(&up, &target_dir)
-            .unwrap_or(UnitQuaternion::identity());
+            .unwrap_or_else(|| UnitQuaternion::from_axis_angle(&Vector3::x_axis(), PI));
         let translation = Translation3::from(*position);
 
         let mut transform = nalgebra::Isometry3::from_parts(translation, rotation).to_homogeneous();

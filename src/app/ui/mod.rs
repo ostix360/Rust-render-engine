@@ -2,6 +2,7 @@
 
 mod app;
 pub(crate) mod legend;
+mod presets;
 mod state;
 mod theme;
 mod validation;

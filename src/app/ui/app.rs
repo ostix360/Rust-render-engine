@@ -1,6 +1,7 @@
 //! egui control panel for editing the grid, field, and tangent-view settings.
 
 use crate::app::ui::legend::show_legend_window;
+use crate::app::ui::presets::{EmPreset, FieldPreset, GridPreset};
 use crate::app::ui::state::{ControlTab, EmMode, FieldKind, GridUiState};
 use crate::app::ui::theme::{
     self, ACCENT, BORDER, CRAYOLA_BLUE, JET_BLACK, MUTED, PANEL, RASPBERRY, SHADOW_GREY, TEXT,
@@ -9,6 +10,28 @@ use crate::app::ui::validation::validate_ui_state;
 use eframe::egui::{self, Color32, Stroke};
 use eframe::epaint::{CornerRadius, Margin};
 use std::sync::{Arc, Mutex};
+
+trait PresetLabel {
+    fn label(self) -> &'static str;
+}
+
+impl PresetLabel for GridPreset {
+    fn label(self) -> &'static str {
+        self.label
+    }
+}
+
+impl PresetLabel for FieldPreset {
+    fn label(self) -> &'static str {
+        self.label
+    }
+}
+
+impl PresetLabel for EmPreset {
+    fn label(self) -> &'static str {
+        self.label
+    }
+}
 
 pub(crate) struct ControlApp {
     state: Arc<Mutex<GridUiState>>,
@@ -59,6 +82,13 @@ impl ControlApp {
 
     /// Renders the grid, coordinate-system, and tangent-scale controls.
     fn render_grid_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(theme::section_heading("Standard parameters"))
+            .default_open(true)
+            .show(ui, |ui| {
+                Self::preset_buttons(ui, GridPreset::ALL, |preset, data| preset.apply(data), data);
+            });
+
+        ui.add_space(8.0);
         egui::CollapsingHeader::new(theme::section_heading("Coordinate system"))
             .default_open(true)
             .show(ui, |ui| {
@@ -118,6 +148,18 @@ impl ControlApp {
 
     /// Renders the field-equation and tangent-arrow controls.
     fn render_field_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(theme::section_heading("Standard parameters"))
+            .default_open(true)
+            .show(ui, |ui| {
+                Self::preset_buttons(
+                    ui,
+                    FieldPreset::ALL,
+                    |preset, data| preset.apply(data),
+                    data,
+                );
+            });
+
+        ui.add_space(8.0);
         egui::CollapsingHeader::new(theme::section_heading("Field equations"))
             .default_open(true)
             .show(ui, |ui| {
@@ -195,6 +237,13 @@ impl ControlApp {
     }
 
     fn render_em_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(theme::section_heading("Standard parameters"))
+            .default_open(true)
+            .show(ui, |ui| {
+                Self::preset_buttons(ui, EmPreset::ALL, |preset, data| preset.apply(data), data);
+            });
+
+        ui.add_space(8.0);
         egui::CollapsingHeader::new(theme::section_heading("Electromagnetism"))
             .default_open(true)
             .show(ui, |ui| {
@@ -346,6 +395,34 @@ impl ControlApp {
         add_contents: impl FnOnce(&mut egui::Ui),
     ) {
         ui.add_enabled_ui(editable, add_contents);
+    }
+
+    fn preset_buttons<T: Copy>(
+        ui: &mut egui::Ui,
+        presets: impl IntoIterator<Item = T>,
+        apply: impl Fn(T, &mut GridUiState),
+        data: &mut GridUiState,
+    ) where
+        T: PresetLabel,
+    {
+        ui.horizontal_wrapped(|ui| {
+            for preset in presets {
+                if Self::compact_button(ui, preset.label()) {
+                    apply(preset, data);
+                }
+            }
+        });
+    }
+
+    fn compact_button(ui: &mut egui::Ui, label: &str) -> bool {
+        ui.add(
+            egui::Button::new(egui::RichText::new(label).color(TEXT))
+                .fill(JET_BLACK)
+                .stroke(Stroke::new(1.0, BORDER))
+                .min_size(egui::vec2(116.0, 28.0))
+                .corner_radius(CornerRadius::same(6)),
+        )
+        .clicked()
     }
 
     /// Validates the current UI state and bumps the apply counter on success.
