@@ -3,6 +3,7 @@
 use super::World;
 use crate::app::applied_config::{AppliedConfig, ApplyDiff};
 use crate::app::coords_sys::CoordsSys;
+use crate::app::em_runtime::EmRuntime;
 use crate::app::field_runtime::RuntimeField;
 use crate::app::ui::GridUiState;
 
@@ -45,6 +46,9 @@ impl World {
             let (field_samples, grid_samples) = Self::build_grid_cache(&self.grid);
             self.field_samples = field_samples;
             self.grid_world.replace_samples(grid_samples);
+            if self.em_runtime.is_some() && !diff.em_runtime_changed() {
+                self.recompute_cached_em_data();
+            }
         }
     }
 
@@ -62,6 +66,18 @@ impl World {
 
         if diff.field_cache_changed() {
             self.recompute_cached_field_data();
+        }
+
+        if diff.em_runtime_changed() {
+            self.em_runtime = state.em.enabled.then(|| {
+                EmRuntime::from_ui_with_config(&state.em, &self.grid, next_config.grid_config)
+            });
+        } else if let Some(runtime) = &mut self.em_runtime {
+            runtime.layers = state.em.layers.clone();
+        }
+
+        if diff.em_render_changed() {
+            self.recompute_cached_em_data();
         }
     }
 }

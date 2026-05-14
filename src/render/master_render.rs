@@ -87,10 +87,11 @@ impl MasterRenderer {
             self.grid_renderer
                 .render(&grid, &view_matrix, scene_transform);
         }
+        if !form_samples.is_empty() {
+            self.renderer.draw_points(form_samples, &view_matrix);
+        }
         if show_vector_field {
             self.field_renderer.render(field_vectors, &view_matrix);
-        } else {
-            self.renderer.draw_points(form_samples, &view_matrix);
         }
         if let Some(sphere) = sphere {
             self.renderer.draw_point(sphere, &view_matrix);

@@ -1,7 +1,7 @@
 //! Applied UI configuration snapshots and diffing.
 
 use crate::app::grid::GridConfig;
-use crate::app::ui::{FieldKind, GridUiState};
+use crate::app::ui::{EmLayerVisibility, EmMode, FieldKind, GridUiState};
 use mathhook_core::formatter::simple::SimpleContext;
 use mathhook_core::SimpleFormatter;
 
@@ -14,6 +14,15 @@ pub(crate) struct AppliedConfig {
     vector_eqs: [String; 3],
     render_d: bool,
     pub(crate) normalize_field: bool,
+    em_enabled: bool,
+    em_mode: EmMode,
+    em_phi: String,
+    em_a_eqs: [String; 3],
+    em_e_eqs: [String; 3],
+    em_b_eqs: [String; 3],
+    em_light_speed_bits: u64,
+    em_magnetic_vector_scale_bits: u64,
+    em_layers: EmLayerVisibility,
 }
 
 impl AppliedConfig {
@@ -51,6 +60,27 @@ impl AppliedConfig {
             ],
             render_d: state.render_d,
             normalize_field: state.normalize_field,
+            em_enabled: state.em.enabled,
+            em_mode: state.em.mode,
+            em_phi: state.em.phi.eq_str.clone(),
+            em_a_eqs: [
+                state.em.vector_potential.x.eq_str.clone(),
+                state.em.vector_potential.y.eq_str.clone(),
+                state.em.vector_potential.z.eq_str.clone(),
+            ],
+            em_e_eqs: [
+                state.em.electric_field.x.eq_str.clone(),
+                state.em.electric_field.y.eq_str.clone(),
+                state.em.electric_field.z.eq_str.clone(),
+            ],
+            em_b_eqs: [
+                state.em.magnetic_field.x.eq_str.clone(),
+                state.em.magnetic_field.y.eq_str.clone(),
+                state.em.magnetic_field.z.eq_str.clone(),
+            ],
+            em_light_speed_bits: state.em.light_speed.to_bits(),
+            em_magnetic_vector_scale_bits: state.em.magnetic_vector_scale.to_bits(),
+            em_layers: state.em.layers.clone(),
         }
     }
 
@@ -64,6 +94,15 @@ impl AppliedConfig {
             vector_changed: self.vector_eqs != next.vector_eqs,
             render_d_changed: self.render_d != next.render_d,
             normalize_changed: self.normalize_field != next.normalize_field,
+            em_enabled_changed: self.em_enabled != next.em_enabled,
+            em_mode_changed: self.em_mode != next.em_mode,
+            em_equations_changed: self.em_phi != next.em_phi
+                || self.em_a_eqs != next.em_a_eqs
+                || self.em_e_eqs != next.em_e_eqs
+                || self.em_b_eqs != next.em_b_eqs
+                || self.em_light_speed_bits != next.em_light_speed_bits
+                || self.em_magnetic_vector_scale_bits != next.em_magnetic_vector_scale_bits,
+            em_layers_changed: self.em_layers != next.em_layers,
         }
     }
 }
@@ -77,6 +116,10 @@ pub(crate) struct ApplyDiff {
     pub(crate) vector_changed: bool,
     pub(crate) render_d_changed: bool,
     pub(crate) normalize_changed: bool,
+    pub(crate) em_enabled_changed: bool,
+    pub(crate) em_mode_changed: bool,
+    pub(crate) em_equations_changed: bool,
+    pub(crate) em_layers_changed: bool,
 }
 
 impl ApplyDiff {
@@ -92,6 +135,18 @@ impl ApplyDiff {
             || self.scalar_changed
             || self.vector_changed
             || self.render_d_changed
+    }
+
+    pub(crate) fn em_runtime_changed(self) -> bool {
+        self.coords_changed
+            || self.grid_changed
+            || self.em_enabled_changed
+            || self.em_mode_changed
+            || self.em_equations_changed
+    }
+
+    pub(crate) fn em_render_changed(self) -> bool {
+        self.geometry_changed() || self.em_runtime_changed() || self.em_layers_changed
     }
 
     /// Returns whether cached field samples must be recomputed.

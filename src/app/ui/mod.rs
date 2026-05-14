@@ -7,7 +7,10 @@ mod theme;
 mod validation;
 
 #[allow(unused_imports)]
-pub use state::{EqRender, FieldKind, GridUiState, LegendKind, LegendState, SpacialEqs};
+pub use state::{
+    EmLayerVisibility, EmMode, EmUiState, EqRender, FieldKind, GridUiState, LegendKind,
+    LegendState, SpacialEqs,
+};
 
 use crate::app::ui::app::ControlApp;
 use std::sync::{Arc, Mutex};

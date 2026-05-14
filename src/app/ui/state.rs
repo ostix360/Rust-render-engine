@@ -55,6 +55,73 @@ pub enum FieldKind {
     Vector,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmMode {
+    Potentials,
+    Electric,
+    Magnetic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmLayerVisibility {
+    pub electric: bool,
+    pub magnetic: bool,
+    pub scalar_potential: bool,
+    pub vector_potential: bool,
+}
+
+impl EmLayerVisibility {
+    pub fn any_visible(&self) -> bool {
+        self.electric || self.magnetic || self.scalar_potential || self.vector_potential
+    }
+}
+
+impl Default for EmLayerVisibility {
+    fn default() -> Self {
+        Self {
+            electric: true,
+            magnetic: true,
+            scalar_potential: true,
+            vector_potential: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EmUiState {
+    pub enabled: bool,
+    pub mode: EmMode,
+    pub light_speed: f64,
+    pub magnetic_vector_scale: f64,
+    pub phi: EqRender,
+    pub vector_potential: SpacialEqs,
+    pub electric_field: SpacialEqs,
+    pub magnetic_field: SpacialEqs,
+    pub running: bool,
+    pub time_scale: f64,
+    pub reset_counter: u64,
+    pub layers: EmLayerVisibility,
+}
+
+impl Default for EmUiState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: EmMode::Potentials,
+            light_speed: 1.0,
+            magnetic_vector_scale: 1.0,
+            phi: default_eq("0"),
+            vector_potential: SpacialEqs::from_defaults("0", "sin(z - t)", "0"),
+            electric_field: SpacialEqs::from_defaults("0", "cos(z - t)", "0"),
+            magnetic_field: SpacialEqs::from_defaults("cos(z - t)", "0", "0"),
+            running: true,
+            time_scale: 1.0,
+            reset_counter: 0,
+            layers: EmLayerVisibility::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GridUiState {
     pub render_3d: bool,
@@ -64,6 +131,7 @@ pub struct GridUiState {
     pub field: SpacialEqs,
     pub render_d: bool,
     pub normalize_field: bool,
+    pub em: EmUiState,
     pub tangent_scale: f64,
     pub geometric_arrow_scale: f64,
     pub nb_x: f64,
@@ -155,12 +223,12 @@ impl GridUiState {
 
     /// Returns whether the active field render path should draw arrows.
     pub fn renders_vector_field(&self) -> bool {
-        self.field_kind == FieldKind::Vector || self.render_d
+        self.em.enabled || self.field_kind == FieldKind::Vector || self.render_d
     }
 
     /// Returns whether the active field render path should draw sampled scalar spheres.
     pub fn renders_scalar_samples(&self) -> bool {
-        self.field_kind == FieldKind::Scalar && !self.render_d
+        self.em.enabled || (self.field_kind == FieldKind::Scalar && !self.render_d)
     }
 }
 
@@ -181,6 +249,7 @@ impl Default for GridUiState {
             field: SpacialEqs::default_field(),
             render_d: false,
             normalize_field: false,
+            em: EmUiState::default(),
             tangent_scale: 0.12,
             geometric_arrow_scale: 0.55,
             nb_x: 5.0,
@@ -199,6 +268,7 @@ impl Default for GridUiState {
 pub(crate) enum ControlTab {
     Grid,
     Field,
+    Em,
 }
 
 /// Parses one default equation string into `EqRender`.
@@ -211,7 +281,7 @@ fn default_eq(expr: &str) -> EqRender {
 
 #[cfg(test)]
 mod tests {
-    use super::{ControlTab, FieldKind, GridUiState};
+    use super::{ControlTab, EmMode, FieldKind, GridUiState};
 
     #[test]
     #[allow(clippy::approx_constant)]
@@ -222,6 +292,14 @@ mod tests {
         assert_eq!(state.field_kind, FieldKind::Vector);
         assert!(!state.render_d);
         assert!(!state.normalize_field);
+        assert!(!state.em.enabled);
+        assert_eq!(state.em.mode, EmMode::Potentials);
+        assert_eq!(state.em.light_speed, 1.0);
+        assert_eq!(state.em.magnetic_vector_scale, 1.0);
+        assert!(state.em.layers.electric);
+        assert!(state.em.layers.magnetic);
+        assert!(state.em.layers.scalar_potential);
+        assert!(state.em.layers.vector_potential);
         assert_eq!(state.tangent_scale, 0.12);
         assert_eq!(state.geometric_arrow_scale, 0.55);
         assert_eq!(state.nb_x, 5.0);
@@ -255,6 +333,15 @@ mod tests {
         state.render_d = true;
 
         assert!(!state.renders_scalar_samples());
+        assert!(state.renders_vector_field());
+    }
+
+    #[test]
+    fn em_mode_renders_vectors_and_scalar_samples() {
+        let mut state = GridUiState::default();
+        state.em.enabled = true;
+
+        assert!(state.renders_scalar_samples());
         assert!(state.renders_vector_field());
     }
 }

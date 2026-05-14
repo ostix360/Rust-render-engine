@@ -185,6 +185,24 @@ impl GridConfig {
             nb_w,
         }
     }
+
+    /// Returns the abstract-coordinate bounds used to build the grid.
+    pub fn bounds(&self) -> [(f64, f64); 3] {
+        [
+            (self.u_min, self.u_max),
+            (self.v_min, self.v_max),
+            (self.w_min, self.w_max),
+        ]
+    }
+
+    /// Returns the rounded sampling counts configured for each abstract axis.
+    pub fn sample_counts(&self) -> [usize; 3] {
+        [
+            self.nb_u.round().max(2.0) as usize,
+            self.nb_v.round().max(2.0) as usize,
+            self.nb_w.round().max(2.0) as usize,
+        ]
+    }
 }
 
 impl Default for GridConfig {

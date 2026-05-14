@@ -20,10 +20,11 @@ pub mod field;
 pub mod space;
 
 pub type Expr = Expression;
-pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Sync>;
+pub type FastExpr1d = Arc<dyn Fn(f64) -> f64 + Send + Sync>;
 
 pub type FastExpr2dto1d = Arc<dyn Fn(f64, f64) -> FastExpr1d>;
-pub type FastExpr3d = Arc<dyn Fn(f64, f64, f64) -> f64 + Sync>;
+pub type FastExpr3d = Arc<dyn Fn(f64, f64, f64) -> f64 + Send + Sync>;
+pub type FastExpr4d = Arc<dyn Fn(f64, f64, f64, f64) -> f64 + Send + Sync>;
 
 pub const COORD: [&str; 3] = ["x", "y", "z"];
 
@@ -157,6 +158,10 @@ pub fn expr_to_fastexpr2dto1d(mut expr: Expr, var_name: String) -> FastExpr2dto1
 pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
     let eval_expr = Arc::new(expr.simplify());
     let eval = move |x: f64, y: f64, z: f64| -> f64 {
+        if let Some(value) = eval_xyzt_fast_path(&eval_expr, x, y, z, 0.0) {
+            return value;
+        }
+
         let mut vars = HashMap::with_capacity(3);
         vars.insert("x".to_string(), num(x));
         vars.insert("y".to_string(), num(y));
@@ -171,6 +176,83 @@ pub fn expr_to_fastexpr3d(expr: Expr) -> FastExpr3d {
             .unwrap_or(f64::NAN)
     };
     Arc::new(eval)
+}
+
+/// Compiles a symbolic expression into a fast evaluator over spatial coordinates and time.
+pub fn expr_to_fastexpr4d(expr: Expr) -> FastExpr4d {
+    let eval_expr = Arc::new(expr.simplify());
+    let eval = move |x: f64, y: f64, z: f64, t: f64| -> f64 {
+        if let Some(value) = eval_xyzt_fast_path(&eval_expr, x, y, z, t) {
+            return value;
+        }
+
+        let mut vars = HashMap::with_capacity(4);
+        vars.insert("x".to_string(), num(x));
+        vars.insert("y".to_string(), num(y));
+        vars.insert("z".to_string(), num(z));
+        vars.insert("t".to_string(), num(t));
+        let substituted = eval_expr.substitute(&vars);
+        eval_expr
+            .evaluate_with_context(&EvalContext::numeric(vars))
+            .ok()
+            .and_then(|value| value.evaluate_to_f64().ok())
+            .or_else(|| eval_numeric_fallback(&substituted).ok())
+            .filter(|value| value.is_finite())
+            .unwrap_or(f64::NAN)
+    };
+    Arc::new(eval)
+}
+
+fn eval_xyzt_fast_path(expr: &Expr, x: f64, y: f64, z: f64, t: f64) -> Option<f64> {
+    eval_xyzt_node(expr, x, y, z, t).filter(|value| value.is_finite())
+}
+
+fn eval_xyzt_node(expr: &Expr, x: f64, y: f64, z: f64, t: f64) -> Option<f64> {
+    match expr {
+        Expression::Number(number) => number_to_f64(number),
+        Expression::Constant(constant) => Some(constant.to_f64()),
+        Expression::Symbol(symbol) => match symbol.name() {
+            "x" => Some(x),
+            "y" => Some(y),
+            "z" => Some(z),
+            "t" => Some(t),
+            _ => None,
+        },
+        Expression::Add(terms) => terms.iter().try_fold(0.0, |acc, term| {
+            Some(acc + eval_xyzt_node(term, x, y, z, t)?)
+        }),
+        Expression::Mul(factors) => factors.iter().try_fold(1.0, |acc, factor| {
+            Some(acc * eval_xyzt_node(factor, x, y, z, t)?)
+        }),
+        Expression::Pow(base, exp) => {
+            Some(eval_xyzt_node(base, x, y, z, t)?.powf(eval_xyzt_node(exp, x, y, z, t)?))
+        }
+        Expression::Function { name, args } => {
+            let arg = |idx: usize| eval_xyzt_node(&args[idx], x, y, z, t);
+            match name.as_ref() {
+                "sqrt" => Some(arg(0)?.sqrt()),
+                "sin" => Some(arg(0)?.sin()),
+                "cos" => Some(arg(0)?.cos()),
+                "tan" => Some(arg(0)?.tan()),
+                "asin" | "arcsin" => Some(arg(0)?.asin()),
+                "acos" | "arccos" => Some(arg(0)?.acos()),
+                "atan" | "arctan" => Some(arg(0)?.atan()),
+                "ln" | "log" => Some(arg(0)?.ln()),
+                "exp" => Some(arg(0)?.exp()),
+                "abs" => Some(arg(0)?.abs()),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn number_to_f64(number: &mathhook_core::Number) -> Option<f64> {
+    match number {
+        mathhook_core::Number::Integer(value) => Some(*value as f64),
+        mathhook_core::Number::Float(value) => Some(*value),
+        _ => Expression::Number(number.clone()).evaluate_to_f64().ok(),
+    }
 }
 
 /// Recursively evaluates an expression node using a small numeric fallback interpreter.

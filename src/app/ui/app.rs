@@ -1,7 +1,7 @@
 //! egui control panel for editing the grid, field, and tangent-view settings.
 
 use crate::app::ui::legend::show_legend_window;
-use crate::app::ui::state::{ControlTab, FieldKind, GridUiState};
+use crate::app::ui::state::{ControlTab, EmMode, FieldKind, GridUiState};
 use crate::app::ui::theme::{
     self, ACCENT, BORDER, CRAYOLA_BLUE, JET_BLACK, MUTED, PANEL, RASPBERRY, SHADOW_GREY, TEXT,
 };
@@ -41,6 +41,9 @@ impl ControlApp {
                     if Self::tab_button(ui, *active_tab == ControlTab::Field, "Field") {
                         *active_tab = ControlTab::Field;
                     }
+                    if Self::tab_button(ui, *active_tab == ControlTab::Em, "EM") {
+                        *active_tab = ControlTab::Em;
+                    }
                 });
             });
     }
@@ -50,6 +53,7 @@ impl ControlApp {
         match active_tab {
             ControlTab::Grid => Self::render_grid_tab(ui, data),
             ControlTab::Field => Self::render_field_tab(ui, data),
+            ControlTab::Em => Self::render_em_tab(ui, data),
         }
     }
 
@@ -190,6 +194,156 @@ impl ControlApp {
             });
     }
 
+    fn render_em_tab(ui: &mut egui::Ui, data: &mut GridUiState) {
+        egui::CollapsingHeader::new(theme::section_heading("Electromagnetism"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.checkbox(
+                    &mut data.em.enabled,
+                    egui::RichText::new("Enable EM").color(TEXT),
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("Mode").color(TEXT));
+                    if Self::tab_button(ui, data.em.mode == EmMode::Potentials, "Potentials") {
+                        data.em.mode = EmMode::Potentials;
+                    }
+                    if Self::tab_button(ui, data.em.mode == EmMode::Electric, "E") {
+                        data.em.mode = EmMode::Electric;
+                    }
+                    if Self::tab_button(ui, data.em.mode == EmMode::Magnetic, "B") {
+                        data.em.mode = EmMode::Magnetic;
+                    }
+                });
+                ui.separator();
+                Self::em_source_group(ui, data.em.mode == EmMode::Potentials, |ui| {
+                    Self::eq_row(ui, "Scalar:  V =", &mut data.em.phi.eq_str);
+                    Self::eq_row(
+                        ui,
+                        "Vector x:  Ax =",
+                        &mut data.em.vector_potential.x.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Vector y:  Ay =",
+                        &mut data.em.vector_potential.y.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Vector z:  Az =",
+                        &mut data.em.vector_potential.z.eq_str,
+                    );
+                });
+                ui.separator();
+                Self::em_source_group(ui, data.em.mode == EmMode::Electric, |ui| {
+                    Self::eq_row(
+                        ui,
+                        "Electric x:  Ex =",
+                        &mut data.em.electric_field.x.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Electric y:  Ey =",
+                        &mut data.em.electric_field.y.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Electric z:  Ez =",
+                        &mut data.em.electric_field.z.eq_str,
+                    );
+                });
+                ui.separator();
+                Self::em_source_group(ui, data.em.mode == EmMode::Magnetic, |ui| {
+                    Self::eq_row(
+                        ui,
+                        "Magnetic x:  Bx =",
+                        &mut data.em.magnetic_field.x.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Magnetic y:  By =",
+                        &mut data.em.magnetic_field.y.eq_str,
+                    );
+                    Self::eq_row(
+                        ui,
+                        "Magnetic z:  Bz =",
+                        &mut data.em.magnetic_field.z.eq_str,
+                    );
+                });
+            });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(theme::section_heading("Constants"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.add(
+                    egui::Slider::new(&mut data.em.light_speed, 0.1..=100.0)
+                        .logarithmic(true)
+                        .text("c")
+                        .trailing_fill(true),
+                );
+                ui.add(
+                    egui::Slider::new(&mut data.em.magnetic_vector_scale, 0.1..=100.0)
+                        .logarithmic(true)
+                        .text("B vector scale")
+                        .trailing_fill(true),
+                );
+            });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(theme::section_heading("Time"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.checkbox(&mut data.em.running, egui::RichText::new("Run").color(TEXT));
+                ui.add(
+                    egui::Slider::new(&mut data.em.time_scale, -5.0..=5.0)
+                        .text("time scale")
+                        .trailing_fill(true),
+                );
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("Reset time").color(Color32::WHITE))
+                            .fill(RASPBERRY)
+                            .min_size(egui::vec2(120.0, 30.0))
+                            .corner_radius(CornerRadius::same(6)),
+                    )
+                    .clicked()
+                {
+                    data.em.reset_counter += 1;
+                }
+            });
+
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(theme::section_heading("Layers"))
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.checkbox(
+                    &mut data.em.layers.electric,
+                    egui::RichText::new("E").color(TEXT),
+                );
+                ui.checkbox(
+                    &mut data.em.layers.magnetic,
+                    egui::RichText::new("B").color(TEXT),
+                );
+                ui.checkbox(
+                    &mut data.em.layers.scalar_potential,
+                    egui::RichText::new("V").color(TEXT),
+                );
+                ui.checkbox(
+                    &mut data.em.layers.vector_potential,
+                    egui::RichText::new("A").color(TEXT),
+                );
+            });
+    }
+
+    fn em_source_group(
+        ui: &mut egui::Ui,
+        editable: bool,
+        add_contents: impl FnOnce(&mut egui::Ui),
+    ) {
+        ui.add_enabled_ui(editable, add_contents);
+    }
+
     /// Validates the current UI state and bumps the apply counter on success.
     fn handle_apply(data: &mut GridUiState, error_popup: &mut Option<String>) {
         match validate_ui_state(data) {
@@ -197,12 +351,12 @@ impl ControlApp {
                 data.coords_sys = validated.coords_sys;
                 data.scalar_field = validated.scalar_field;
                 data.field = validated.field;
+                data.em = validated.em;
                 data.apply_counter += 1;
             }
             Err(error) => *error_popup = Some(error),
         }
     }
-
     /// Renders the Apply button and runs validation when it is clicked.
     fn render_apply_button(
         ui: &mut egui::Ui,

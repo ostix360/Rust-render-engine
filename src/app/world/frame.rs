@@ -36,6 +36,10 @@ impl World {
             needs_render_rebuild = true;
         }
 
+        if self.advance_em_time(dt) {
+            needs_render_rebuild = true;
+        }
+
         self.tangent_space.update(
             input,
             dt,
@@ -93,6 +97,41 @@ impl World {
         }
 
         pending_state
+    }
+
+    fn advance_em_time(&mut self, dt: f64) -> bool {
+        if self.em_runtime.is_none() {
+            return false;
+        }
+
+        let (running, time_scale, reset_counter) = {
+            let shared = self.shared_ui_state.lock().unwrap();
+            (
+                shared.em.running,
+                shared.em.time_scale,
+                shared.em.reset_counter,
+            )
+        };
+
+        let mut changed = false;
+        if reset_counter != self.last_em_reset_counter {
+            self.em_time = 0.0;
+            self.last_em_reset_counter = reset_counter;
+            changed = true;
+        }
+        if running && time_scale != 0.0 {
+            self.em_time += dt * time_scale;
+            changed = true;
+        }
+
+        let has_visible_layers = self
+            .em_runtime
+            .as_ref()
+            .is_some_and(|runtime| runtime.active_layers().any_visible());
+        if changed && has_visible_layers {
+            self.recompute_cached_em_data();
+        }
+        changed && has_visible_layers
     }
 
     /// Refreshes the marker sphere that highlights the hovered or anchored sample.

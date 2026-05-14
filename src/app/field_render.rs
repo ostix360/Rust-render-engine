@@ -1,5 +1,6 @@
 //! Field sampling caches and renderable construction.
 
+use crate::app::em_runtime::EmRuntime;
 use crate::app::field_runtime::RuntimeField;
 use crate::app::tangent_space::TangentSpace;
 use crate::app::ui::legend::sampled_value_color;
@@ -82,6 +83,80 @@ pub struct ScalarRender {
 
 pub struct VectorRenderConfig {
     pub normalize_field: bool,
+}
+
+pub struct EmRenderCache {
+    pub phi: Option<Vec<f64>>,
+    pub electric: Option<CachedVectorLayer>,
+    pub magnetic: Option<CachedVectorLayer>,
+    pub vector_potential: Option<CachedVectorLayer>,
+}
+
+pub struct CachedVectorLayer {
+    pub components: Vec<Vector3<f64>>,
+    pub world_vectors: Vec<Vector3<f64>>,
+}
+
+impl EmRenderCache {
+    pub fn from_runtime(runtime: &EmRuntime, samples: &[FieldSample], time: f64) -> Self {
+        let layers = runtime.active_layers();
+        let mut phi = layers
+            .scalar_potential
+            .then(|| Vec::with_capacity(samples.len()));
+        let mut electric = layers
+            .electric
+            .then(|| CachedVectorLayer::new(samples.len()));
+        let mut magnetic = layers
+            .magnetic
+            .then(|| CachedVectorLayer::new(samples.len()));
+        let mut vector_potential = layers
+            .vector_potential
+            .then(|| CachedVectorLayer::new(samples.len()));
+
+        for sample in samples {
+            let point = Point {
+                x: sample.abstract_pos.x,
+                y: sample.abstract_pos.y,
+                z: sample.abstract_pos.z,
+            };
+            if let Some(phi) = &mut phi {
+                phi.push(runtime.phi_at(point, time));
+            }
+            if let Some(layer) = &mut electric {
+                layer.push(sample, runtime.electric_at(point, time));
+            }
+            if let Some(layer) = &mut magnetic {
+                layer.push(
+                    sample,
+                    runtime.magnetic_at(point, time) * runtime.magnetic_render_scale(),
+                );
+            }
+            if let Some(layer) = &mut vector_potential {
+                layer.push(sample, runtime.vector_potential_at(point, time));
+            }
+        }
+
+        Self {
+            phi,
+            electric,
+            magnetic,
+            vector_potential,
+        }
+    }
+}
+
+impl CachedVectorLayer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            components: Vec::with_capacity(capacity),
+            world_vectors: Vec::with_capacity(capacity),
+        }
+    }
+
+    fn push(&mut self, sample: &FieldSample, component: Vector3<f64>) {
+        self.components.push(component);
+        self.world_vectors.push(sample.vector_to_world(component));
+    }
 }
 
 /// Returns whether every component of the vector is finite.
@@ -170,9 +245,26 @@ pub fn build_vector_render(
     samples: &[FieldSample],
     components: &[Vector3<f64>],
     world_vectors: &[Vector3<f64>],
-    _field: &crate::maths::field::VectorField,
     tangent_space: &TangentSpace,
     config: VectorRenderConfig,
+) -> Vec<RenderVField> {
+    build_vector_render_with_color(
+        samples,
+        components,
+        world_vectors,
+        tangent_space,
+        config,
+        Vector4::new(1.0, 1.0, 0.0, 1.0),
+    )
+}
+
+pub fn build_vector_render_with_color(
+    samples: &[FieldSample],
+    components: &[Vector3<f64>],
+    world_vectors: &[Vector3<f64>],
+    tangent_space: &TangentSpace,
+    config: VectorRenderConfig,
+    color: Vector4<f64>,
 ) -> Vec<RenderVField> {
     let mut render_field = Vec::with_capacity(samples.len());
 
@@ -212,11 +304,7 @@ pub fn build_vector_render(
             }
         }
 
-        render_field.push(RenderVField::new(
-            render_position,
-            render_vector,
-            Vector4::new(1.0, 1.0, 0.0, 1.0),
-        ));
+        render_field.push(RenderVField::new(render_position, render_vector, color));
     }
 
     render_field
@@ -224,8 +312,12 @@ pub fn build_vector_render(
 
 #[cfg(test)]
 mod tests {
-    use super::normalized_or_original;
-    use nalgebra::vector;
+    use super::{
+        build_scalar_render, build_vector_render_with_color, normalized_or_original, FieldSample,
+        VectorRenderConfig,
+    };
+    use crate::app::tangent_space::TangentSpace;
+    use nalgebra::{vector, Vector3, Vector4};
 
     #[test]
     fn normalization_helper_preserves_direction_and_unit_length() {
@@ -239,5 +331,33 @@ mod tests {
         let normalized = normalized_or_original(vector![0.0, 0.0, 0.0]);
 
         assert_eq!(normalized, vector![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn vector_and_scalar_renderables_can_be_assembled_together() {
+        let samples = vec![FieldSample {
+            abstract_pos: vector![0.0, 0.0, 0.0],
+            world_pos: vector![0.0, 0.0, 0.0],
+            basis: [
+                vector![1.0, 0.0, 0.0],
+                vector![0.0, 1.0, 0.0],
+                vector![0.0, 0.0, 1.0],
+            ],
+        }];
+        let tangent_space = TangentSpace::new();
+        let vectors = build_vector_render_with_color(
+            &samples,
+            &[Vector3::new(1.0, 0.0, 0.0)],
+            &[Vector3::new(1.0, 0.0, 0.0)],
+            &tangent_space,
+            VectorRenderConfig {
+                normalize_field: false,
+            },
+            Vector4::new(0.0, 0.8, 1.0, 1.0),
+        );
+        let scalars = build_scalar_render(&samples, &[1.0], &tangent_space, 0.1);
+
+        assert_eq!(vectors.len(), 1);
+        assert_eq!(scalars.samples.len(), 1);
     }
 }

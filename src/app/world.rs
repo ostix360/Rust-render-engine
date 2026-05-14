@@ -7,7 +7,8 @@ mod grid_cache;
 
 use crate::app::applied_config::AppliedConfig;
 use crate::app::coords_sys::CoordsSys;
-use crate::app::field_render::{FieldRenderCache, FieldSample};
+use crate::app::em_runtime::EmRuntime;
+use crate::app::field_render::{EmRenderCache, FieldRenderCache, FieldSample};
 use crate::app::field_runtime::RuntimeField;
 use crate::app::grid::Grid;
 use crate::app::grid_world::{GridSample, GridWorld};
@@ -23,10 +24,14 @@ const SPHERE_SIZE: f64 = 0.1;
 
 pub struct World {
     field: RuntimeField,
+    em_runtime: Option<EmRuntime>,
     render_field: Vec<RenderVField>,
     render_form_samples: Vec<Sphere>,
     field_samples: Vec<FieldSample>,
     field_cache: FieldRenderCache,
+    em_cache: Option<EmRenderCache>,
+    em_time: f64,
+    last_em_reset_counter: u64,
     normalize_field: bool,
     renderer: MasterRenderer,
     grid: Grid,
@@ -51,12 +56,19 @@ impl World {
         let initial_state = shared_ui_state.lock().unwrap().clone();
         let applied_config = AppliedConfig::from_ui(&initial_state);
         let (grid, field, field_samples, grid_samples) = Self::init(initial_state.clone());
+        let em_runtime = initial_state.em.enabled.then(|| {
+            EmRuntime::from_ui_with_config(&initial_state.em, &grid, applied_config.grid_config)
+        });
         let mut world = Self {
             field,
+            em_runtime,
             render_field: Vec::new(),
             render_form_samples: Vec::new(),
             field_samples,
             field_cache: FieldRenderCache::Scalar(Vec::new()),
+            em_cache: None,
+            em_time: 0.0,
+            last_em_reset_counter: initial_state.em.reset_counter,
             normalize_field: initial_state.normalize_field,
             renderer: MasterRenderer::new(
                 display_manager.get_width() as f64,
@@ -79,6 +91,7 @@ impl World {
             .tangent_space
             .set_geometric_arrow_scale(initial_state.geometric_arrow_scale);
         world.recompute_cached_field_data();
+        world.recompute_cached_em_data();
         world.rebuild_render_field();
         world
     }
@@ -113,7 +126,7 @@ impl World {
 mod tests {
     use super::World;
     use crate::app::applied_config::AppliedConfig;
-    use crate::app::ui::{FieldKind, GridUiState};
+    use crate::app::ui::{EmMode, FieldKind, GridUiState};
     use crate::maths::differential::Form;
     use crate::maths::field::VectorField;
     use crate::maths::space::Space;
@@ -165,6 +178,22 @@ mod tests {
         assert!(diff.field_kind_changed);
         assert!(diff.scalar_changed);
         assert!(diff.render_d_changed);
+    }
+
+    #[test]
+    fn apply_diff_tracks_em_enable_mode_and_equation_changes() {
+        let current = AppliedConfig::from_ui(&GridUiState::default());
+        let mut next_state = GridUiState::default();
+        next_state.em.enabled = true;
+        next_state.em.mode = EmMode::Electric;
+        next_state.em.electric_field.x.eq_str = "sin(t)".to_string();
+        let next = AppliedConfig::from_ui(&next_state);
+
+        let diff = current.diff(&next);
+
+        assert!(diff.em_enabled_changed);
+        assert!(diff.em_mode_changed);
+        assert!(diff.em_equations_changed);
     }
 
     #[test]

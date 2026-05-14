@@ -1,38 +1,65 @@
 # Project Status
 
-Generated: 2026-04-27
+Generated: 2026-05-14
 
 ## Summary
 
 `render_engine` is a Rust/OpenGL demo engine for visualizing coordinate grids,
-scalar fields, vector fields, and tangent-space views. The runtime is split
-between a GLFW/OpenGL render loop and an egui control window. The control window
-publishes validated grid and field settings through shared UI state, while the
-render thread owns OpenGL resources, cached geometry, field samples, tangent
-state, and rendering.
+scalar fields, vector fields, electromagnetism slices, and tangent-space views.
+The runtime is split between a GLFW/OpenGL render loop and an egui control
+window. The control window publishes validated grid, field, and EM settings
+through shared UI state, while the render thread owns OpenGL resources, cached
+geometry, field samples, tangent state, EM time, and rendering.
 
-The current checkout builds and the test suite passes locally. The working tree
-contains the current documentation pass plus unrelated untracked root files.
+The current checkout builds and the CPU-safe EM/runtime validation tests pass
+locally. This pass fixes reviewed EM source-mode issues: potential mode keeps
+`B` derived from `*dA`, electric source mode rejects mixed static terms before
+using the plane-wave shortcut, and EM apply no longer fails because of hidden
+normal-field drafts. The working tree contains EM visualizer changes plus
+unrelated untracked root files.
 
 ## Current Verification
 
+- `rtk cargo fmt` completed successfully.
+- `rtk cargo test potential_mode_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
+  passes.
+- `rtk cargo test electric_source_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
+  passes.
+- `rtk cargo test em_runtime -- --skip test_logger` passes.
+- `rtk cargo test validate_ui_state -- --skip test_logger` passes.
+- `rtk cargo test em_vectors_remain_visible -- --skip test_logger` passes.
 - `rtk cargo test -- --skip test_logger` passes.
-- Result: 117 tests passed, 2 tests filtered out.
+- Result: 163 tests passed, 2 tests filtered out.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
-- `rtk cargo fmt` completed successfully after the documentation update.
+- `rtk cargo run` was not rerun in this pass.
 
 ## Main Capabilities
 
 - Renders a sampled coordinate grid with editable coordinate-system equations.
-- Supports a separate egui control window with Grid and Field tabs.
+- Supports a separate egui control window with Grid, Field, and EM tabs.
 - Validates edited equations before publishing them to the render thread.
 - Supports vector fields, scalar fields, exterior derivative rendering, and
   optional vector normalization.
+- Supports an optional electromagnetism render mode over animated 3D slices,
+  with `t` as time. The EM tab now supports potential, electric-field, and
+  magnetic-field source families.
+- EM can render all four measures (`V/phi`, `A`, `E`, and `B`) from any source
+  family. Potential source uses `E = -dV - partial_t A` and `B = *dA`. Electric
+  source resolves pure `z` plane waves with `B = k x E / c`, then falls back to
+  `curl(B) = (1/c^2) partial_t(E)` with `div(B)=0` for non-plane-wave inputs;
+  magnetic source resolves `E` through `curl(E) = -partial_t(B)` in the same
+  divergence-free Coulomb-gauge reconstruction. Scalar/vector potentials remain
+  reconstructed visualization layers for direct source modes.
+- Electric source mode keeps the visible `A` layer responsive by using a local
+  vector-potential visualization from the derived `B` instead of nesting another
+  inverse-curl solve.
+- EM exposes a configurable `c` and a separate `B vector scale` control.
 - Uses a dedicated field render path and field shaders for field arrows.
 - Provides scalar and dual-tangent legends through auxiliary UI windows.
 - Supports geometric tangent view and dual tangent view, with smooth transition
-  logic and local tangent patch controls.
+  logic and local tangent patch controls. EM layers use the same sample
+  filtering and tangent blend path as normal field rendering.
 
 ## Architecture Snapshot
 
@@ -49,11 +76,15 @@ contains the current documentation pass plus unrelated untracked root files.
 - `src/app/world/field_rendering.rs` rebuilds cached field values and
   renderable field/dual-form overlays.
 - `src/app/applied_config.rs` stores comparable UI snapshots and computes which
-  runtime caches need rebuilding.
+  runtime caches need rebuilding, including EM mode/equation/layer diffs.
+- `src/app/em_runtime.rs` builds timed EM scalar/vector evaluators for
+  potential-derived, electric-source, and magnetic-source modes, including the
+  finite-domain Maxwell inverse-curl reconstruction used by direct `E`/`B`
+  sources.
 - `src/app/field_runtime.rs` builds the active scalar/vector runtime field from
   validated UI state.
 - `src/app/field_render.rs` owns field sampling caches and renderable creation
-  for scalar samples and vector arrows.
+  for scalar samples, vector arrows, and EM render layers.
 - `src/app/tangent_space.rs` owns tangent-space state, anchor selection, smooth
   dive transitions, local sample filtering, geometric tangent display, and dual
   tangent display.
@@ -64,17 +95,54 @@ contains the current documentation pass plus unrelated untracked root files.
 - `src/maths/` contains expression evaluation, coordinate-space math,
   differential forms, scalar fields, and vector fields.
 - `tests/` covers matrix/camera math, coordinate evaluation, field operations,
+  EM derivation/source-mode behavior, UI validation, applied-config diffs,
   metrics, and render-vector transforms.
 
 ## Current Working Tree
 
 The repository has uncommitted changes. Current tracked edits include:
 
-- unstaged documentation improvements in `src/maths/differential.rs`,
-  `src/maths/field.rs`, `src/maths/space.rs`, `src/app/field_render.rs`,
-  `src/app/field_runtime.rs`, `src/app/tangent_space.rs`, and
-  `src/app/ui/validation.rs`.
-- unstaged `PROJECT_STATUS.md` updates for the current documentation pass.
+- EM UI state, tab rendering, and validation updates in `src/app/ui/`.
+- EM runtime/cache wiring in `src/app/em_runtime.rs`, `src/app/world.rs`,
+  `src/app/world/apply.rs`, `src/app/world/frame.rs`, and
+  `src/app/world/field_rendering.rs`.
+- EM source-mode updates so `V/phi + A`, `E`, or `B` can act as the input
+  family while the other measures are resolved for rendering.
+- Direct electric source mode now derives `B` from the Ampere-Maxwell source
+  `(1/c^2) partial_t(E)` instead of `curl(E)` for general inputs.
+- Direct electric source mode now detects transverse plane waves travelling
+  along `z` and derives `B` analytically from `k x E / c`, preventing the
+  default `E = (0, cos(z - t), 0)` case from rotating during animation.
+- Potential source mode keeps magnetic reconstruction anchored to `B = *dA`,
+  including static curl terms mixed into travelling-wave vector potentials.
+- Electric source mode rejects mixed static spatial terms before using the
+  plane-wave shortcut, so only pure `z`-travelling transverse waves skip the
+  finite-domain inverse-curl fallback.
+- EM validation preserves hidden normal field drafts while EM is enabled, so
+  Apply is not blocked by unrelated Field-tab parse errors.
+- Direct magnetic source mode now derives `E` from the Faraday source
+  `-partial_t(B)` instead of `curl(B)`.
+- The direct-source inverse curl uses a finite-domain Coulomb/Biot-Savart
+  reconstruction over the active grid bounds, which makes the derived field
+  divergence-free under the chosen boundary/gauge assumption.
+- Removed the elapsed-time integral previously used for source-derived fields;
+  derived `E`/`B` layers are now bounded compiled expressions rather than
+  accumulated values.
+- Added a direct `x/y/z/t` expression fast path that bypasses per-sample
+  substitution maps for common arithmetic and transcendental expressions.
+- Added Coulomb-style scalar-potential reconstruction for `E` and `B` source
+  modes, and reconstructs `A` from the derived or supplied `B` field.
+- Configurable `c` and `B vector scale` controls.
+- EM cache/render optimizations that skip hidden layers, avoid time rebuilds
+  when the clock is effectively paused, and reserve vector render buffers for
+  the active layer count.
+- EM vector layers remain visible in dual tangent mode because there is not yet
+  an EM-specific dual-form replacement layer.
+- Timed expression evaluation in `src/maths/mod.rs`.
+- Field-render assembly updates in `src/app/field_render.rs` and
+  `src/render/master_render.rs` so scalar samples and vector arrows can render
+  in the same frame.
+- unstaged `PROJECT_STATUS.md` updates for the EM visualizer pass.
 
 There are also untracked agent/editor/tooling files in the repository root.
 Those appear unrelated to the render-engine runtime itself.
@@ -87,17 +155,24 @@ Those appear unrelated to the render-engine runtime itself.
 - The test suite passes, but the current warnings show stale or partially unused
   projection/tangent API surfaces that should either be wired back in or removed
   intentionally.
+- EM is implemented as animated 3D spatial slices with time-varying equations,
+  not as a full 4D spacetime exterior-algebra model.
+- Direct `E`/`B` source modes still need a boundary/gauge choice because a
+  single field does not uniquely determine the complementary field. The current
+  general fallback is a finite-domain Coulomb/Biot-Savart inverse over the
+  active grid bounds; electric `z`-travelling plane waves use an analytic
+  transverse shortcut instead.
+- Recovering potentials from `E` or `B` uses visualization conventions rather
+  than a full boundary-value solve. The gauge is intentionally local to the EM
+  runtime so it can become editable later.
 - `GridWorld::ray_cast` currently selects the nearest candidate relative to the
   ray origin after a radius hit. That may be wrong for later ray steps and
   should be reviewed with a targeted regression before changing behavior.
 - The general `Hodge::hodge_star` implementation for `Form` still delegates to
   `todo!()`. Runtime curl/dual behavior uses `hodge_star_otn_3d`, but direct
   calls to the trait method will panic until implemented.
-- Runtime rendering behavior was not visually smoke-tested in this snapshot.
-  This pass only changed comments and rustdoc, so OpenGL/window-specific
-  behavior was not rechecked.
-- The working tree contains documentation edits and unrelated untracked root
-  files. Keep those separate when committing.
+- The working tree contains EM implementation edits and unrelated untracked
+  root files. Keep those separate when committing.
 
 ## Suggested Next Steps
 
@@ -105,8 +180,8 @@ Those appear unrelated to the render-engine runtime itself.
    selection from ray-origin distance to query-point distance.
 2. Decide whether the unused projection/tangent helpers are future-facing API or
    dead code, then either wire them in or annotate/remove them.
-3. Implement or explicitly deprecate the unused `Hodge::hodge_star` trait path.
-4. Review the untracked root tooling files and keep only the ones intended for
+3. Add a visual regression capture or manual screenshot checklist for the EM
+   layer colors and tangent-space interaction.
+4. Implement or explicitly deprecate the unused `Hodge::hodge_star` trait path.
+5. Review the untracked root tooling files and keep only the ones intended for
    the repository.
-5. Split any commit into focused changes: staged instruction updates, world
-   readability refactor, lint cleanup, and status documentation.
