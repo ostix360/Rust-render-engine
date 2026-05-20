@@ -1,6 +1,6 @@
 //! Built-in UI presets for common coordinate systems and field configurations.
 
-use crate::app::ui::state::{EmMode, FieldKind, GridUiState, SpacialEqs};
+use crate::app::ui::state::{EmGauge, EmMode, FieldKind, GridUiState, SpacialEqs};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GridPreset {
@@ -150,6 +150,7 @@ impl EmPreset {
 
     pub(crate) fn apply(self, state: &mut GridUiState) {
         state.em.mode = EmMode::Potentials;
+        state.em.gauge = EmGauge::Coulomb;
         state.em.phi.eq_str = self.phi.to_string();
         set_spacial_eqs(&mut state.em.vector_potential, self.vector_potential);
         set_spacial_eqs(&mut state.em.electric_field, self.electric_field);

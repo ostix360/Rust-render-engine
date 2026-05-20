@@ -62,6 +62,12 @@ pub enum EmMode {
     Magnetic,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmGauge {
+    Coulomb,
+    Lorenz,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmLayerVisibility {
     pub electric: bool,
@@ -94,6 +100,7 @@ pub struct EmUiState {
     pub light_speed: f64,
     pub magnetic_vector_scale: f64,
     pub normalize_vectors: bool,
+    pub gauge: EmGauge,
     pub phi: EqRender,
     pub vector_potential: SpacialEqs,
     pub electric_field: SpacialEqs,
@@ -112,6 +119,7 @@ impl Default for EmUiState {
             light_speed: 1.0,
             magnetic_vector_scale: 1.0,
             normalize_vectors: false,
+            gauge: EmGauge::Coulomb,
             phi: default_eq("0"),
             vector_potential: SpacialEqs::from_defaults("0", "sin(z - t)", "0"),
             electric_field: SpacialEqs::from_defaults("0", "cos(z - t)", "0"),
@@ -149,6 +157,7 @@ pub struct GridUiState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LegendKind {
     ScalarField,
+    ScalarPotential,
     DualTangent,
 }
 
@@ -169,6 +178,12 @@ impl LegendKind {
                 title: "Scalar Field Legend",
                 subtitle: "Sampled field values over the current grid",
                 footer: "Visible when rendering the base scalar field.",
+            },
+            Self::ScalarPotential => LegendDescriptor {
+                window_title: "Scalar Potential V Legend",
+                title: "Scalar Potential V Legend",
+                subtitle: "Sampled EM scalar potential over the current grid",
+                footer: "A uniform range means the active gauge has constant V.",
             },
             Self::DualTangent => LegendDescriptor {
                 window_title: "Dual Tangent Legend",
@@ -283,7 +298,7 @@ fn default_eq(expr: &str) -> EqRender {
 
 #[cfg(test)]
 mod tests {
-    use super::{ControlTab, EmMode, FieldKind, GridUiState};
+    use super::{ControlTab, EmGauge, EmMode, FieldKind, GridUiState};
 
     #[test]
     #[allow(clippy::approx_constant)]
@@ -299,6 +314,7 @@ mod tests {
         assert_eq!(state.em.light_speed, 1.0);
         assert_eq!(state.em.magnetic_vector_scale, 1.0);
         assert!(!state.em.normalize_vectors);
+        assert_eq!(state.em.gauge, EmGauge::Coulomb);
         assert!(state.em.layers.electric);
         assert!(state.em.layers.magnetic);
         assert!(!state.em.layers.scalar_potential);

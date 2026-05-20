@@ -1,7 +1,7 @@
 //! Electromagnetism runtime fields over animated 3D slices.
 
 use crate::app::grid::{Grid, GridConfig};
-use crate::app::ui::{EmLayerVisibility, EmMode, EmUiState, SpacialEqs};
+use crate::app::ui::{EmGauge, EmLayerVisibility, EmMode, EmUiState, SpacialEqs};
 use crate::maths::differential::Form;
 use crate::maths::space::Space;
 use crate::maths::{derivate, expr_to_fastexpr4d, Expr, ExternalDerivative, FastExpr4d, Point};
@@ -193,7 +193,7 @@ impl EmRuntime {
                 maxwell_inverse_curl(ampere_source, maxwell_config)
             };
         let vector_potential = local_vector_potential_from_b(magnetic_field.clone());
-        let phi = local_scalar_potential_from_e(electric_field.clone());
+        let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
 
         Self {
             layers: state.layers.clone(),
@@ -218,7 +218,7 @@ impl EmRuntime {
                 let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
                 maxwell_inverse_curl(faraday_source, maxwell_config.clone())
             };
-        let phi = local_scalar_potential_from_e(electric_field.clone());
+        let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
         let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
 
         Self {
@@ -514,6 +514,18 @@ fn local_scalar_potential_from_e(electric_field: TimedVectorField) -> TimedScala
     }))
 }
 
+fn scalar_potential_for_gauge(
+    gauge: EmGauge,
+    electric_field: TimedVectorField,
+) -> TimedScalarField {
+    match gauge {
+        EmGauge::Coulomb => local_scalar_potential_from_e(electric_field),
+        // A zero Lorenz scalar potential would require a matching transform of `A`; otherwise
+        // the displayed potentials no longer reconstruct the displayed source field.
+        EmGauge::Lorenz => local_scalar_potential_from_e(electric_field),
+    }
+}
+
 fn exprs_from_spacial(eqs: &SpacialEqs) -> [Expr; 3] {
     [eqs.x.eq.clone(), eqs.y.eq.clone(), eqs.z.eq.clone()]
 }
@@ -539,7 +551,7 @@ mod tests {
     use super::EmRuntime;
     use crate::app::coords_sys::CoordsSys;
     use crate::app::grid::Grid;
-    use crate::app::ui::{EmMode, EmUiState};
+    use crate::app::ui::{EmGauge, EmMode, EmUiState};
     use crate::maths::Point;
     use mathhook_core::Parser;
     use std::f64::consts::PI;
@@ -866,6 +878,33 @@ mod tests {
                 0.0,
             ),
             -6.0,
+        );
+    }
+
+    #[test]
+    fn lorenz_source_gauge_keeps_potential_reconstruction_consistent() {
+        let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+        let point = Point {
+            x: 3.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let mut state = EmUiState::default();
+        state.mode = EmMode::Electric;
+        state.electric_field.x.eq = parse("2");
+        state.electric_field.y.eq = parse("0");
+        state.electric_field.z.eq = parse("0");
+
+        state.gauge = EmGauge::Coulomb;
+        let coulomb = EmRuntime::from_ui(&state, &identity_grid());
+        state.gauge = EmGauge::Lorenz;
+        let lorenz = EmRuntime::from_ui(&state, &identity_grid());
+
+        assert_close(coulomb.phi_at(point, 0.0), -6.0);
+        assert_close(lorenz.phi_at(point, 0.0), -6.0);
+        assert_close(
+            (coulomb.electric_at(point, 0.0) - lorenz.electric_at(point, 0.0)).norm(),
+            0.0,
         );
     }
 

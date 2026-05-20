@@ -1,7 +1,7 @@
 //! Applied UI configuration snapshots and diffing.
 
 use crate::app::grid::GridConfig;
-use crate::app::ui::{EmLayerVisibility, EmMode, FieldKind, GridUiState};
+use crate::app::ui::{EmGauge, EmLayerVisibility, EmMode, FieldKind, GridUiState};
 use mathhook_core::formatter::simple::SimpleContext;
 use mathhook_core::SimpleFormatter;
 
@@ -16,6 +16,7 @@ pub(crate) struct AppliedConfig {
     pub(crate) normalize_field: bool,
     em_enabled: bool,
     em_mode: EmMode,
+    em_gauge: EmGauge,
     em_phi: String,
     em_a_eqs: [String; 3],
     em_e_eqs: [String; 3],
@@ -63,6 +64,7 @@ impl AppliedConfig {
             normalize_field: state.normalize_field,
             em_enabled: state.em.enabled,
             em_mode: state.em.mode,
+            em_gauge: state.em.gauge,
             em_phi: state.em.phi.eq_str.clone(),
             em_a_eqs: [
                 state.em.vector_potential.x.eq_str.clone(),
@@ -98,7 +100,8 @@ impl AppliedConfig {
             normalize_changed: self.normalize_field != next.normalize_field,
             em_enabled_changed: self.em_enabled != next.em_enabled,
             em_mode_changed: self.em_mode != next.em_mode,
-            em_equations_changed: self.em_phi != next.em_phi
+            em_equations_changed: self.em_gauge != next.em_gauge
+                || self.em_phi != next.em_phi
                 || self.em_a_eqs != next.em_a_eqs
                 || self.em_e_eqs != next.em_e_eqs
                 || self.em_b_eqs != next.em_b_eqs

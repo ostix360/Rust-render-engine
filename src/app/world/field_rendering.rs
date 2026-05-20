@@ -2,10 +2,12 @@
 
 use super::{World, SPHERE_SIZE};
 use crate::app::field_render::{
-    build_scalar_render, build_vector_render, build_vector_render_with_color, EmRenderCache,
-    FieldRenderCache, VectorNormalization, VectorRenderConfig,
+    build_scalar_render, build_scalar_render_with_kind, build_vector_render,
+    build_vector_render_with_color, EmRenderCache, FieldRenderCache, VectorNormalization,
+    VectorRenderConfig,
 };
 use crate::app::field_runtime::RuntimeField;
+use crate::app::ui::LegendKind;
 use crate::maths::field::VectorField;
 use crate::maths::Point;
 use nalgebra::Vector3;
@@ -104,8 +106,13 @@ impl World {
             let Some(phi) = &cache.phi else {
                 return;
             };
-            let scalar_render =
-                build_scalar_render(&self.field_samples, phi, &self.tangent_space, SPHERE_SIZE);
+            let scalar_render = build_scalar_render_with_kind(
+                &self.field_samples,
+                phi,
+                &self.tangent_space,
+                SPHERE_SIZE,
+                LegendKind::ScalarPotential,
+            );
             self.render_form_samples = scalar_render.samples;
             self.legend = scalar_render.legend;
         }

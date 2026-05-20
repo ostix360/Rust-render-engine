@@ -2,7 +2,7 @@
 
 use crate::app::ui::legend::show_legend_window;
 use crate::app::ui::presets::{EmPreset, FieldPreset, GridPreset};
-use crate::app::ui::state::{ControlTab, EmMode, FieldKind, GridUiState};
+use crate::app::ui::state::{ControlTab, EmGauge, EmMode, FieldKind, GridUiState};
 use crate::app::ui::theme::{
     self, ACCENT, BORDER, CRAYOLA_BLUE, JET_BLACK, MUTED, PANEL, RASPBERRY, SHADOW_GREY, TEXT,
 };
@@ -265,6 +265,24 @@ impl ControlApp {
                     }
                 });
                 ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("Gauge").color(TEXT));
+                    if Self::tab_button(ui, data.em.gauge == EmGauge::Coulomb, "Coulomb") {
+                        data.em.gauge = EmGauge::Coulomb;
+                    }
+                    if Self::tab_button(ui, data.em.gauge == EmGauge::Lorenz, "Lorenz") {
+                        data.em.gauge = EmGauge::Lorenz;
+                    }
+                });
+                ui.label(
+                    egui::RichText::new(
+                        "Named gauge selector for potential display/reconstruction. Coulomb-like \
+                         is the current reconstruction; Lorenz currently uses the same consistent \
+                         potential reconstruction until its matching A transform is implemented.",
+                    )
+                    .color(MUTED),
+                );
+                ui.separator();
                 Self::em_source_group(ui, data.em.mode == EmMode::Potentials, |ui| {
                     Self::eq_row(ui, "Scalar:  V =", &mut data.em.phi.eq_str);
                     Self::eq_row(
@@ -381,6 +399,11 @@ impl ControlApp {
                 ui.checkbox(
                     &mut data.em.layers.scalar_potential,
                     egui::RichText::new("V").color(TEXT),
+                )
+                .on_hover_text(
+                    "Shows the scalar potential. The built-in wave presets use the V = 0 gauge, \
+                     so this layer is intentionally uniform until V is edited or reconstructed \
+                     from E/B source mode.",
                 );
                 ui.checkbox(
                     &mut data.em.layers.vector_potential,

@@ -251,6 +251,22 @@ pub fn build_scalar_render(
     tangent_space: &TangentSpace,
     sample_size: f64,
 ) -> ScalarRender {
+    build_scalar_render_with_kind(
+        samples,
+        values,
+        tangent_space,
+        sample_size,
+        LegendKind::ScalarField,
+    )
+}
+
+pub fn build_scalar_render_with_kind(
+    samples: &[FieldSample],
+    values: &[f64],
+    tangent_space: &TangentSpace,
+    sample_size: f64,
+    legend_kind: LegendKind,
+) -> ScalarRender {
     let mut min_value = f64::INFINITY;
     let mut max_value = f64::NEG_INFINITY;
     for (sample, value) in samples.iter().zip(values.iter().copied()) {
@@ -292,7 +308,7 @@ pub fn build_scalar_render(
     ScalarRender {
         samples: render_samples,
         legend: Some(LegendState {
-            kind: LegendKind::ScalarField,
+            kind: legend_kind,
             min_value,
             max_value,
         }),
@@ -378,10 +394,12 @@ pub fn build_vector_render_with_color(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_scalar_render, build_vector_render_with_color, normalized_or_original,
-        time_normalization_scale, FieldSample, VectorNormalization, VectorRenderConfig,
+        build_scalar_render, build_scalar_render_with_kind, build_vector_render_with_color,
+        normalized_or_original, time_normalization_scale, FieldSample, VectorNormalization,
+        VectorRenderConfig,
     };
     use crate::app::tangent_space::TangentSpace;
+    use crate::app::ui::LegendKind;
     use nalgebra::{vector, Vector3, Vector4};
 
     #[test]
@@ -424,6 +442,44 @@ mod tests {
 
         assert_eq!(vectors.len(), 1);
         assert_eq!(scalars.samples.len(), 1);
+    }
+
+    #[test]
+    fn scalar_potential_render_uses_potential_legend_and_value_colors() {
+        let samples = vec![
+            FieldSample {
+                abstract_pos: vector![0.0, 0.0, 0.0],
+                world_pos: vector![0.0, 0.0, 0.0],
+                basis: [
+                    vector![1.0, 0.0, 0.0],
+                    vector![0.0, 1.0, 0.0],
+                    vector![0.0, 0.0, 1.0],
+                ],
+            },
+            FieldSample {
+                abstract_pos: vector![1.0, 0.0, 0.0],
+                world_pos: vector![1.0, 0.0, 0.0],
+                basis: [
+                    vector![1.0, 0.0, 0.0],
+                    vector![0.0, 1.0, 0.0],
+                    vector![0.0, 0.0, 1.0],
+                ],
+            },
+        ];
+
+        let render = build_scalar_render_with_kind(
+            &samples,
+            &[0.0, 10.0],
+            &TangentSpace::new(),
+            0.1,
+            LegendKind::ScalarPotential,
+        );
+
+        let legend = render.legend.expect("expected scalar potential legend");
+        assert_eq!(legend.kind, LegendKind::ScalarPotential);
+        assert_eq!(legend.min_value, 0.0);
+        assert_eq!(legend.max_value, 10.0);
+        assert_ne!(render.samples[0].get_color(), render.samples[1].get_color());
     }
 
     #[test]

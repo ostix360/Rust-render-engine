@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-05-14
+Generated: 2026-05-20
 
 ## Summary
 
@@ -12,23 +12,29 @@ through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
 The current checkout builds and the CPU-safe EM/runtime validation tests pass
-locally. This pass adds standard-parameter buttons to the Grid, Field, and EM
-tabs. Grid presets cover Cartesian, spherical, cylindrical, and polar
-coordinates with matching sampling counts and bounds. Field presets cover
-constant/non-constant scalar and vector inputs. EM presets cover plane,
-standing, and damped waves, and the default EM layer visibility now leaves
-`V/phi` and `A` unchecked while keeping `E` and `B` visible. Applying an EM
-preset also restores `E` and `B` visibility if the user previously hid all EM
-layers. Earlier EM
-source-mode and vector-normalization fixes remain in the tree. This pass also
-fixes field-arrow transforms for vectors that point exactly opposite the mesh
-up axis, so the default plane-wave `E` arrow flips direction instead of
-shrinking and growing in place. The working tree contains UI preset changes,
-this render-vector fix, plus unrelated untracked root files.
+locally. EM scalar-potential rendering now uses a dedicated `V` legend instead
+of the generic scalar-field legend, and the UI layer toggle explains that the
+built-in wave presets intentionally use the `V = 0` gauge. A focused regression
+test covers nonuniform scalar-potential samples producing distinct render
+colors. The EM tab now exposes named gauge buttons instead of a free-form gauge
+equation; Coulomb-like remains the default and Lorenz is available as an
+explicit selection. Both choices currently use the existing local `V = -E·r`
+scalar-potential visualization for direct source modes so the displayed
+potentials remain consistent with the displayed `E` field; a real Lorenz
+reconstruction still needs a matching `A` transform before it can diverge.
+Earlier preset, source-mode, vector-normalization, and 180-degree field-arrow
+transform fixes remain in the tree. The working tree contains this EM `V`
+visibility/legend and gauge-selector change plus unrelated untracked root files.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test scalar_potential_render_uses_potential_legend_and_value_colors -- --skip test_logger`
+  passes.
+- `rtk cargo test apply_diff_tracks_em_gauge_selection -- --skip test_logger`
+  passes.
+- `rtk cargo test lorenz_source_gauge_keeps_potential_reconstruction_consistent -- --skip test_logger`
+  passes.
 - `rtk cargo test render_vfield -- --skip test_logger` passes with 5
   render-vector transform tests.
 - `rtk cargo test plane_wave -- --skip test_logger` passes with 12
@@ -53,7 +59,7 @@ this render-vector fix, plus unrelated untracked root files.
   41 EM-filtered tests.
 - `rtk cargo test validate_ui_state -- --skip test_logger` passes.
 - `rtk cargo test -- --skip test_logger` passes.
-- Result: 187 tests passed, 2 tests filtered out.
+- Result: 193 tests passed, 2 tests filtered out.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
 - `rtk cargo run` was not rerun in this pass.
@@ -89,6 +95,13 @@ this render-vector fix, plus unrelated untracked root files.
   and `A` arrows.
 - EM defaults to showing `E` and `B` while hiding `V/phi` and `A`; users can
   re-enable the potential layers from the EM Layers section.
+- The `V/phi` layer has a dedicated scalar-potential legend. If the range is
+  uniform, the legend now identifies that as a constant active gauge rather
+  than presenting it as an ordinary scalar field.
+- EM exposes named gauge buttons for Coulomb-like and Lorenz selection, and the
+  apply diff treats gauge changes as EM runtime changes. Direct `E`/`B` source
+  modes keep Lorenz on the consistent Coulomb-like scalar-potential
+  reconstruction until a matching vector-potential transform is implemented.
 - Uses a dedicated field render path and field shaders for field arrows.
 - Field arrows now handle exact 180-degree direction flips, including negative
   `Y` vectors produced by oscillating plane-wave `E` layers.

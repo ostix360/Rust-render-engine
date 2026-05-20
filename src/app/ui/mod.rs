@@ -9,7 +9,7 @@ mod validation;
 
 #[allow(unused_imports)]
 pub use state::{
-    EmLayerVisibility, EmMode, EmUiState, EqRender, FieldKind, GridUiState, LegendKind,
+    EmGauge, EmLayerVisibility, EmMode, EmUiState, EqRender, FieldKind, GridUiState, LegendKind,
     LegendState, SpacialEqs,
 };
 
