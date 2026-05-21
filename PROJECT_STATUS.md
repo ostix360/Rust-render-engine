@@ -11,9 +11,15 @@ window. The control window publishes validated grid, field, and EM settings
 through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
-The current checkout builds and the targeted EM/runtime validation tests pass
-locally. The latest runtime change adds an opt-in EM profiling path and
-parallelizes the expensive direct-source fallback work. Setting
+The current checkout builds and the full non-logger test suite passes locally.
+The latest maintenance pass splits oversized app modules by responsibility:
+`em_runtime` now delegates timed field wrappers, Maxwell inverse-curl/cache
+logic, plane-wave shortcuts, local potential reconstruction, and focused tests
+to child modules; `field_render` delegates EM render-cache sampling; the tangent
+subsystem delegates dive state and public render-state types; and the control UI
+keeps tab rendering in a child module. No Rust source or test file is currently
+over 500 lines. The EM runtime still includes an opt-in profiling path and
+parallelized direct-source fallback work. Setting
 `RENDER_ENGINE_PROFILE_EM=1`
 prints per-cache timings for EM render-cache rebuilds, inverse-curl target
 evaluation, source-grid sampling, and vector time normalization. EM render-cache
@@ -45,7 +51,7 @@ untracked root files.
   45 EM-filtered tests.
 - `rtk cargo test field_render -- --skip test_logger` passes with 16
   field-render-filtered tests.
-- `rtk cargo test -- --skip test_logger` passes with 195 tests passed, 2
+- `rtk cargo test -- --skip test_logger` passes with 167 tests passed, 2
   filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
@@ -118,20 +124,24 @@ untracked root files.
 - `src/app/applied_config.rs` stores comparable UI snapshots and computes which
   runtime caches need rebuilding, including EM mode/equation/layer diffs.
 - `src/app/em_runtime.rs` builds timed EM scalar/vector evaluators for
-  potential-derived, electric-source, and magnetic-source modes, including the
-  finite-domain Maxwell inverse-curl reconstruction used by direct `E`/`B`
-  sources.
+  potential-derived, electric-source, and magnetic-source modes. Child modules
+  under `src/app/em_runtime/` own timed field wrappers, finite-domain Maxwell
+  inverse-curl reconstruction and source caching, plane-wave shortcuts, local
+  potential reconstruction, and focused unit tests.
 - `src/app/em_profile.rs` owns opt-in EM timing counters used by the runtime and
   render-cache paths.
 - `src/app/field_runtime.rs` builds the active scalar/vector runtime field from
   validated UI state.
 - `src/app/field_render.rs` owns field sampling caches and renderable creation
-  for scalar samples, vector arrows, and EM render layers.
-- `src/app/tangent_space.rs` owns tangent-space state, anchor selection, smooth
-  dive transitions, local sample filtering, geometric tangent display, and dual
-  tangent display.
+  for scalar samples and vector arrows; `src/app/field_render/em_cache.rs` owns
+  EM render-layer sampling and time-amplitude normalization.
+- `src/app/tangent_space.rs` owns the public tangent-space API, anchor
+  selection, local sample filtering, geometric tangent display, and dual tangent
+  display; `src/app/tangent_space/dive.rs` owns dive transitions and
+  `src/app/tangent_space/types.rs` owns shared tangent render-state types.
 - `src/app/ui/` contains the egui application, shared UI state, validation,
-  standard presets, theme, validation, and legend UI.
+  standard presets, theme, validation, and legend UI. `src/app/ui/app/tabs.rs`
+  owns Grid, Field, and EM tab rendering for the control app.
 - `src/render/` contains shader wrappers and renderers for grids, classic sphere
   drawing, field arrows, and master renderer projection control.
 - `src/maths/` contains expression evaluation, coordinate-space math,
@@ -153,9 +163,10 @@ The repository has uncommitted changes. Current feature edits include:
 - Field-arrow model transforms now use a deterministic half-turn when a vector
   points opposite the arrow mesh's local `Y` axis, with regression coverage in
   `tests/render_vfield_tests.rs`.
-- EM runtime/cache wiring in `src/app/em_runtime.rs`, `src/app/world.rs`,
-  `src/app/world/apply.rs`, `src/app/world/frame.rs`, and
-  `src/app/world/field_rendering.rs`.
+- EM runtime/cache wiring in `src/app/em_runtime.rs`,
+  `src/app/em_runtime/`, `src/app/world.rs`, `src/app/world/apply.rs`,
+  `src/app/world/frame.rs`, and `src/app/world/field_rendering.rs`.
+- Oversized app modules have been split so each Rust file is below 500 lines.
 - EM source-mode updates so `V/phi + A`, `E`, or `B` can act as the input
   family while the other measures are resolved for rendering.
 - Direct electric source mode now derives `B` from the Ampere-Maxwell source
