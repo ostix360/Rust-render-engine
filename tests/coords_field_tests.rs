@@ -105,6 +105,58 @@ fn eval_otn_vector_matches_expected_spherical_basis_at_y_axis() {
 }
 
 #[test]
+fn regular_tangent_basis_rejects_spherical_coordinate_singularities() {
+    let coords = CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+
+    assert!(coords
+        .eval_regular_tangent_basis(vector![0.0, 1.0, 1.0])
+        .is_none());
+    assert!(coords
+        .eval_regular_tangent_basis(vector![2.0, 1.0, 0.0])
+        .is_none());
+}
+
+#[test]
+fn regular_tangent_basis_accepts_regular_spherical_samples() {
+    let coords = CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+
+    let basis = coords
+        .eval_regular_tangent_basis(vector![2.0, 1.0, std::f64::consts::FRAC_PI_2])
+        .expect("regular spherical point should have a tangent basis");
+
+    assert_vec3_close(
+        basis[0],
+        vector![1.0_f64.cos(), 1.0_f64.sin(), 0.0],
+        "r basis",
+    );
+}
+
+#[test]
+fn spherical_sample_geometry_reports_physical_volume_density() {
+    let coords = CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+    let geometry = coords.sample_geometry();
+    let point = vector![2.0, 1.0, std::f64::consts::FRAC_PI_2];
+
+    let density = geometry
+        .volume_density(point)
+        .expect("regular spherical point should have volume density");
+
+    assert_close(density, 4.0, "spherical volume density");
+}
+
+#[test]
 fn vector_field_from_otn_evaluates_component_expressions() {
     let space = Space::new(parse("x"), parse("y"), parse("z"));
     let field = VectorField::from_otn(

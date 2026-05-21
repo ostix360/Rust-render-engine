@@ -1,5 +1,6 @@
 use super::fields::TimedVectorField;
 use super::plane_wave::scale_exprs;
+use crate::app::coords_sys::CoordSampleGeometry;
 use crate::app::em_profile::{self, EmProfileMetric};
 use crate::app::grid::GridConfig;
 use crate::maths::{derivate, Expr, Point};
@@ -11,20 +12,25 @@ const MAXWELL_MIN_AXIS_SAMPLES: usize = 5;
 const MAXWELL_MAX_AXIS_SAMPLES: usize = 7;
 const MAXWELL_SINGULAR_EPSILON_SQUARED: f64 = 1.0e-18;
 const MAXWELL_SOURCE_TIME_CACHE_LIMIT: usize = 64;
+const MIN_CELL_SOFTENING_RADIUS_SQUARED: f64 = 1.0e-12;
 
 #[derive(Clone, Copy)]
 struct MaxwellCell {
     point: Point,
+    world_point: Vector3<f64>,
+    basis: [Vector3<f64>; 3],
     weight: f64,
+    softening_radius_squared: f64,
 }
 
 #[derive(Clone)]
 pub(super) struct MaxwellSolveConfig {
     cells: Arc<[MaxwellCell]>,
+    geometry: CoordSampleGeometry,
 }
 
 impl MaxwellSolveConfig {
-    pub(super) fn from_grid_config(grid_config: GridConfig) -> Self {
+    pub(super) fn from_grid_config(grid_config: GridConfig, geometry: CoordSampleGeometry) -> Self {
         let bounds = grid_config.bounds();
         let counts = grid_config.sample_counts().map(Self::axis_sample_count);
         let normalized_bounds = bounds.map(Self::normalized_bounds);
@@ -42,9 +48,23 @@ impl MaxwellSolveConfig {
                 let y = normalized_bounds[1].0 + (iy as f64 + 0.5) * steps[1];
                 for iz in 0..counts[2] {
                     let z = normalized_bounds[2].0 + (iz as f64 + 0.5) * steps[2];
+                    let abstract_point = Vector3::new(x, y, z);
+                    let Some(basis) = geometry.eval_regular_tangent_basis(abstract_point) else {
+                        continue;
+                    };
+                    let Some(volume_density) = geometry.volume_density(abstract_point) else {
+                        continue;
+                    };
+                    if volume_density <= 1.0e-12 {
+                        continue;
+                    }
+                    let physical_weight = weight * volume_density;
                     cells.push(MaxwellCell {
                         point: Point { x, y, z },
-                        weight,
+                        world_point: geometry.eval_position(abstract_point),
+                        basis,
+                        weight: physical_weight,
+                        softening_radius_squared: cell_softening_radius_squared(physical_weight),
                     });
                 }
             }
@@ -52,6 +72,7 @@ impl MaxwellSolveConfig {
 
         Self {
             cells: Arc::from(cells),
+            geometry,
         }
     }
 
@@ -153,12 +174,15 @@ impl MaxwellSampledSource {
 
     fn inverse_curl_at(&self, target: Vector3<f64>, time: f64) -> Vector3<f64> {
         em_profile::measure(EmProfileMetric::InverseCurl, || {
+            let Some(target_basis) = self.config.geometry.eval_regular_tangent_basis(target) else {
+                return Vector3::zeros();
+            };
+            let target_world = self.config.geometry.eval_position(target);
             let source_values = self.source_values_at(time);
             let mut value = Vector3::zeros();
 
             for (cell, source_value) in self.config.cells.iter().zip(source_values.iter()) {
-                let source_point = Vector3::new(cell.point.x, cell.point.y, cell.point.z);
-                let radius = target - source_point;
+                let radius = target_world - cell.world_point;
                 let radius_squared = radius.norm_squared();
                 if radius_squared <= MAXWELL_SINGULAR_EPSILON_SQUARED {
                     continue;
@@ -171,12 +195,15 @@ impl MaxwellSampledSource {
                     continue;
                 }
 
-                let kernel_scale =
-                    cell.weight / (4.0 * std::f64::consts::PI * radius_squared.sqrt().powi(3));
+                let kernel_radius_squared = radius_squared.max(cell.softening_radius_squared);
+                let kernel_scale = cell.weight
+                    / (4.0 * std::f64::consts::PI * kernel_radius_squared.sqrt().powi(3));
                 value += source_value.cross(&radius) * kernel_scale;
             }
 
-            value
+            self.config
+                .geometry
+                .world_to_components(&target_basis, value)
         })
     }
 
@@ -214,10 +241,23 @@ impl MaxwellSampledSource {
         self.config
             .cells
             .iter()
-            .map(|cell| self.source.at(cell.point, time))
+            .map(|cell| {
+                let source_value = self.source.at(cell.point, time);
+                self.config
+                    .geometry
+                    .vector_to_world(&cell.basis, source_value)
+            })
             .collect::<Vec<_>>()
             .into()
     }
+}
+
+fn cell_softening_radius_squared(volume: f64) -> f64 {
+    if !volume.is_finite() || volume <= 0.0 {
+        return MIN_CELL_SOFTENING_RADIUS_SQUARED;
+    }
+    let radius = (3.0 * volume / (4.0 * std::f64::consts::PI)).cbrt();
+    (radius * radius).max(MIN_CELL_SOFTENING_RADIUS_SQUARED)
 }
 
 impl MaxwellSourceTimeCache {

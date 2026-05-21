@@ -7,7 +7,7 @@ use crate::maths::{
 use integrate::prelude::trapezoidal_rule;
 use mathhook::prelude::*;
 use mathhook::Symbol;
-use nalgebra::{vector, Vector3};
+use nalgebra::{vector, Matrix3, Vector3};
 use std::ops::{Add, Deref};
 
 pub struct CoordsSys {
@@ -27,6 +27,16 @@ pub struct CoordsSys {
     y_curvature: FastExpr2dto1d,
     z_curvature: FastExpr2dto1d,
     space: Space,
+}
+
+#[derive(Clone)]
+pub struct CoordSampleGeometry {
+    fast_x_eq: FastExpr3d,
+    fast_y_eq: FastExpr3d,
+    fast_z_eq: FastExpr3d,
+    tangent_x: [FastExpr3d; 3],
+    tangent_y: [FastExpr3d; 3],
+    tangent_z: [FastExpr3d; 3],
 }
 
 impl CoordsSys {
@@ -145,28 +155,84 @@ impl CoordsSys {
     }
 
     /// Evaluates one compiled tangent axis and normalizes the result.
-    ///
-    /// When the sampled derivative is numerically degenerate, the provided fallback basis
-    /// vector is returned instead.
-    fn eval_compiled_axis(
-        point: Vector3<f64>,
-        axis: &[FastExpr3d; 3],
-        fallback: Vector3<f64>,
-    ) -> Vector3<f64> {
-        let tangent = vector![
+    fn eval_raw_axis(point: Vector3<f64>, axis: &[FastExpr3d; 3]) -> Vector3<f64> {
+        vector![
             axis[0](point.x, point.y, point.z),
             axis[1](point.x, point.y, point.z),
             axis[2](point.x, point.y, point.z)
-        ];
+        ]
+    }
+
+    fn normalize_axis(tangent: Vector3<f64>) -> Option<Vector3<f64>> {
         if !tangent.x.is_finite()
             || !tangent.y.is_finite()
             || !tangent.z.is_finite()
             || tangent.norm() <= 1e-9
         {
-            fallback
+            None
         } else {
-            tangent.normalize()
+            Some(tangent.normalize())
         }
+    }
+
+    fn eval_regular_axis(point: Vector3<f64>, axis: &[FastExpr3d; 3]) -> Option<Vector3<f64>> {
+        Self::normalize_axis(Self::eval_raw_axis(point, axis))
+    }
+
+    fn eval_regular_tangent_basis_from_axes(
+        point: Vector3<f64>,
+        tangent_x: &[FastExpr3d; 3],
+        tangent_y: &[FastExpr3d; 3],
+        tangent_z: &[FastExpr3d; 3],
+    ) -> Option<[Vector3<f64>; 3]> {
+        Some([
+            Self::eval_regular_axis(point, tangent_x)?,
+            Self::eval_regular_axis(point, tangent_y)?,
+            Self::eval_regular_axis(point, tangent_z)?,
+        ])
+    }
+
+    fn raw_tangent_axes_from_axes(
+        point: Vector3<f64>,
+        tangent_x: &[FastExpr3d; 3],
+        tangent_y: &[FastExpr3d; 3],
+        tangent_z: &[FastExpr3d; 3],
+    ) -> Option<[Vector3<f64>; 3]> {
+        let tangent = vector![
+            tangent_x[0](point.x, point.y, point.z),
+            tangent_x[1](point.x, point.y, point.z),
+            tangent_x[2](point.x, point.y, point.z)
+        ];
+        let tangent_y = vector![
+            tangent_y[0](point.x, point.y, point.z),
+            tangent_y[1](point.x, point.y, point.z),
+            tangent_y[2](point.x, point.y, point.z)
+        ];
+        let tangent_z = vector![
+            tangent_z[0](point.x, point.y, point.z),
+            tangent_z[1](point.x, point.y, point.z),
+            tangent_z[2](point.x, point.y, point.z)
+        ];
+        if [tangent, tangent_y, tangent_z]
+            .iter()
+            .any(|axis| !axis.x.is_finite() || !axis.y.is_finite() || !axis.z.is_finite())
+        {
+            None
+        } else {
+            Some([tangent, tangent_y, tangent_z])
+        }
+    }
+
+    /// Evaluates one compiled tangent axis and normalizes the result.
+    ///
+    /// When the sampled derivative is numerically degenerate, the provided fallback basis
+    /// vector is returned instead.
+    fn eval_compiled_axis_with_fallback(
+        point: Vector3<f64>,
+        axis: &[FastExpr3d; 3],
+        fallback: Vector3<f64>,
+    ) -> Vector3<f64> {
+        Self::eval_regular_axis(point, axis).unwrap_or(fallback)
     }
 
     /// Evaluates the three normalized tangent directions at an abstract point.
@@ -175,10 +241,36 @@ impl CoordsSys {
     /// falls back to the canonical axes when needed.
     pub fn eval_tangent_basis(&self, point: Vector3<f64>) -> [Vector3<f64>; 3] {
         [
-            Self::eval_compiled_axis(point, &self.tangent_x, vector![1.0, 0.0, 0.0]),
-            Self::eval_compiled_axis(point, &self.tangent_y, vector![0.0, 1.0, 0.0]),
-            Self::eval_compiled_axis(point, &self.tangent_z, vector![0.0, 0.0, 1.0]),
+            Self::eval_compiled_axis_with_fallback(point, &self.tangent_x, vector![1.0, 0.0, 0.0]),
+            Self::eval_compiled_axis_with_fallback(point, &self.tangent_y, vector![0.0, 1.0, 0.0]),
+            Self::eval_compiled_axis_with_fallback(point, &self.tangent_z, vector![0.0, 0.0, 1.0]),
         ]
+    }
+
+    /// Evaluates the tangent basis only when every coordinate direction is regular.
+    ///
+    /// Coordinate singularities such as cylindrical `r = 0` or spherical poles do not define a
+    /// stable local orthonormal frame. Field arrows sampled there can inherit huge metric factors,
+    /// so render caches should skip those points instead of silently substituting fallback axes.
+    pub fn eval_regular_tangent_basis(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {
+        Self::eval_regular_tangent_basis_from_axes(
+            point,
+            &self.tangent_x,
+            &self.tangent_y,
+            &self.tangent_z,
+        )
+    }
+
+    /// Returns a lightweight clone of the compiled geometry evaluators.
+    pub fn sample_geometry(&self) -> CoordSampleGeometry {
+        CoordSampleGeometry {
+            fast_x_eq: self.fast_x_eq.clone(),
+            fast_y_eq: self.fast_y_eq.clone(),
+            fast_z_eq: self.fast_z_eq.clone(),
+            tangent_x: self.tangent_x.clone(),
+            tangent_y: self.tangent_y.clone(),
+            tangent_z: self.tangent_z.clone(),
+        }
     }
 
     /// Converts components expressed in the local tangent basis into world-space coordinates.
@@ -220,5 +312,51 @@ impl CoordsSys {
     /// The returned `Space` is reused by differential-form and vector-field code.
     pub fn get_space(&self) -> &Space {
         &self.space
+    }
+}
+
+impl CoordSampleGeometry {
+    pub fn eval_position(&self, point: Vector3<f64>) -> Vector3<f64> {
+        vector![
+            (self.fast_x_eq)(point.x, point.y, point.z),
+            (self.fast_y_eq)(point.x, point.y, point.z),
+            (self.fast_z_eq)(point.x, point.y, point.z)
+        ]
+    }
+
+    pub fn eval_regular_tangent_basis(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {
+        CoordsSys::eval_regular_tangent_basis_from_axes(
+            point,
+            &self.tangent_x,
+            &self.tangent_y,
+            &self.tangent_z,
+        )
+    }
+
+    pub fn volume_density(&self, point: Vector3<f64>) -> Option<f64> {
+        let axes = CoordsSys::raw_tangent_axes_from_axes(
+            point,
+            &self.tangent_x,
+            &self.tangent_y,
+            &self.tangent_z,
+        )?;
+        let density = axes[0].dot(&axes[1].cross(&axes[2])).abs();
+        density.is_finite().then_some(density)
+    }
+
+    pub fn vector_to_world(&self, basis: &[Vector3<f64>; 3], vector: Vector3<f64>) -> Vector3<f64> {
+        basis[0] * vector.x + basis[1] * vector.y + basis[2] * vector.z
+    }
+
+    pub fn world_to_components(
+        &self,
+        basis: &[Vector3<f64>; 3],
+        vector: Vector3<f64>,
+    ) -> Vector3<f64> {
+        let matrix = Matrix3::from_columns(basis);
+        matrix
+            .try_inverse()
+            .map(|inverse| inverse * vector)
+            .unwrap_or_else(Vector3::zeros)
     }
 }

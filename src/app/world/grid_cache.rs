@@ -62,7 +62,9 @@ impl World {
             };
             let abstract_pos = Self::transform_vertex(transform, endpoint);
             let world_pos = coords.eval_position(abstract_pos);
-            let basis = coords.eval_tangent_basis(abstract_pos);
+            let Some(basis) = coords.eval_regular_tangent_basis(abstract_pos) else {
+                continue;
+            };
 
             if !is_finite_vec3(&world_pos) || basis.iter().any(|axis| !is_finite_vec3(axis)) {
                 continue;

@@ -1,6 +1,6 @@
 use super::EmRuntime;
 use crate::app::coords_sys::CoordsSys;
-use crate::app::grid::Grid;
+use crate::app::grid::{Grid, GridConfig};
 use crate::app::ui::{EmMode, EmUiState};
 use crate::maths::Point;
 use mathhook_core::Parser;
@@ -9,6 +9,15 @@ use std::f64::consts::PI;
 fn identity_grid() -> Grid {
     let parse = |expr: &str| Parser::default().parse(expr).unwrap();
     Grid::new(CoordsSys::new(parse("x"), parse("y"), parse("z")))
+}
+
+fn spherical_grid() -> Grid {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    Grid::new(CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    ))
 }
 
 fn assert_close(actual: f64, expected: f64) {
@@ -125,6 +134,63 @@ fn electric_source_uses_ampere_time_derivative_for_magnetic_field() {
 
     assert!(unit_c_value > 1.0e-6);
     assert_close_tol(slower_value, unit_c_value * 0.25, 1.0e-6);
+}
+
+#[test]
+fn electric_source_inverse_curl_stays_bounded_in_spherical_geometry() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.electric_field.x.eq = parse("0");
+    state.electric_field.y.eq = parse("1/x * cos(x - t)");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui_with_config(
+        &state,
+        &spherical_grid(),
+        GridConfig::new(0.0, 6.0, 5.0, 0.0, 6.28, 12.0, 0.0, 3.14, 8.0),
+    );
+    let value = runtime.magnetic_at(
+        Point {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        },
+        0.0,
+    );
+
+    assert!(value.x.is_finite() && value.y.is_finite() && value.z.is_finite());
+    assert!(
+        value.norm() < 25.0,
+        "unexpected spherical B spike: {value:?}"
+    );
+
+    for point in [
+        Point {
+            x: 1.0,
+            y: 0.0,
+            z: 1.57,
+        },
+        Point {
+            x: 1.0,
+            y: 3.14,
+            z: 1.57,
+        },
+        Point {
+            x: 2.0,
+            y: 1.0,
+            z: 1.0,
+        },
+    ] {
+        let value = runtime.magnetic_at(point, 0.0);
+        assert!(
+            value.norm() < 25.0,
+            "unexpected spherical B spike at ({}, {}, {}): {value:?}",
+            point.x,
+            point.y,
+            point.z
+        );
+    }
 }
 
 #[test]

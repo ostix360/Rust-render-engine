@@ -44,7 +44,8 @@ impl EmRuntime {
     }
 
     pub fn from_ui_with_config(state: &EmUiState, grid: &Grid, grid_config: GridConfig) -> Self {
-        let maxwell_config = MaxwellSolveConfig::from_grid_config(grid_config);
+        let maxwell_config =
+            MaxwellSolveConfig::from_grid_config(grid_config, grid.get_coords().sample_geometry());
         match state.mode {
             EmMode::Potentials => Self::from_potentials(state, grid.get_coords().get_space()),
             EmMode::Electric => Self::from_electric(state, maxwell_config),

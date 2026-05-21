@@ -35,23 +35,33 @@ Apply freeze seen with spatially varying animated fields such as
 reconstruction instead of the plane-wave shortcut. EM scalar-potential rendering
 keeps its dedicated `V` legend, and earlier preset, source-mode,
 vector-normalization, and 180-degree field-arrow transform fixes remain in the
-tree. The working tree also contains local edits that hide the unfinished Lorenz
-gauge path until its matching `A` transform is implemented, plus unrelated
-untracked root files.
+tree. Field-arrow sample caches now reject degenerate coordinate frames such as
+spherical/cylindrical origins and spherical poles, so non-normalized arrows are
+not built on coordinate singularities that can inject unreal metric-scale
+spikes. The Maxwell inverse-curl fallback now integrates direct-source EM
+fields in embedded world space with the coordinate volume density, so spherical
+sources such as `E_y = 1/x * cos(x - t)` no longer feed the solver through a
+Cartesian interpretation of `(r, theta, phi)`. The inverse-curl kernel also
+uses a finite-cell softening radius derived from each sampled cell volume, which
+prevents coarse source cells from creating point-kernel spikes when render
+samples sit close to source-cell centers. The working tree also contains local
+edits that hide the unfinished Lorenz gauge path until its matching `A`
+transform is implemented, plus unrelated untracked root files.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test --test coords_field_tests -- --skip test_logger` passes with
+  23 coordinate/field integration tests.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time --release -- --skip test_logger`
   passes with 4 release-filtered inverse-curl tests.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
   passes, including the parallel-target cache regression.
-- `rtk cargo test em_runtime -- --skip test_logger` includes
-  `tests/em_runtime_tests.rs` analytical Maxwell regressions and passes with
-  45 EM-filtered tests.
+- `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
+  Maxwell regressions and passes with 31 EM-filtered tests.
 - `rtk cargo test field_render -- --skip test_logger` passes with 16
   field-render-filtered tests.
-- `rtk cargo test -- --skip test_logger` passes with 167 tests passed, 2
+- `rtk cargo test -- --skip test_logger` passes with 172 tests passed, 2
   filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
@@ -91,6 +101,11 @@ untracked root files.
   render thread reports per-cache timing totals and Rayon thread count so heavy
   resource use can be separated into render-cache assembly, inverse-curl target
   evaluation, source sampling, or vector time normalization.
+- The EM inverse-curl fallback samples source vectors in world space, weights
+  source cells by the coordinate Jacobian, and projects the reconstructed field
+  back into the target OTN frame. Its Biot-Savart kernel is softened by each
+  finite source cell's equivalent world-volume radius rather than treating every
+  cell as a singular point source.
 - EM defaults to showing `E` and `B` while hiding `V/phi` and `A`; users can
   re-enable the potential layers from the EM Layers section.
 - The `V/phi` layer has a dedicated scalar-potential legend. If the range is
@@ -100,6 +115,9 @@ untracked root files.
   remains in code, but the local UI/runtime edits keep it hidden/incomplete
   until a matching vector-potential transform is implemented.
 - Uses a dedicated field render path and field shaders for field arrows.
+- Field-arrow caches skip samples whose coordinate tangent basis is degenerate,
+  preventing arrows from being rendered at coordinate singularities such as
+  `r = 0` and spherical poles.
 - Field arrows now handle exact 180-degree direction flips, including negative
   `Y` vectors produced by oscillating plane-wave `E` layers.
 - Provides scalar and dual-tangent legends through auxiliary UI windows.

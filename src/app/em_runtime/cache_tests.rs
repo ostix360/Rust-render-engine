@@ -1,7 +1,9 @@
 use super::fields::TimedVectorField;
 use super::maxwell::{maxwell_inverse_curl, MaxwellSolveConfig};
+use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::GridConfig;
 use crate::maths::{FastExpr4d, Point};
+use mathhook_core::Parser;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -23,9 +25,12 @@ fn counted_source() -> (TimedVectorField, Arc<AtomicUsize>) {
 }
 
 fn cache_test_config() -> MaxwellSolveConfig {
-    MaxwellSolveConfig::from_grid_config(GridConfig::new(
-        0.0, 2.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0, 2.0,
-    ))
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let coords = CoordsSys::new(parse("x"), parse("y"), parse("z"));
+    MaxwellSolveConfig::from_grid_config(
+        GridConfig::new(0.0, 2.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0, 2.0),
+        coords.sample_geometry(),
+    )
 }
 
 #[test]
