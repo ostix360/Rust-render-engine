@@ -270,15 +270,14 @@ impl ControlApp {
                     if Self::tab_button(ui, data.em.gauge == EmGauge::Coulomb, "Coulomb") {
                         data.em.gauge = EmGauge::Coulomb;
                     }
-                    if Self::tab_button(ui, data.em.gauge == EmGauge::Lorenz, "Lorenz") {
-                        data.em.gauge = EmGauge::Lorenz;
-                    }
+                    // if Self::tab_button(ui, data.em.gauge == EmGauge::Lorenz, "Lorenz", ) {
+                    //     data.em.gauge = EmGauge::Lorenz;
+                    // }
                 });
                 ui.label(
                     egui::RichText::new(
                         "Named gauge selector for potential display/reconstruction. Coulomb-like \
-                         is the current reconstruction; Lorenz currently uses the same consistent \
-                         potential reconstruction until its matching A transform is implemented.",
+                         is the current reconstruction",
                     )
                     .color(MUTED),
                 );

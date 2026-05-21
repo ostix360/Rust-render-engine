@@ -1,5 +1,6 @@
 pub mod applied_config;
 pub mod coords_sys;
+pub(crate) mod em_profile;
 pub mod em_runtime;
 pub mod field_render;
 pub mod field_runtime;

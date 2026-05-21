@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-05-20
+Generated: 2026-05-21
 
 ## Summary
 
@@ -11,58 +11,46 @@ window. The control window publishes validated grid, field, and EM settings
 through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
-The current checkout builds and the CPU-safe EM/runtime validation tests pass
-locally. EM scalar-potential rendering now uses a dedicated `V` legend instead
-of the generic scalar-field legend, and the UI layer toggle explains that the
-built-in wave presets intentionally use the `V = 0` gauge. A focused regression
-test covers nonuniform scalar-potential samples producing distinct render
-colors. The EM tab now exposes named gauge buttons instead of a free-form gauge
-equation; Coulomb-like remains the default and Lorenz is available as an
-explicit selection. Both choices currently use the existing local `V = -E·r`
-scalar-potential visualization for direct source modes so the displayed
-potentials remain consistent with the displayed `E` field; a real Lorenz
-reconstruction still needs a matching `A` transform before it can diverge.
-Earlier preset, source-mode, vector-normalization, and 180-degree field-arrow
-transform fixes remain in the tree. The working tree contains this EM `V`
-visibility/legend and gauge-selector change plus unrelated untracked root files.
+The current checkout builds and the targeted EM/runtime validation tests pass
+locally. The latest runtime change adds an opt-in EM profiling path and
+parallelizes the expensive direct-source fallback work. Setting
+`RENDER_ENGINE_PROFILE_EM=1`
+prints per-cache timings for EM render-cache rebuilds, inverse-curl target
+evaluation, source-grid sampling, and vector time normalization. EM render-cache
+sampling fans out across field samples with Rayon, while inverse-curl
+source-cell values are cached once per sampled time and reused across parallel
+target points. Cache misses reserve one time entry, release the cache mutex while
+sampling, and wake any waiters when the entry is ready or if sampling fails. The
+render cache also prewarms visible EM vector time slices before entering the
+parallel sample loop, so normalized inverse-curl layers do not make every worker
+contend on the first miss for each time. These changes avoid a release-mode
+Apply freeze seen with spatially varying animated fields such as
+`E_phi = 1/r * cos(r - t)`, which correctly fall back to the general inverse-curl
+reconstruction instead of the plane-wave shortcut. EM scalar-potential rendering
+keeps its dedicated `V` legend, and earlier preset, source-mode,
+vector-normalization, and 180-degree field-arrow transform fixes remain in the
+tree. The working tree also contains local edits that hide the unfinished Lorenz
+gauge path until its matching `A` transform is implemented, plus unrelated
+untracked root files.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
-- `rtk cargo test scalar_potential_render_uses_potential_legend_and_value_colors -- --skip test_logger`
-  passes.
-- `rtk cargo test apply_diff_tracks_em_gauge_selection -- --skip test_logger`
-  passes.
-- `rtk cargo test lorenz_source_gauge_keeps_potential_reconstruction_consistent -- --skip test_logger`
-  passes.
-- `rtk cargo test render_vfield -- --skip test_logger` passes with 5
-  render-vector transform tests.
-- `rtk cargo test plane_wave -- --skip test_logger` passes with 12
-  plane-wave-filtered tests.
-- `rtk cargo test presets -- --skip test_logger` passes with 6 preset-filtered
-  tests.
-- `rtk cargo test ui:: -- --skip test_logger` passes with 32 UI-filtered tests.
-- `rtk cargo test apply_diff_tracks_em_vector_normalization -- --skip test_logger`
-  passes.
-- `rtk cargo test time_normalization_scale_uses_each_vectors_temporal_amplitude -- --skip test_logger`
-  passes.
-- `rtk cargo test time_normalization_scale -- --skip test_logger` passes.
-- `rtk cargo test grid_ui_state_defaults_match_expected_values -- --skip test_logger`
-  passes.
-- `rtk cargo test em_vectors_remain_visible -- --skip test_logger` passes.
-- `rtk cargo test potential_mode_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
-  passes.
-- `rtk cargo test electric_source_plane_wave_magnetic_field_oscillates_without_rotation -- --skip test_logger`
-  passes.
+- `rtk cargo test inverse_curl_reuses_source_samples_per_time --release -- --skip test_logger`
+  passes with 4 release-filtered inverse-curl tests.
+- `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
+  passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes
   `tests/em_runtime_tests.rs` analytical Maxwell regressions and passes with
-  41 EM-filtered tests.
-- `rtk cargo test validate_ui_state -- --skip test_logger` passes.
-- `rtk cargo test -- --skip test_logger` passes.
-- Result: 193 tests passed, 2 tests filtered out.
+  45 EM-filtered tests.
+- `rtk cargo test field_render -- --skip test_logger` passes with 16
+  field-render-filtered tests.
+- `rtk cargo test -- --skip test_logger` passes with 195 tests passed, 2
+  filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.
-- `rtk cargo run` was not rerun in this pass.
+- `rtk cargo run` and release-mode flamegraph/perf profiling were not rerun in
+  this pass.
 
 ## Main Capabilities
 
@@ -93,15 +81,18 @@ visibility/legend and gauge-selector change plus unrelated untracked root files.
 - EM exposes a configurable `c`, a separate `B vector scale` control, and an
   EM-specific per-vector time-amplitude normalization checkbox for `E`, `B`,
   and `A` arrows.
+- EM profiling is available by launching with `RENDER_ENGINE_PROFILE_EM=1`; the
+  render thread reports per-cache timing totals and Rayon thread count so heavy
+  resource use can be separated into render-cache assembly, inverse-curl target
+  evaluation, source sampling, or vector time normalization.
 - EM defaults to showing `E` and `B` while hiding `V/phi` and `A`; users can
   re-enable the potential layers from the EM Layers section.
 - The `V/phi` layer has a dedicated scalar-potential legend. If the range is
   uniform, the legend now identifies that as a constant active gauge rather
   than presenting it as an ordinary scalar field.
-- EM exposes named gauge buttons for Coulomb-like and Lorenz selection, and the
-  apply diff treats gauge changes as EM runtime changes. Direct `E`/`B` source
-  modes keep Lorenz on the consistent Coulomb-like scalar-potential
-  reconstruction until a matching vector-potential transform is implemented.
+- EM currently exposes the Coulomb-like gauge path in the UI. The Lorenz enum
+  remains in code, but the local UI/runtime edits keep it hidden/incomplete
+  until a matching vector-potential transform is implemented.
 - Uses a dedicated field render path and field shaders for field arrows.
 - Field arrows now handle exact 180-degree direction flips, including negative
   `Y` vectors produced by oscillating plane-wave `E` layers.
@@ -130,6 +121,8 @@ visibility/legend and gauge-selector change plus unrelated untracked root files.
   potential-derived, electric-source, and magnetic-source modes, including the
   finite-domain Maxwell inverse-curl reconstruction used by direct `E`/`B`
   sources.
+- `src/app/em_profile.rs` owns opt-in EM timing counters used by the runtime and
+  render-cache paths.
 - `src/app/field_runtime.rs` builds the active scalar/vector runtime field from
   validated UI state.
 - `src/app/field_render.rs` owns field sampling caches and renderable creation
@@ -184,6 +177,22 @@ The repository has uncommitted changes. Current feature edits include:
 - The direct-source inverse curl uses a finite-domain Coulomb/Biot-Savart
   reconstruction over the active grid bounds, which makes the derived field
   divergence-free under the chosen boundary/gauge assumption.
+- The direct-source inverse curl now samples the source grid once per requested
+  time value, reuses those samples across target points, and returns all three
+  vector components from one quadrature pass.
+- The inverse-curl time cache now reserves each missing time under the cache
+  lock, computes source-grid samples outside the lock, then publishes the ready
+  values to any waiting parallel render samples. If sampling panics, waiters are
+  woken instead of blocking indefinitely.
+- EM render-cache assembly now samples visible EM layers across field samples
+  with Rayon and preserves deterministic output ordering when collecting scalar
+  values and vector layers.
+- EM render-cache assembly prewarms visible vector-layer time samples before
+  entering the parallel loop, including the extra time-normalization samples.
+- Source-grid sampling for inverse-curl cache misses is intentionally sequential
+  while the cache entry is created, avoiding nested Rayon work during Apply.
+- New opt-in profiling counters measure EM render-cache rebuilds, inverse-curl
+  target evaluation, source-grid sampling, and vector time normalization.
 - Removed the elapsed-time integral previously used for source-derived fields;
   derived `E`/`B` layers are now bounded compiled expressions rather than
   accumulated values.
@@ -207,6 +216,8 @@ The repository has uncommitted changes. Current feature edits include:
   bounding arrow size for non-periodic expressions such as `E = (t, 0, 0)`. It
   updates the EM cache/render path for `E`, `B`, and `A` without changing the
   Field-tab unit-vector normalization flag.
+- EM vector time normalization now reuses the already-sampled current vector
+  instead of evaluating the same field again at `current_time`.
 - EM vector layers remain visible in dual tangent mode because there is not yet
   an EM-specific dual-form replacement layer.
 - Timed expression evaluation in `src/maths/mod.rs`.
@@ -236,6 +247,14 @@ Those appear unrelated to the render-engine runtime itself.
 - Recovering potentials from `E` or `B` uses visualization conventions rather
   than a full boundary-value solve. The gauge is intentionally local to the EM
   runtime so it can become editable later.
+- Lorenz gauge remains incomplete in this working tree. The UI hides it, and
+  forcing `EmGauge::Lorenz` through code will hit the current runtime `todo!()`.
+- Expressions with coordinate singularities such as `1/x` still describe
+  unbounded input at the singular surface. Non-finite samples are skipped, but
+  very large finite arrows can still require bounds or EM normalization choices.
+- The profiling counters identify where EM cache rebuild time is spent, but a
+  release-mode manual profile or flamegraph still needs to be captured on a
+  representative heavy scene before adding finer-grained solver changes.
 - `GridWorld::ray_cast` currently selects the nearest candidate relative to the
   ray origin after a radius hit. That may be wrong for later ray steps and
   should be reviewed with a targeted regression before changing behavior.
@@ -253,6 +272,9 @@ Those appear unrelated to the render-engine runtime itself.
    dead code, then either wire them in or annotate/remove them.
 3. Add a visual regression capture or manual screenshot checklist for the EM
    layer colors and tangent-space interaction.
-4. Implement or explicitly deprecate the unused `Hodge::hodge_star` trait path.
-5. Review the untracked root tooling files and keep only the ones intended for
+4. Capture a representative EM profile with
+   `RENDER_ENGINE_PROFILE_EM=1 rtk cargo run --release`, then use perf or
+   flamegraph if the counters still show unexplained CPU cost.
+5. Implement or explicitly deprecate the unused `Hodge::hodge_star` trait path.
+6. Review the untracked root tooling files and keep only the ones intended for
    the repository.
