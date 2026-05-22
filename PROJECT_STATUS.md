@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-05-21
+Generated: 2026-05-22
 
 ## Summary
 
@@ -12,6 +12,10 @@ through shared UI state, while the render thread owns OpenGL resources, cached
 geometry, field samples, tangent state, EM time, and rendering.
 
 The current checkout builds and the full non-logger test suite passes locally.
+The control-window bootstrap now imports the platform-specific winit
+`with_any_thread` extension for Linux/X11 and Windows separately, so the crate
+type-checks for `x86_64-pc-windows-msvc` instead of pulling in the X11-only
+extension on Windows.
 The latest maintenance pass splits oversized app modules by responsibility:
 `em_runtime` now delegates timed field wrappers, Maxwell inverse-curl/cache
 logic, plane-wave shortcuts, local potential reconstruction, and focused tests
@@ -51,6 +55,12 @@ transform is implemented, plus unrelated untracked root files.
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo check --target x86_64-pc-windows-msvc` completed successfully with
+  the existing unused-code warning set.
+- `rtk cargo build --target x86_64-pc-windows-msvc` reached the link step, then
+  failed because `link.exe` is not installed on this host.
+- `rtk cargo build --target x86_64-pc-windows-gnu` failed before Rust crate
+  checking because `x86_64-w64-mingw32-dlltool` is not installed on this host.
 - `rtk cargo test --test coords_field_tests -- --skip test_logger` passes with
   23 coordinate/field integration tests.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time --release -- --skip test_logger`
@@ -263,6 +273,9 @@ Those appear unrelated to the render-engine runtime itself.
 - `mathhook` and `mathhook-core` are configured as git dependencies. That keeps
   the crate portable, but fresh builds still need network access or a populated
   Cargo git cache.
+- Windows MSVC linking requires Visual Studio Build Tools or another setup that
+  provides `link.exe`; Windows GNU linking requires MinGW-w64 tools such as
+  `x86_64-w64-mingw32-dlltool`.
 - The test suite passes, but the current warnings show stale or partially unused
   projection/tangent API surfaces that should either be wired back in or removed
   intentionally.

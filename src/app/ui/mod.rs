@@ -17,6 +17,9 @@ use crate::app::ui::app::ControlApp;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use winit::event_loop::EventLoop;
+#[cfg(target_os = "windows")]
+use winit::platform::windows::EventLoopBuilderExtWindows;
+#[cfg(target_os = "linux")]
 use winit::platform::x11::EventLoopBuilderExtX11;
 
 /// Spawns the control window on a dedicated thread.
