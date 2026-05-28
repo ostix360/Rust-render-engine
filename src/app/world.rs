@@ -213,6 +213,21 @@ mod tests {
     }
 
     #[test]
+    fn apply_diff_treats_em_magnetic_scale_as_render_only() {
+        let current = AppliedConfig::from_ui(&GridUiState::default());
+        let mut next_state = GridUiState::default();
+        next_state.em.magnetic_vector_scale = 2.0;
+        let next = AppliedConfig::from_ui(&next_state);
+
+        let diff = current.diff(&next);
+
+        assert!(diff.em_magnetic_scale_changed);
+        assert!(!diff.em_equations_changed);
+        assert!(!diff.em_runtime_changed());
+        assert!(diff.em_render_changed());
+    }
+
+    #[test]
     fn apply_diff_tracks_em_gauge_selection() {
         let current = AppliedConfig::from_ui(&GridUiState::default());
         let mut next_state = GridUiState::default();

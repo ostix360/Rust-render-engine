@@ -57,11 +57,17 @@ edits that hide the unfinished Lorenz gauge path until its matching `A`
 transform is implemented, plus a review fix that keeps the `B vector scale`
 slider effective when EM vector normalization is enabled, aligns the default
 magnetic plane wave sign with the default electric/potential wave, and makes
-the EM enable control larger. Unrelated untracked root files are still present.
+the EM enable control larger. The latest review fix also treats `B vector
+scale` as a render-cache-only EM change, so slider changes invalidate sampled
+EM arrows without rebuilding `EmRuntime` or re-running the inverse-curl setup.
+Unrelated untracked root files are still present.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test apply_diff -- --skip test_logger` passes with 14
+  apply-diff-filtered tests, including the `B vector scale` render-only
+  invalidation regression.
 - `rtk cargo test field_render -- --skip test_logger` passes with 18
   field-render-filtered tests, including the normalized magnetic scale
   regression.

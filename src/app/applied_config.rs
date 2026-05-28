@@ -105,8 +105,9 @@ impl AppliedConfig {
                 || self.em_a_eqs != next.em_a_eqs
                 || self.em_e_eqs != next.em_e_eqs
                 || self.em_b_eqs != next.em_b_eqs
-                || self.em_light_speed_bits != next.em_light_speed_bits
-                || self.em_magnetic_vector_scale_bits != next.em_magnetic_vector_scale_bits,
+                || self.em_light_speed_bits != next.em_light_speed_bits,
+            em_magnetic_scale_changed: self.em_magnetic_vector_scale_bits
+                != next.em_magnetic_vector_scale_bits,
             em_normalize_changed: self.em_normalize_vectors != next.em_normalize_vectors,
             em_layers_changed: self.em_layers != next.em_layers,
         }
@@ -125,6 +126,7 @@ pub(crate) struct ApplyDiff {
     pub(crate) em_enabled_changed: bool,
     pub(crate) em_mode_changed: bool,
     pub(crate) em_equations_changed: bool,
+    pub(crate) em_magnetic_scale_changed: bool,
     pub(crate) em_normalize_changed: bool,
     pub(crate) em_layers_changed: bool,
 }
@@ -155,6 +157,7 @@ impl ApplyDiff {
     pub(crate) fn em_render_changed(self) -> bool {
         self.geometry_changed()
             || self.em_runtime_changed()
+            || self.em_magnetic_scale_changed
             || self.em_normalize_changed
             || self.em_layers_changed
     }
