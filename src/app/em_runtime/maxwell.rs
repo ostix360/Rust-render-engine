@@ -93,6 +93,10 @@ impl MaxwellSolveConfig {
     pub(super) fn cell_count(&self) -> usize {
         self.cells.len()
     }
+
+    pub(super) fn supports_plane_wave_shortcut(&self) -> bool {
+        self.geometry.is_orthonormal_cartesian()
+    }
 }
 
 pub(super) fn maxwell_ampere_source_exprs(electric_exprs: &[Expr; 3], c: f64) -> [Expr; 3] {

@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-05-22
+Generated: 2026-05-28
 
 ## Summary
 
@@ -39,7 +39,11 @@ Apply freeze seen with spatially varying animated fields such as
 reconstruction instead of the plane-wave shortcut. EM scalar-potential rendering
 keeps its dedicated `V` legend, and earlier preset, source-mode,
 vector-normalization, and 180-degree field-arrow transform fixes remain in the
-tree. Field-arrow sample caches now reject degenerate coordinate frames such as
+tree. Direct-source plane-wave shortcuts are now gated to fixed right-handed
+orthonormal Cartesian coordinate embeddings; scaled Cartesian and curvilinear
+coordinate grids fall back to the coordinate-aware inverse-curl solver so
+derived companion fields are not interpreted through Cartesian propagation axes.
+Field-arrow sample caches now reject degenerate coordinate frames such as
 spherical/cylindrical origins and spherical poles, so non-normalized arrows are
 not built on coordinate singularities that can inject unreal metric-scale
 spikes. The Maxwell inverse-curl fallback now integrates direct-source EM
@@ -68,7 +72,7 @@ transform is implemented, plus unrelated untracked root files.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
   passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
-  Maxwell regressions and passes with 31 EM-filtered tests.
+  Maxwell regressions and passes with 35 EM-filtered tests.
 - `rtk cargo test field_render -- --skip test_logger` passes with 16
   field-render-filtered tests.
 - `rtk cargo test -- --skip test_logger` passes with 172 tests passed, 2
@@ -207,8 +211,12 @@ The repository has uncommitted changes. Current feature edits include:
 - Potential source mode keeps magnetic reconstruction anchored to `B = *dA`,
   including static curl terms mixed into travelling-wave vector potentials.
 - Electric source mode rejects mixed static spatial terms before using the
-  plane-wave shortcut, so only pure `z`-travelling transverse waves skip the
+  plane-wave shortcut, so only pure transverse travelling waves skip the
   finite-domain inverse-curl fallback.
+- Direct electric and magnetic source modes now require fixed right-handed
+  orthonormal Cartesian geometry before using analytical plane-wave shortcuts;
+  scaled Cartesian and curvilinear grids use the coordinate-aware inverse-curl
+  fallback.
 - EM validation preserves hidden normal field drafts while EM is enabled, so
   Apply is not blocked by unrelated Field-tab parse errors.
 - Direct magnetic source mode now derives `E` from the Faraday source

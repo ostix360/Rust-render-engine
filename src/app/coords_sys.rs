@@ -10,6 +10,8 @@ use mathhook::Symbol;
 use nalgebra::{vector, Matrix3, Vector3};
 use std::ops::{Add, Deref};
 
+const CARTESIAN_GEOMETRY_EPSILON: f64 = 1.0e-7;
+
 pub struct CoordsSys {
     #[allow(dead_code)]
     x_eq: Expr,
@@ -316,6 +318,41 @@ impl CoordsSys {
 }
 
 impl CoordSampleGeometry {
+    pub fn is_orthonormal_cartesian(&self) -> bool {
+        let samples = [
+            vector![0.0, 0.0, 0.0],
+            vector![1.0, 0.5, -0.25],
+            vector![-0.75, 1.25, 0.5],
+            vector![0.25, -1.0, 1.5],
+        ];
+        let Some(reference_axes) = self.raw_tangent_axes(samples[0]) else {
+            return false;
+        };
+        if !is_right_handed_orthonormal(&reference_axes) {
+            return false;
+        }
+        let reference_origin = self.eval_position(samples[0]);
+
+        samples.iter().all(|point| {
+            let Some(axes) = self.raw_tangent_axes(*point) else {
+                return false;
+            };
+            if !axes
+                .iter()
+                .zip(reference_axes.iter())
+                .all(|(axis, reference)| (*axis - *reference).norm() <= CARTESIAN_GEOMETRY_EPSILON)
+            {
+                return false;
+            }
+
+            let expected_position = reference_origin
+                + reference_axes[0] * (point.x - samples[0].x)
+                + reference_axes[1] * (point.y - samples[0].y)
+                + reference_axes[2] * (point.z - samples[0].z);
+            (self.eval_position(*point) - expected_position).norm() <= CARTESIAN_GEOMETRY_EPSILON
+        })
+    }
+
     pub fn eval_position(&self, point: Vector3<f64>) -> Vector3<f64> {
         vector![
             (self.fast_x_eq)(point.x, point.y, point.z),
@@ -334,14 +371,18 @@ impl CoordSampleGeometry {
     }
 
     pub fn volume_density(&self, point: Vector3<f64>) -> Option<f64> {
-        let axes = CoordsSys::raw_tangent_axes_from_axes(
+        let axes = self.raw_tangent_axes(point)?;
+        let density = axes[0].dot(&axes[1].cross(&axes[2])).abs();
+        density.is_finite().then_some(density)
+    }
+
+    fn raw_tangent_axes(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {
+        CoordsSys::raw_tangent_axes_from_axes(
             point,
             &self.tangent_x,
             &self.tangent_y,
             &self.tangent_z,
-        )?;
-        let density = axes[0].dot(&axes[1].cross(&axes[2])).abs();
-        density.is_finite().then_some(density)
+        )
     }
 
     pub fn vector_to_world(&self, basis: &[Vector3<f64>; 3], vector: Vector3<f64>) -> Vector3<f64> {
@@ -359,4 +400,17 @@ impl CoordSampleGeometry {
             .map(|inverse| inverse * vector)
             .unwrap_or_else(Vector3::zeros)
     }
+}
+
+fn is_right_handed_orthonormal(axes: &[Vector3<f64>; 3]) -> bool {
+    let unit_axes = axes
+        .iter()
+        .all(|axis| (axis.norm() - 1.0).abs() <= CARTESIAN_GEOMETRY_EPSILON);
+    let orthogonal_axes = axes[0].dot(&axes[1]).abs() <= CARTESIAN_GEOMETRY_EPSILON
+        && axes[0].dot(&axes[2]).abs() <= CARTESIAN_GEOMETRY_EPSILON
+        && axes[1].dot(&axes[2]).abs() <= CARTESIAN_GEOMETRY_EPSILON;
+    let right_handed =
+        (axes[0].cross(&axes[1]).dot(&axes[2]) - 1.0).abs() <= CARTESIAN_GEOMETRY_EPSILON;
+
+    unit_axes && orthogonal_axes && right_handed
 }

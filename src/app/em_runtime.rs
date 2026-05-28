@@ -90,14 +90,19 @@ impl EmRuntime {
         let c = state.light_speed.max(1.0e-6);
 
         let electric_field = TimedVectorField::from_exprs(electric_exprs.clone());
-        let magnetic_field =
+        let magnetic_field = if maxwell_config.supports_plane_wave_shortcut() {
             if let Some(magnetic_exprs) = plane_wave_magnetic_exprs(&electric_exprs, c) {
                 TimedVectorField::from_exprs(magnetic_exprs)
             } else {
                 let ampere_source_exprs = maxwell_ampere_source_exprs(&electric_exprs, c);
                 let ampere_source = TimedVectorField::from_exprs(ampere_source_exprs);
                 maxwell_inverse_curl(ampere_source, maxwell_config)
-            };
+            }
+        } else {
+            let ampere_source_exprs = maxwell_ampere_source_exprs(&electric_exprs, c);
+            let ampere_source = TimedVectorField::from_exprs(ampere_source_exprs);
+            maxwell_inverse_curl(ampere_source, maxwell_config)
+        };
         let vector_potential = local_vector_potential_from_b(magnetic_field.clone());
         let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
 
@@ -116,14 +121,19 @@ impl EmRuntime {
         let c = state.light_speed.max(1.0e-6);
 
         let magnetic_field = TimedVectorField::from_exprs(magnetic_exprs.clone());
-        let electric_field =
+        let electric_field = if maxwell_config.supports_plane_wave_shortcut() {
             if let Some(electric_exprs) = plane_wave_electric_exprs(&magnetic_exprs, c) {
                 TimedVectorField::from_exprs(electric_exprs)
             } else {
                 let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
                 let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
                 maxwell_inverse_curl(faraday_source, maxwell_config.clone())
-            };
+            }
+        } else {
+            let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
+            let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
+            maxwell_inverse_curl(faraday_source, maxwell_config.clone())
+        };
         let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
         let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
 

@@ -11,6 +11,11 @@ fn identity_grid() -> Grid {
     Grid::new(CoordsSys::new(parse("x"), parse("y"), parse("z")))
 }
 
+fn scaled_cartesian_grid() -> Grid {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    Grid::new(CoordsSys::new(parse("2*x"), parse("3*y"), parse("4*z")))
+}
+
 fn spherical_grid() -> Grid {
     let parse = |expr: &str| Parser::default().parse(expr).unwrap();
     Grid::new(CoordsSys::new(
@@ -33,6 +38,22 @@ fn assert_close_tol(actual: f64, expected: f64, tolerance: f64) {
 
 fn assert_near_zero(actual: f64) {
     assert_close(actual, 0.0);
+}
+
+#[test]
+fn plane_wave_shortcut_requires_orthonormal_cartesian_geometry() {
+    assert!(identity_grid()
+        .get_coords()
+        .sample_geometry()
+        .is_orthonormal_cartesian());
+    assert!(!scaled_cartesian_grid()
+        .get_coords()
+        .sample_geometry()
+        .is_orthonormal_cartesian());
+    assert!(!spherical_grid()
+        .get_coords()
+        .sample_geometry()
+        .is_orthonormal_cartesian());
 }
 
 #[test]
@@ -217,6 +238,30 @@ fn electric_source_plane_wave_magnetic_field_oscillates_without_rotation() {
     assert_close(half_turn.x, 1.0);
     assert_near_zero(half_turn.y);
     assert_near_zero(half_turn.z);
+}
+
+#[test]
+fn electric_source_plane_wave_falls_back_for_scaled_cartesian_geometry() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.electric_field.x.eq = parse("0");
+    state.electric_field.y.eq = parse("cos(z - t)");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui(&state, &scaled_cartesian_grid());
+    let point = Point {
+        x: 3.0,
+        y: 3.0,
+        z: 3.0,
+    };
+    let value = runtime.magnetic_at(point, 0.5);
+    let shortcut_x = -(point.z - 0.5).cos();
+
+    assert!(
+        (value.x - shortcut_x).abs() > 1.0e-3 || value.y.abs() > 1.0e-3 || value.z.abs() > 1.0e-3,
+        "scaled Cartesian direct source should use inverse-curl fallback, not shortcut B: {value:?}"
+    );
 }
 
 #[test]
