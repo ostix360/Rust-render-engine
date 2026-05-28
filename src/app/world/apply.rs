@@ -74,7 +74,7 @@ impl World {
                 EmRuntime::from_ui_with_config(&state.em, &self.grid, next_config.grid_config)
             });
         } else if let Some(runtime) = &mut self.em_runtime {
-            runtime.layers = state.em.layers.clone();
+            runtime.update_render_controls(&state.em);
         }
 
         if diff.em_render_changed() {

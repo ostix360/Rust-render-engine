@@ -1,7 +1,7 @@
 use super::EmRuntime;
 use crate::app::coords_sys::CoordsSys;
 use crate::app::grid::{Grid, GridConfig};
-use crate::app::ui::{EmMode, EmUiState};
+use crate::app::ui::{EmLayerVisibility, EmMode, EmUiState};
 use crate::maths::Point;
 use mathhook_core::Parser;
 use std::f64::consts::PI;
@@ -54,6 +54,30 @@ fn plane_wave_shortcut_requires_orthonormal_cartesian_geometry() {
         .get_coords()
         .sample_geometry()
         .is_orthonormal_cartesian());
+}
+
+#[test]
+fn render_control_update_refreshes_magnetic_scale_without_runtime_rebuild() {
+    let mut state = EmUiState::default();
+    state.layers = EmLayerVisibility {
+        electric: false,
+        magnetic: true,
+        scalar_potential: false,
+        vector_potential: false,
+    };
+    let mut runtime = EmRuntime::from_ui(&state, &identity_grid());
+
+    state.magnetic_vector_scale = 3.5;
+    state.layers = EmLayerVisibility {
+        electric: true,
+        magnetic: false,
+        scalar_potential: false,
+        vector_potential: false,
+    };
+    runtime.update_render_controls(&state);
+
+    assert_close(runtime.magnetic_render_scale(), 3.5);
+    assert_eq!(runtime.active_layers(), state.layers);
 }
 
 #[test]

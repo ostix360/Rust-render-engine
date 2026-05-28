@@ -58,8 +58,11 @@ transform is implemented, plus a review fix that keeps the `B vector scale`
 slider effective when EM vector normalization is enabled, aligns the default
 magnetic plane wave sign with the default electric/potential wave, and makes
 the EM enable control larger. The latest review fix also treats `B vector
-scale` as a render-cache-only EM change, so slider changes invalidate sampled
-EM arrows without rebuilding `EmRuntime` or re-running the inverse-curl setup.
+scale` as a render-cache-only EM change, and the render-only Apply path now
+copies that scale into the existing `EmRuntime` before rebuilding the EM render
+cache. Slider changes therefore invalidate sampled EM arrows without rebuilding
+the equation runtime or re-running the inverse-curl setup, while still taking
+visible effect immediately.
 The latest validation/diff review fix keeps normal Field-tab equation drafts
 out of the applied base-field snapshot while EM is enabled, so editing a hidden
 base field under EM no longer consumes the diff before EM is disabled.
@@ -73,6 +76,8 @@ Unrelated untracked root files are still present.
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test render_control_update_refreshes_magnetic_scale_without_runtime_rebuild`
+  passes with 2 focused tests across the matching unit and integration filters.
 - `rtk cargo test apply_diff_does_not_consume_hidden_field_drafts_while_em_is_enabled -- --skip test_logger`
   passes with 2 focused tests across the matching unit and integration filters.
 - `rtk cargo test apply_diff -- --skip test_logger` passes with 16
@@ -96,10 +101,10 @@ Unrelated untracked root files are still present.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
   passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
-  Maxwell regressions and passes with 37 EM-filtered tests.
+  Maxwell regressions and passes with 39 EM-filtered tests.
 - `rtk cargo test plane_wave -- --skip test_logger` passes with 16
   plane-wave-filtered tests, including the fixed-probe static-term regression.
-- `rtk cargo test -- --skip test_logger` passes with 178 tests passed, 2
+- `rtk cargo test -- --skip test_logger` passes with 190 tests passed, 2
   filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.

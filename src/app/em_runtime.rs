@@ -167,6 +167,11 @@ impl EmRuntime {
         self.magnetic_vector_scale
     }
 
+    pub(crate) fn update_render_controls(&mut self, state: &EmUiState) {
+        self.layers = state.layers.clone();
+        self.magnetic_vector_scale = state.magnetic_vector_scale;
+    }
+
     pub fn active_layers(&self) -> EmLayerVisibility {
         self.layers.clone()
     }
