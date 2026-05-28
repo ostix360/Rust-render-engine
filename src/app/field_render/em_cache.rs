@@ -179,14 +179,15 @@ fn sample_em_layers(
         CachedVectorSample::scaled(sample, component, scale)
     });
     let magnetic = layers.magnetic.then(|| {
-        let component = runtime.magnetic_at(point, time) * runtime.magnetic_render_scale();
+        let component = runtime.magnetic_at(point, time);
         let scale = normalize_vectors_by_time
             .then(|| {
                 time_normalization_scale(sample, time, component, |time| {
-                    runtime.magnetic_at(point, time) * runtime.magnetic_render_scale()
+                    runtime.magnetic_at(point, time)
                 })
             })
-            .unwrap_or(1.0);
+            .unwrap_or(1.0)
+            * runtime.magnetic_render_scale();
         CachedVectorSample::scaled(sample, component, scale)
     });
     let vector_potential = layers.vector_potential.then(|| {

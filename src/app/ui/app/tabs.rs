@@ -186,10 +186,17 @@ impl ControlApp {
         egui::CollapsingHeader::new(theme::section_heading("Electromagnetism"))
             .default_open(true)
             .show(ui, |ui| {
-                ui.checkbox(
-                    &mut data.em.enabled,
-                    egui::RichText::new("Enable EM").color(TEXT),
-                );
+                if ui
+                    .add_sized(
+                        egui::vec2(160.0, 32.0),
+                        egui::Button::new(egui::RichText::new("Enable EM").color(TEXT).strong())
+                            .selected(data.em.enabled),
+                    )
+                    .on_hover_text("Enable electromagnetism rendering")
+                    .clicked()
+                {
+                    data.em.enabled = !data.em.enabled;
+                }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("Mode").color(TEXT));

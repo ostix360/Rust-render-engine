@@ -54,11 +54,19 @@ uses a finite-cell softening radius derived from each sampled cell volume, which
 prevents coarse source cells from creating point-kernel spikes when render
 samples sit close to source-cell centers. The working tree also contains local
 edits that hide the unfinished Lorenz gauge path until its matching `A`
-transform is implemented, plus unrelated untracked root files.
+transform is implemented, plus a review fix that keeps the `B vector scale`
+slider effective when EM vector normalization is enabled, aligns the default
+magnetic plane wave sign with the default electric/potential wave, and makes
+the EM enable control larger. Unrelated untracked root files are still present.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
+- `rtk cargo test field_render -- --skip test_logger` passes with 18
+  field-render-filtered tests, including the normalized magnetic scale
+  regression.
+- `rtk cargo test grid_ui_state_defaults_match_expected_values -- --skip
+  test_logger` passes with 2 default-state tests.
 - `rtk cargo check --target x86_64-pc-windows-msvc` completed successfully with
   the existing unused-code warning set.
 - `rtk cargo build --target x86_64-pc-windows-msvc` reached the link step, then
@@ -73,9 +81,7 @@ transform is implemented, plus unrelated untracked root files.
   passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
   Maxwell regressions and passes with 35 EM-filtered tests.
-- `rtk cargo test field_render -- --skip test_logger` passes with 16
-  field-render-filtered tests.
-- `rtk cargo test -- --skip test_logger` passes with 172 tests passed, 2
+- `rtk cargo test -- --skip test_logger` passes with 178 tests passed, 2
   filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent
   helpers.

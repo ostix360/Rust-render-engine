@@ -123,7 +123,7 @@ impl Default for EmUiState {
             phi: default_eq("0"),
             vector_potential: SpacialEqs::from_defaults("0", "sin(z - t)", "0"),
             electric_field: SpacialEqs::from_defaults("0", "cos(z - t)", "0"),
-            magnetic_field: SpacialEqs::from_defaults("cos(z - t)", "0", "0"),
+            magnetic_field: SpacialEqs::from_defaults("-cos(z - t)", "0", "0"),
             running: true,
             time_scale: 1.0,
             reset_counter: 0,
@@ -315,6 +315,8 @@ mod tests {
         assert_eq!(state.em.magnetic_vector_scale, 1.0);
         assert!(!state.em.normalize_vectors);
         assert_eq!(state.em.gauge, EmGauge::Coulomb);
+        assert_eq!(state.em.electric_field.y.eq_str, "cos(z - t)");
+        assert_eq!(state.em.magnetic_field.x.eq_str, "-cos(z - t)");
         assert!(state.em.layers.electric);
         assert!(state.em.layers.magnetic);
         assert!(!state.em.layers.scalar_potential);

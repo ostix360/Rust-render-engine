@@ -1,11 +1,16 @@
 use super::{
     build_scalar_render, build_scalar_render_with_kind, build_vector_render_with_color,
-    em_cache::time_normalization_scale, normalized_or_original, FieldSample, VectorNormalization,
-    VectorRenderConfig,
+    em_cache::time_normalization_scale, normalized_or_original, EmRenderCache, FieldSample,
+    VectorNormalization, VectorRenderConfig,
 };
+use crate::app::coords_sys::CoordsSys;
+use crate::app::em_runtime::EmRuntime;
+use crate::app::grid::{Grid, GridConfig};
 use crate::app::tangent_space::TangentSpace;
-use crate::app::ui::LegendKind;
+use crate::app::ui::{EmLayerVisibility, EmMode, EmUiState, LegendKind};
+use mathhook_core::Parser;
 use nalgebra::{vector, Vector3, Vector4};
+use std::f64::consts::FRAC_PI_2;
 
 fn origin_sample() -> FieldSample {
     FieldSample {
@@ -99,4 +104,31 @@ fn time_normalization_scale_includes_current_time_for_non_periodic_fields() {
     );
 
     assert!(scale <= 0.1);
+}
+
+#[test]
+fn em_time_normalization_keeps_magnetic_render_scale_visible() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let grid = Grid::new(CoordsSys::new(parse("x"), parse("y"), parse("z")));
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Magnetic;
+    state.layers = EmLayerVisibility {
+        electric: false,
+        magnetic: true,
+        scalar_potential: false,
+        vector_potential: false,
+    };
+    state.magnetic_field.x.eq = parse("sin(t)");
+    state.magnetic_field.x.eq_str = "sin(t)".to_string();
+    state.magnetic_vector_scale = 4.0;
+
+    let runtime = EmRuntime::from_ui_with_config(
+        &state,
+        &grid,
+        GridConfig::new(0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 2.0),
+    );
+    let cache = EmRenderCache::from_runtime(&runtime, &[origin_sample()], FRAC_PI_2, true);
+    let magnetic = cache.magnetic.expect("magnetic layer should be cached");
+
+    assert!((magnetic.world_vectors[0].norm() - 4.0).abs() < 1.0e-6);
 }
