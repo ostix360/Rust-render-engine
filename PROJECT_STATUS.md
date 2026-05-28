@@ -63,6 +63,11 @@ EM arrows without rebuilding `EmRuntime` or re-running the inverse-curl setup.
 The latest validation/diff review fix keeps normal Field-tab equation drafts
 out of the applied base-field snapshot while EM is enabled, so editing a hidden
 base field under EM no longer consumes the diff before EM is disabled.
+The latest EM review fix removes fixed numeric probe points from plane-wave
+shortcut detection; the shortcut is now only selected when the required
+transverse and wave-equation residuals simplify to symbolic zero, so expressions
+that merely vanish at old probe samples fall back to inverse-curl
+reconstruction.
 Unrelated untracked root files are still present.
 
 ## Current Verification
@@ -91,7 +96,9 @@ Unrelated untracked root files are still present.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
   passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
-  Maxwell regressions and passes with 35 EM-filtered tests.
+  Maxwell regressions and passes with 37 EM-filtered tests.
+- `rtk cargo test plane_wave -- --skip test_logger` passes with 16
+  plane-wave-filtered tests, including the fixed-probe static-term regression.
 - `rtk cargo test -- --skip test_logger` passes with 178 tests passed, 2
   filtered out, across 10 suites.
 - Current compiler warnings are still present for unused projection/tangent

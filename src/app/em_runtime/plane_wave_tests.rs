@@ -8,3 +8,16 @@ fn electric_source_mixed_static_term_does_not_use_plane_wave_shortcut() {
 
     assert!(plane_wave_magnetic_exprs(&electric_exprs, 1.0).is_none());
 }
+
+#[test]
+fn electric_source_static_term_zero_at_old_probes_does_not_use_plane_wave_shortcut() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let static_term = "((x + 1) * (x + 0.25) * (x - 0.5) * (x - 1)) ^ 2";
+    let electric_exprs = [
+        parse("0"),
+        parse(&format!("cos(z - t) + {static_term}")),
+        parse("0"),
+    ];
+
+    assert!(plane_wave_magnetic_exprs(&electric_exprs, 1.0).is_none());
+}
