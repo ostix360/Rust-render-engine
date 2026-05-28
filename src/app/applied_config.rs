@@ -1,7 +1,7 @@
 //! Applied UI configuration snapshots and diffing.
 
 use crate::app::grid::GridConfig;
-use crate::app::ui::{EmGauge, EmLayerVisibility, EmMode, FieldKind, GridUiState};
+use crate::app::ui::{EmGauge, EmLayerVisibility, EmMode, EqRender, FieldKind, GridUiState};
 use mathhook_core::formatter::simple::SimpleContext;
 use mathhook_core::SimpleFormatter;
 
@@ -31,6 +31,27 @@ impl AppliedConfig {
     /// Builds the subset of UI state that drives world reconfiguration.
     pub(crate) fn from_ui(state: &GridUiState) -> Self {
         let context = SimpleContext::default();
+        // EM mode lets normal Field-tab drafts stay unparsed. Diff against the last parsed
+        // expression so hidden drafts are not treated as committed before EM is disabled.
+        let scalar_eq = if state.em.enabled {
+            equation_key(&state.scalar_field, &context)
+        } else {
+            state.scalar_field.eq_str.clone()
+        };
+        let vector_eqs = if state.em.enabled {
+            [
+                equation_key(&state.field.x, &context),
+                equation_key(&state.field.y, &context),
+                equation_key(&state.field.z, &context),
+            ]
+        } else {
+            [
+                state.field.x.eq_str.clone(),
+                state.field.y.eq_str.clone(),
+                state.field.z.eq_str.clone(),
+            ]
+        };
+
         Self {
             grid_config: state.to_grid_config(),
             coord_eqs: [
@@ -54,12 +75,8 @@ impl AppliedConfig {
                     .expect("Error while converting z eq"),
             ],
             field_kind: state.field_kind,
-            scalar_eq: state.scalar_field.eq_str.clone(),
-            vector_eqs: [
-                state.field.x.eq_str.clone(),
-                state.field.y.eq_str.clone(),
-                state.field.z.eq_str.clone(),
-            ],
+            scalar_eq,
+            vector_eqs,
             render_d: state.render_d,
             normalize_field: state.normalize_field,
             em_enabled: state.em.enabled,
@@ -112,6 +129,12 @@ impl AppliedConfig {
             em_layers_changed: self.em_layers != next.em_layers,
         }
     }
+}
+
+fn equation_key(eq: &EqRender, context: &SimpleContext) -> String {
+    eq.eq
+        .to_simple(context)
+        .expect("Error while converting field eq")
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

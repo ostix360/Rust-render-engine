@@ -199,6 +199,30 @@ mod tests {
     }
 
     #[test]
+    fn apply_diff_does_not_consume_hidden_field_drafts_while_em_is_enabled() {
+        let mut current_state = GridUiState::default();
+        current_state.em.enabled = true;
+        let current = AppliedConfig::from_ui(&current_state);
+
+        let mut draft_state = current_state.clone();
+        draft_state.field.x.eq_str = "2".to_string();
+        let draft = AppliedConfig::from_ui(&draft_state);
+
+        let diff = current.diff(&draft);
+
+        assert!(!diff.vector_changed);
+
+        draft_state.em.enabled = false;
+        draft_state.field.x.eq = Parser::default().parse("2").unwrap();
+        let disabled = AppliedConfig::from_ui(&draft_state);
+        let disable_diff = current.diff(&disabled);
+
+        assert!(disable_diff.em_enabled_changed);
+        assert!(disable_diff.vector_changed);
+        assert!(disable_diff.runtime_field_changed());
+    }
+
+    #[test]
     fn apply_diff_tracks_em_vector_normalization() {
         let current = AppliedConfig::from_ui(&GridUiState::default());
         let mut next_state = GridUiState::default();

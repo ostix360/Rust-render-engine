@@ -60,14 +60,19 @@ magnetic plane wave sign with the default electric/potential wave, and makes
 the EM enable control larger. The latest review fix also treats `B vector
 scale` as a render-cache-only EM change, so slider changes invalidate sampled
 EM arrows without rebuilding `EmRuntime` or re-running the inverse-curl setup.
+The latest validation/diff review fix keeps normal Field-tab equation drafts
+out of the applied base-field snapshot while EM is enabled, so editing a hidden
+base field under EM no longer consumes the diff before EM is disabled.
 Unrelated untracked root files are still present.
 
 ## Current Verification
 
 - `rtk cargo fmt` completed successfully.
-- `rtk cargo test apply_diff -- --skip test_logger` passes with 14
+- `rtk cargo test apply_diff_does_not_consume_hidden_field_drafts_while_em_is_enabled -- --skip test_logger`
+  passes with 2 focused tests across the matching unit and integration filters.
+- `rtk cargo test apply_diff -- --skip test_logger` passes with 16
   apply-diff-filtered tests, including the `B vector scale` render-only
-  invalidation regression.
+  invalidation regression and the hidden Field-tab draft regression.
 - `rtk cargo test field_render -- --skip test_logger` passes with 18
   field-render-filtered tests, including the normalized magnetic scale
   regression.
@@ -231,6 +236,9 @@ The repository has uncommitted changes. Current feature edits include:
   fallback.
 - EM validation preserves hidden normal field drafts while EM is enabled, so
   Apply is not blocked by unrelated Field-tab parse errors.
+- Applied-config diffing now keys hidden normal Field-tab equations from their
+  last parsed expressions while EM is enabled, so a draft edit is not treated
+  as applied until EM is disabled and the field equations are reparsed.
 - Direct magnetic source mode now derives `E` from the Faraday source
   `-partial_t(B)` instead of `curl(B)`.
 - The direct-source inverse curl uses a finite-domain Coulomb/Biot-Savart
