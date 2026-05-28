@@ -140,6 +140,38 @@ fn regular_tangent_basis_accepts_regular_spherical_samples() {
 }
 
 #[test]
+fn sample_tangent_basis_keeps_globally_2d_polar_samples() {
+    let coords = CoordsSys::new(parse("x*cos(y)"), parse("x*sin(y)"), parse("0"));
+
+    let basis = coords
+        .eval_sample_tangent_basis(vector![2.0, 1.0, 0.0])
+        .expect("2D polar embedding should keep field sample basis");
+
+    assert_vec3_close(
+        basis[0],
+        vector![1.0_f64.cos(), 1.0_f64.sin(), 0.0],
+        "polar radial basis",
+    );
+    assert_vec3_close(basis[2], vector![0.0, 0.0, 1.0], "inactive z fallback");
+}
+
+#[test]
+fn sample_tangent_basis_rejects_local_coordinate_singularities() {
+    let coords = CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+
+    assert!(coords
+        .eval_sample_tangent_basis(vector![0.0, 1.0, 1.0])
+        .is_none());
+    assert!(coords
+        .eval_sample_tangent_basis(vector![2.0, 1.0, 0.0])
+        .is_none());
+}
+
+#[test]
 fn spherical_sample_geometry_reports_physical_volume_density() {
     let coords = CoordsSys::new(
         parse("x*cos(y) * sin(z)"),

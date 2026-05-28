@@ -10,7 +10,7 @@ use crate::app::tangent_space::TangentSpace;
 use crate::app::ui::{EmLayerVisibility, EmMode, EmUiState, LegendKind};
 use mathhook_core::Parser;
 use nalgebra::{vector, Vector3, Vector4};
-use std::f64::consts::FRAC_PI_2;
+use std::f64::consts::{FRAC_PI_2, TAU};
 
 fn origin_sample() -> FieldSample {
     FieldSample {
@@ -131,4 +131,57 @@ fn em_time_normalization_keeps_magnetic_render_scale_visible() {
     let magnetic = cache.magnetic.expect("magnetic layer should be cached");
 
     assert!((magnetic.world_vectors[0].norm() - 4.0).abs() < 1.0e-6);
+}
+
+#[test]
+fn em_time_normalization_keeps_spherical_e_y_amplitude_across_radius() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let coords = CoordsSys::new(
+        parse("x*cos(y) * sin(z)"),
+        parse("x*sin(y) * sin(z)"),
+        parse("x * cos(z)"),
+    );
+    let grid = Grid::new(coords);
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.layers = EmLayerVisibility {
+        electric: true,
+        magnetic: false,
+        scalar_potential: false,
+        vector_potential: false,
+    };
+    state.electric_field.x.eq = parse("0");
+    state.electric_field.y.eq = parse("cos(x - t)");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui_with_config(
+        &state,
+        &grid,
+        GridConfig::new(1.0, 8.0, 2.0, 0.0, 1.0, 2.0, 0.2, 2.8, 2.0),
+    );
+    let near = vector![1.0, 0.5, FRAC_PI_2];
+    let far = vector![1.0 + TAU, 0.5, FRAC_PI_2];
+    let samples = vec![
+        FieldSample {
+            abstract_pos: near,
+            world_pos: grid.get_coords().eval_position(near),
+            basis: grid
+                .get_coords()
+                .eval_sample_tangent_basis(near)
+                .expect("near spherical sample should be regular"),
+        },
+        FieldSample {
+            abstract_pos: far,
+            world_pos: grid.get_coords().eval_position(far),
+            basis: grid
+                .get_coords()
+                .eval_sample_tangent_basis(far)
+                .expect("far spherical sample should be regular"),
+        },
+    ];
+
+    let cache = EmRenderCache::from_runtime(&runtime, &samples, 0.0, true);
+    let electric = cache.electric.expect("electric layer should be cached");
+
+    assert!((electric.world_vectors[0].norm() - electric.world_vectors[1].norm()).abs() < 1.0e-6);
 }

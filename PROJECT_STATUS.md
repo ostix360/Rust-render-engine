@@ -294,6 +294,9 @@ The repository has uncommitted changes. Current feature edits include:
   instead of evaluating the same field again at `current_time`.
 - EM vector layers remain visible in dual tangent mode because there is not yet
   an EM-specific dual-form replacement layer.
+- Field and EM sample caches now preserve globally 2D coordinate embeddings
+  such as the Polar preset while still rejecting local coordinate
+  singularities.
 - Timed expression evaluation in `src/maths/mod.rs`.
 - Field-render assembly updates in `src/app/field_render.rs` and
   `src/render/master_render.rs` so scalar samples and vector arrows can render

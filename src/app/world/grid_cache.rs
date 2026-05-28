@@ -62,7 +62,7 @@ impl World {
             };
             let abstract_pos = Self::transform_vertex(transform, endpoint);
             let world_pos = coords.eval_position(abstract_pos);
-            let Some(basis) = coords.eval_regular_tangent_basis(abstract_pos) else {
+            let Some(basis) = coords.eval_sample_tangent_basis(abstract_pos) else {
                 continue;
             };
 

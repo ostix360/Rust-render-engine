@@ -181,6 +181,14 @@ impl CoordsSys {
         Self::normalize_axis(Self::eval_raw_axis(point, axis))
     }
 
+    fn axis_is_zero_at(point: Vector3<f64>, axis: &[FastExpr3d; 3]) -> bool {
+        let tangent = Self::eval_raw_axis(point, axis);
+        tangent.x.is_finite()
+            && tangent.y.is_finite()
+            && tangent.z.is_finite()
+            && tangent.norm() <= 1e-9
+    }
+
     fn eval_regular_tangent_basis_from_axes(
         point: Vector3<f64>,
         tangent_x: &[FastExpr3d; 3],
@@ -191,6 +199,44 @@ impl CoordsSys {
             Self::eval_regular_axis(point, tangent_x)?,
             Self::eval_regular_axis(point, tangent_y)?,
             Self::eval_regular_axis(point, tangent_z)?,
+        ])
+    }
+
+    fn axis_is_locally_inactive(point: Vector3<f64>, axis: &[FastExpr3d; 3]) -> bool {
+        const STENCIL_STEP: f64 = 1.0e-4;
+
+        [
+            point,
+            point + vector![STENCIL_STEP, 0.0, 0.0],
+            point - vector![STENCIL_STEP, 0.0, 0.0],
+            point + vector![0.0, STENCIL_STEP, 0.0],
+            point - vector![0.0, STENCIL_STEP, 0.0],
+            point + vector![0.0, 0.0, STENCIL_STEP],
+            point - vector![0.0, 0.0, STENCIL_STEP],
+        ]
+        .iter()
+        .all(|sample| Self::axis_is_zero_at(*sample, axis))
+    }
+
+    fn eval_sample_axis(
+        point: Vector3<f64>,
+        axis: &[FastExpr3d; 3],
+        fallback: Vector3<f64>,
+    ) -> Option<Vector3<f64>> {
+        Self::eval_regular_axis(point, axis)
+            .or_else(|| Self::axis_is_locally_inactive(point, axis).then_some(fallback))
+    }
+
+    fn eval_sample_tangent_basis_from_axes(
+        point: Vector3<f64>,
+        tangent_x: &[FastExpr3d; 3],
+        tangent_y: &[FastExpr3d; 3],
+        tangent_z: &[FastExpr3d; 3],
+    ) -> Option<[Vector3<f64>; 3]> {
+        Some([
+            Self::eval_sample_axis(point, tangent_x, vector![1.0, 0.0, 0.0])?,
+            Self::eval_sample_axis(point, tangent_y, vector![0.0, 1.0, 0.0])?,
+            Self::eval_sample_axis(point, tangent_z, vector![0.0, 0.0, 1.0])?,
         ])
     }
 
@@ -256,6 +302,20 @@ impl CoordsSys {
     /// so render caches should skip those points instead of silently substituting fallback axes.
     pub fn eval_regular_tangent_basis(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {
         Self::eval_regular_tangent_basis_from_axes(
+            point,
+            &self.tangent_x,
+            &self.tangent_y,
+            &self.tangent_z,
+        )
+    }
+
+    /// Evaluates a basis suitable for cached display samples.
+    ///
+    /// Truly singular points are still rejected, but coordinate systems with an intentionally
+    /// inactive axis, such as a 2D polar embedding with `z = 0`, keep the canonical fallback for
+    /// that axis so scalar and vector field samples remain visible.
+    pub fn eval_sample_tangent_basis(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {
+        Self::eval_sample_tangent_basis_from_axes(
             point,
             &self.tangent_x,
             &self.tangent_y,
