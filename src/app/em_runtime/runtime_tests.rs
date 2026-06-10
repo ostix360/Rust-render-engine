@@ -182,6 +182,74 @@ fn electric_source_uses_ampere_time_derivative_for_magnetic_field() {
 }
 
 #[test]
+fn electric_source_scalar_potential_reconstructs_spatially_varying_gradient() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.electric_field.x.eq = parse("0");
+    state.electric_field.y.eq = parse("y");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui(&state, &identity_grid());
+    let y = 2.0;
+    let point = Point { x: 0.0, y, z: 0.0 };
+    let delta = 1.0e-4;
+    let phi_before = runtime.phi_at(
+        Point {
+            x: point.x,
+            y: point.y - delta,
+            z: point.z,
+        },
+        0.0,
+    );
+    let phi_after = runtime.phi_at(
+        Point {
+            x: point.x,
+            y: point.y + delta,
+            z: point.z,
+        },
+        0.0,
+    );
+    let reconstructed_e_y = -(phi_after - phi_before) / (2.0 * delta);
+
+    assert_close_tol(reconstructed_e_y, y, 1.0e-3);
+    assert_close_tol(runtime.phi_at(point, 0.0), -0.5 * y * y, 1.0e-3);
+}
+
+#[test]
+fn electric_source_scalar_potential_uses_coordinate_axis_scale() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.electric_field.x.eq = parse("1");
+    state.electric_field.y.eq = parse("0");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui(&state, &scaled_cartesian_grid());
+    let x = 1.5;
+    let point = Point { x, y: 0.0, z: 0.0 };
+    let delta = 1.0e-4;
+    let phi_before = runtime.phi_at(
+        Point {
+            x: point.x - delta,
+            ..point
+        },
+        0.0,
+    );
+    let phi_after = runtime.phi_at(
+        Point {
+            x: point.x + delta,
+            ..point
+        },
+        0.0,
+    );
+    let reconstructed_e_x = -(phi_after - phi_before) / (2.0 * delta * 2.0);
+
+    assert_close_tol(reconstructed_e_x, 1.0, 1.0e-3);
+    assert_close_tol(runtime.phi_at(point, 0.0), -2.0 * x, 1.0e-3);
+}
+
+#[test]
 fn electric_source_inverse_curl_stays_bounded_in_spherical_geometry() {
     let parse = |expr: &str| Parser::default().parse(expr).unwrap();
     let mut state = EmUiState::default();
@@ -262,6 +330,30 @@ fn electric_source_plane_wave_magnetic_field_oscillates_without_rotation() {
     assert_close(half_turn.x, 1.0);
     assert_near_zero(half_turn.y);
     assert_near_zero(half_turn.z);
+}
+
+#[test]
+fn electric_source_plane_wave_uses_zero_scalar_potential_gauge() {
+    let parse = |expr: &str| Parser::default().parse(expr).unwrap();
+    let mut state = EmUiState::default();
+    state.mode = EmMode::Electric;
+    state.electric_field.x.eq = parse("0");
+    state.electric_field.y.eq = parse("cos(z - t)");
+    state.electric_field.z.eq = parse("0");
+
+    let runtime = EmRuntime::from_ui(&state, &identity_grid());
+    let point = Point {
+        x: 0.0,
+        y: 0.0,
+        z: 0.7,
+    };
+    let time = 0.2;
+    let vector_potential = runtime.vector_potential_at(point, time);
+
+    assert_near_zero(runtime.phi_at(point, time));
+    assert_near_zero(vector_potential.x);
+    assert_close(vector_potential.y, (point.z - time).sin());
+    assert_near_zero(vector_potential.z);
 }
 
 #[test]

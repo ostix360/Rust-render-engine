@@ -45,7 +45,7 @@ fn main() {
     let ui_state = Arc::new(Mutex::new(GridUiState::default()));
     spawn_control_window(ui_state.clone());
 
-    let mut camera = Camera::new(vector![0., 0., 0.]);
+    let mut camera = Camera::new(vector![0., 3., -2.]);
 
     let mut world = World::new(ui_state, &display_manager);
     while !display_manager.is_close_requested() {

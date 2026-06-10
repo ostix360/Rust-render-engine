@@ -230,6 +230,11 @@ impl ControlApp {
         });
     }
 
+    /// Renders a hover-only help marker for compact UI guidance.
+    pub(super) fn help_dot(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
+        draw_info_dot(ui).on_hover_ui(add_contents);
+    }
+
     /// Renders the min and max editors for one axis bound pair.
     fn bounds_row(ui: &mut egui::Ui, label: &str, bounds: &mut (f64, f64)) {
         ui.horizontal(|ui| {
@@ -293,9 +298,13 @@ impl eframe::App for ControlApp {
 }
 
 /// Renders the small help dot shown beside equation inputs.
-fn info_dot(ui: &mut egui::Ui) {
+fn info_dot(ui: &mut egui::Ui) -> egui::Response {
+    draw_info_dot(ui).on_hover_ui(equation_help_popup)
+}
+
+fn draw_info_dot(ui: &mut egui::Ui) -> egui::Response {
     ui.add_space(4.0);
-    let (rect, _response) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
     let painter = ui.painter();
     let center = rect.center();
     painter.circle_filled(center, 8.0, CRAYOLA_BLUE);
@@ -305,5 +314,23 @@ fn info_dot(ui: &mut egui::Ui) {
         "?",
         egui::FontId::proportional(10.0),
         Color32::BLACK,
+    );
+    response
+}
+
+fn equation_help_popup(ui: &mut egui::Ui) {
+    ui.set_max_width(320.0);
+    ui.label(egui::RichText::new("Equation help").color(TEXT).strong());
+    ui.add_space(4.0);
+    ui.label(
+        egui::RichText::new("Use x, y, and z for spatial coordinates. EM equations also allow t.")
+            .color(MUTED),
+    );
+    ui.label(
+        egui::RichText::new("Write explicit multiplication: x*y, 2*sin(z), not xy.").color(MUTED),
+    );
+    ui.label(
+        egui::RichText::new("Common functions include sin, cos, tan, sqrt, exp, ln, log, and abs.")
+            .color(MUTED),
     );
 }

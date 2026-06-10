@@ -295,6 +295,7 @@ impl CoordsSys {
         ]
     }
 
+    #[allow(dead_code)]
     /// Evaluates the tangent basis only when every coordinate direction is regular.
     ///
     /// Coordinate singularities such as cylindrical `r = 0` or spherical poles do not define a
@@ -434,6 +435,13 @@ impl CoordSampleGeometry {
         let axes = self.raw_tangent_axes(point)?;
         let density = axes[0].dot(&axes[1].cross(&axes[2])).abs();
         density.is_finite().then_some(density)
+    }
+
+    pub fn axis_scale(&self, point: Vector3<f64>, axis_index: usize) -> Option<f64> {
+        let axes = self.raw_tangent_axes(point)?;
+        axes.get(axis_index)
+            .map(Vector3::norm)
+            .filter(|scale| scale.is_finite() && *scale > 1.0e-9)
     }
 
     fn raw_tangent_axes(&self, point: Vector3<f64>) -> Option<[Vector3<f64>; 3]> {

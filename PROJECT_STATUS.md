@@ -1,6 +1,6 @@
 # Project Status
 
-Generated: 2026-05-28
+Generated: 2026-06-09
 
 ## Summary
 
@@ -52,13 +52,14 @@ sources such as `E_y = 1/x * cos(x - t)` no longer feed the solver through a
 Cartesian interpretation of `(r, theta, phi)`. The inverse-curl kernel also
 uses a finite-cell softening radius derived from each sampled cell volume, which
 prevents coarse source cells from creating point-kernel spikes when render
-samples sit close to source-cell centers. The working tree also contains local
-edits that hide the unfinished Lorenz gauge path until its matching `A`
-transform is implemented, plus a review fix that keeps the `B vector scale`
-slider effective when EM vector normalization is enabled, aligns the default
-magnetic plane wave sign with the default electric/potential wave, and makes
-the EM enable control larger. The latest review fix also treats `B vector
-scale` as a render-cache-only EM change, and the render-only Apply path now
+samples sit close to source-cell centers. The EM UI and runtime currently expose
+only the Coulomb-style gauge path while Lorenz-gauge support awaits a matching
+`A` transform and validation path. The working tree also contains a review fix
+that keeps the `B vector scale` slider effective when EM vector normalization is
+enabled, aligns the default magnetic plane wave sign with the default
+electric/potential wave, and makes the EM enable control larger. The latest
+review fix also treats `B vector scale` as a render-cache-only EM change, and
+the render-only Apply path now
 copies that scale into the existing `EmRuntime` before rebuilding the EM render
 cache. Slider changes therefore invalidate sampled EM arrows without rebuilding
 the equation runtime or re-running the inverse-curl setup, while still taking
@@ -71,13 +72,37 @@ shortcut detection; the shortcut is now only selected when the required
 transverse and wave-equation residuals simplify to symbolic zero, so expressions
 that merely vanish at old probe samples fall back to inverse-curl
 reconstruction.
+The latest source-mode potential fix replaces the local `V = -E dot r`
+visualization shortcut with gauge-consistent potential reconstruction. Direct
+transverse plane waves use the radiation/Coulomb-style gauge with `V = 0` and
+symbolically integrated `A` carrying the wave; non-plane-wave direct sources
+fall back to a Coulomb-gauge scalar-potential reconstruction from the displayed
+electric field and vector-potential residual. Electric source mode now
+reconstructs non-plane-wave displayed `A` through the same finite-domain
+inverse-curl path used for magnetic source mode, so visible source-mode
+potentials are paired instead of mixing a curl-based field with an unrelated
+pointwise scalar shortcut. The reconstruction line integral now multiplies OTN
+residual components by each coordinate axis scale factor, so scaled Cartesian
+and curvilinear source-mode `V` layers reconstruct the displayed electric field
+instead of integrating over raw abstract-coordinate distance.
+The latest UI pass adds hover help to equation question-mark markers and adds
+tangent-mode discovery popups for `T` geometric tangent space and `Ctrl+T` dual
+tangent space in the tangent-related control sections.
 Unrelated untracked root files are still present.
 
 ## Current Verification
 
-- `rtk cargo fmt` completed successfully.
-- `rtk cargo test render_control_update_refreshes_magnetic_scale_without_runtime_rebuild`
-  passes with 2 focused tests across the matching unit and integration filters.
+- `rtk cargo test em_runtime::runtime_tests::electric_source_scalar_potential_uses_coordinate_axis_scale -- --skip test_logger`
+  passes with the scaled-coordinate source-mode potential regression.
+- `rtk cargo fmt` completed successfully after the UI help changes.
+- `rtk cargo check` completed successfully with the existing unused-code warning
+  set.
+- `rtk cargo test grid_ui_state_defaults_match_expected_values -- --skip
+  test_logger` passes with 2 default-state tests.
+- `rtk cargo test em_runtime::runtime_tests` passes with 24 focused runtime
+  tests.
+- `rtk cargo test -- --skip test_logger` passes with 194 tests and 2 filtered
+  logger tests.
 - `rtk cargo test apply_diff_does_not_consume_hidden_field_drafts_while_em_is_enabled -- --skip test_logger`
   passes with 2 focused tests across the matching unit and integration filters.
 - `rtk cargo test apply_diff -- --skip test_logger` passes with 16
@@ -86,8 +111,6 @@ Unrelated untracked root files are still present.
 - `rtk cargo test field_render -- --skip test_logger` passes with 18
   field-render-filtered tests, including the normalized magnetic scale
   regression.
-- `rtk cargo test grid_ui_state_defaults_match_expected_values -- --skip
-  test_logger` passes with 2 default-state tests.
 - `rtk cargo check --target x86_64-pc-windows-msvc` completed successfully with
   the existing unused-code warning set.
 - `rtk cargo build --target x86_64-pc-windows-msvc` reached the link step, then
@@ -101,7 +124,7 @@ Unrelated untracked root files are still present.
 - `rtk cargo test inverse_curl_reuses_source_samples_per_time -- --skip test_logger`
   passes, including the parallel-target cache regression.
 - `rtk cargo test em_runtime -- --skip test_logger` includes direct-source
-  Maxwell regressions and passes with 39 EM-filtered tests.
+  Maxwell regressions and passes with 45 EM-filtered tests.
 - `rtk cargo test plane_wave -- --skip test_logger` passes with 16
   plane-wave-filtered tests, including the fixed-probe static-term regression.
 - `rtk cargo test -- --skip test_logger` passes with 190 tests passed, 2
@@ -154,9 +177,9 @@ Unrelated untracked root files are still present.
 - The `V/phi` layer has a dedicated scalar-potential legend. If the range is
   uniform, the legend now identifies that as a constant active gauge rather
   than presenting it as an ordinary scalar field.
-- EM currently exposes the Coulomb-like gauge path in the UI. The Lorenz enum
-  remains in code, but the local UI/runtime edits keep it hidden/incomplete
-  until a matching vector-potential transform is implemented.
+- EM currently exposes only the Coulomb-like gauge path in the UI/runtime.
+  Lorenz support is not reachable in the current enum and should be reintroduced
+  only with a matching vector-potential transform and validation coverage.
 - Uses a dedicated field render path and field shaders for field arrows.
 - Field-arrow caches skip samples whose coordinate tangent basis is degenerate,
   preventing arrows from being rendered at coordinate singularities such as
@@ -227,7 +250,7 @@ The repository has uncommitted changes. Current feature edits include:
 - EM runtime/cache wiring in `src/app/em_runtime.rs`,
   `src/app/em_runtime/`, `src/app/world.rs`, `src/app/world/apply.rs`,
   `src/app/world/frame.rs`, and `src/app/world/field_rendering.rs`.
-- Oversized app modules have been split so each Rust file is below 500 lines.
+- Oversized app modules have been split so each Rust file is below ~500 lines.
 - EM source-mode updates so `V/phi + A`, `E`, or `B` can act as the input
   family while the other measures are resolved for rendering.
 - Direct electric source mode now derives `B` from the Ampere-Maxwell source
@@ -332,8 +355,8 @@ Those appear unrelated to the render-engine runtime itself.
 - Recovering potentials from `E` or `B` uses visualization conventions rather
   than a full boundary-value solve. The gauge is intentionally local to the EM
   runtime so it can become editable later.
-- Lorenz gauge remains incomplete in this working tree. The UI hides it, and
-  forcing `EmGauge::Lorenz` through code will hit the current runtime `todo!()`.
+- Lorenz gauge is not currently exposed by `EmGauge`; reintroducing it still
+  requires the matching vector-potential transform and validation coverage.
 - Expressions with coordinate singularities such as `1/x` still describe
   unbounded input at the singular surface. Non-finite samples are skipped, but
   very large finite arrows can still require bounds or EM normalization choices.

@@ -61,6 +61,7 @@ impl GridRenderer {
         self.shader.unbind();
     }
 
+    #[allow(dead_code)]
     /// Updates the projection matrix used by the grid renderer.
     pub fn update_projection(&mut self, projection: Matrix4<f64>) {
         self.projection = projection;

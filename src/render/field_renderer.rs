@@ -50,6 +50,7 @@ impl FieldRenderer {
         self.finish();
     }
 
+    #[allow(dead_code)]
     /// Updates the field shader projection matrix used by subsequent draws.
     pub fn update_projection(&mut self, projection: &Matrix4<f64>) {
         self.shader.bind();

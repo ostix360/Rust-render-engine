@@ -346,6 +346,7 @@ impl TangentSpace {
             && local_position.z.abs() <= radius
     }
 
+    #[allow(dead_code)]
     /// Returns the scaled abstract-space offset from the active anchor.
     ///
     /// This is only available while tangent mode has an anchor selected.
@@ -354,6 +355,7 @@ impl TangentSpace {
         Some(anchor.local_abstract_delta(abstract_pos, self.geometric_local_scale))
     }
 
+    #[allow(dead_code)]
     /// Returns the raw abstract-space offset from the active anchor.
     ///
     /// The delta is unscaled so callers can reuse it for dual-view and linearization work.

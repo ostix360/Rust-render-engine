@@ -1,5 +1,5 @@
 use crate::maths::{derivate, Expr};
-use mathhook_core::Simplify;
+use mathhook_core::{Integration, Simplify, Symbol};
 use std::ops::{Add, Mul};
 
 pub(super) fn plane_wave_magnetic_exprs(electric_exprs: &[Expr; 3], c: f64) -> Option<[Expr; 3]> {
@@ -54,6 +54,32 @@ pub(super) fn plane_wave_electric_exprs(magnetic_exprs: &[Expr; 3], c: f64) -> O
     None
 }
 
+pub(super) fn plane_wave_vector_potential_exprs(electric_exprs: &[Expr; 3]) -> Option<[Expr; 3]> {
+    let time = Symbol::new("t");
+    let vector_potential = [
+        negate(electric_exprs[0].clone())
+            .integrate(time.clone(), 0)
+            .simplify(),
+        negate(electric_exprs[1].clone())
+            .integrate(time.clone(), 0)
+            .simplify(),
+        negate(electric_exprs[2].clone())
+            .integrate(time, 0)
+            .simplify(),
+    ];
+
+    vector_potential
+        .iter()
+        .zip(electric_exprs.iter())
+        .all(|(potential, electric)| {
+            let residual = partial_t(potential.clone())
+                .add(electric.clone())
+                .simplify();
+            is_near_zero_expr(&residual)
+        })
+        .then_some(vector_potential)
+}
+
 fn is_plane_wave_direction(exprs: &[Expr; 3], axis: usize, c: f64, direction: f64) -> bool {
     exprs.iter().all(|expr| {
         (0..3)
@@ -102,6 +128,10 @@ pub(super) fn scale_exprs(exprs: [Expr; 3], scale: f64) -> [Expr; 3] {
 
 fn scale_expr(expr: Expr, scale: f64) -> Expr {
     Expr::number(scale).mul(expr).simplify()
+}
+
+fn negate(expr: Expr) -> Expr {
+    Expr::number(-1.0).mul(expr).simplify()
 }
 
 fn derivate_axis(expr: Expr, axis: usize) -> Expr {

@@ -65,7 +65,7 @@ pub enum EmMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmGauge {
     Coulomb,
-    Lorenz,
+    // Lorenz,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

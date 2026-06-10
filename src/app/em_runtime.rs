@@ -24,8 +24,10 @@ use maxwell::{
     MaxwellSolveConfig,
 };
 use nalgebra::Vector3;
-use plane_wave::{plane_wave_electric_exprs, plane_wave_magnetic_exprs};
-use potentials::{local_vector_potential_from_b, scalar_potential_for_gauge};
+use plane_wave::{
+    plane_wave_electric_exprs, plane_wave_magnetic_exprs, plane_wave_vector_potential_exprs,
+};
+use potentials::{scalar_potential_for_gauge, zero_scalar_potential};
 use std::ops::{Add, Mul};
 
 pub struct EmRuntime {
@@ -44,12 +46,12 @@ impl EmRuntime {
     }
 
     pub fn from_ui_with_config(state: &EmUiState, grid: &Grid, grid_config: GridConfig) -> Self {
-        let maxwell_config =
-            MaxwellSolveConfig::from_grid_config(grid_config, grid.get_coords().sample_geometry());
+        let geometry = grid.get_coords().sample_geometry();
+        let maxwell_config = MaxwellSolveConfig::from_grid_config(grid_config, geometry.clone());
         match state.mode {
             EmMode::Potentials => Self::from_potentials(state, grid.get_coords().get_space()),
-            EmMode::Electric => Self::from_electric(state, maxwell_config),
-            EmMode::Magnetic => Self::from_magnetic(state, maxwell_config),
+            EmMode::Electric => Self::from_electric(state, maxwell_config, geometry),
+            EmMode::Magnetic => Self::from_magnetic(state, maxwell_config, geometry),
         }
     }
 
@@ -85,26 +87,44 @@ impl EmRuntime {
         }
     }
 
-    fn from_electric(state: &EmUiState, maxwell_config: MaxwellSolveConfig) -> Self {
+    fn from_electric(
+        state: &EmUiState,
+        maxwell_config: MaxwellSolveConfig,
+        geometry: crate::app::coords_sys::CoordSampleGeometry,
+    ) -> Self {
         let electric_exprs = exprs_from_spacial(&state.electric_field);
         let c = state.light_speed.max(1.0e-6);
 
         let electric_field = TimedVectorField::from_exprs(electric_exprs.clone());
-        let magnetic_field = if maxwell_config.supports_plane_wave_shortcut() {
-            if let Some(magnetic_exprs) = plane_wave_magnetic_exprs(&electric_exprs, c) {
-                TimedVectorField::from_exprs(magnetic_exprs)
+        let plane_wave_fields = maxwell_config
+            .supports_plane_wave_shortcut()
+            .then(|| {
+                let magnetic_exprs = plane_wave_magnetic_exprs(&electric_exprs, c)?;
+                let vector_potential_exprs = plane_wave_vector_potential_exprs(&electric_exprs)?;
+                Some((magnetic_exprs, vector_potential_exprs))
+            })
+            .flatten();
+
+        let (magnetic_field, vector_potential, phi) =
+            if let Some((magnetic_exprs, vector_potential_exprs)) = plane_wave_fields {
+                (
+                    TimedVectorField::from_exprs(magnetic_exprs),
+                    TimedVectorField::from_exprs(vector_potential_exprs),
+                    zero_scalar_potential(),
+                )
             } else {
                 let ampere_source_exprs = maxwell_ampere_source_exprs(&electric_exprs, c);
                 let ampere_source = TimedVectorField::from_exprs(ampere_source_exprs);
-                maxwell_inverse_curl(ampere_source, maxwell_config)
-            }
-        } else {
-            let ampere_source_exprs = maxwell_ampere_source_exprs(&electric_exprs, c);
-            let ampere_source = TimedVectorField::from_exprs(ampere_source_exprs);
-            maxwell_inverse_curl(ampere_source, maxwell_config)
-        };
-        let vector_potential = local_vector_potential_from_b(magnetic_field.clone());
-        let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
+                let magnetic_field = maxwell_inverse_curl(ampere_source, maxwell_config.clone());
+                let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
+                let phi = scalar_potential_for_gauge(
+                    state.gauge,
+                    electric_field.clone(),
+                    vector_potential.clone(),
+                    geometry,
+                );
+                (magnetic_field, vector_potential, phi)
+            };
 
         Self {
             layers: state.layers.clone(),
@@ -116,26 +136,44 @@ impl EmRuntime {
         }
     }
 
-    fn from_magnetic(state: &EmUiState, maxwell_config: MaxwellSolveConfig) -> Self {
+    fn from_magnetic(
+        state: &EmUiState,
+        maxwell_config: MaxwellSolveConfig,
+        geometry: crate::app::coords_sys::CoordSampleGeometry,
+    ) -> Self {
         let magnetic_exprs = exprs_from_spacial(&state.magnetic_field);
         let c = state.light_speed.max(1.0e-6);
 
         let magnetic_field = TimedVectorField::from_exprs(magnetic_exprs.clone());
-        let electric_field = if maxwell_config.supports_plane_wave_shortcut() {
-            if let Some(electric_exprs) = plane_wave_electric_exprs(&magnetic_exprs, c) {
-                TimedVectorField::from_exprs(electric_exprs)
+        let plane_wave_fields = maxwell_config
+            .supports_plane_wave_shortcut()
+            .then(|| {
+                let electric_exprs = plane_wave_electric_exprs(&magnetic_exprs, c)?;
+                let vector_potential_exprs = plane_wave_vector_potential_exprs(&electric_exprs)?;
+                Some((electric_exprs, vector_potential_exprs))
+            })
+            .flatten();
+
+        let (electric_field, vector_potential, phi) =
+            if let Some((electric_exprs, vector_potential_exprs)) = plane_wave_fields {
+                (
+                    TimedVectorField::from_exprs(electric_exprs),
+                    TimedVectorField::from_exprs(vector_potential_exprs),
+                    zero_scalar_potential(),
+                )
             } else {
                 let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
                 let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
-                maxwell_inverse_curl(faraday_source, maxwell_config.clone())
-            }
-        } else {
-            let faraday_source_exprs = maxwell_faraday_source_exprs(&magnetic_exprs);
-            let faraday_source = TimedVectorField::from_exprs(faraday_source_exprs);
-            maxwell_inverse_curl(faraday_source, maxwell_config.clone())
-        };
-        let phi = scalar_potential_for_gauge(state.gauge, electric_field.clone());
-        let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
+                let electric_field = maxwell_inverse_curl(faraday_source, maxwell_config.clone());
+                let vector_potential = maxwell_inverse_curl(magnetic_field.clone(), maxwell_config);
+                let phi = scalar_potential_for_gauge(
+                    state.gauge,
+                    electric_field.clone(),
+                    vector_potential.clone(),
+                    geometry,
+                );
+                (electric_field, vector_potential, phi)
+            };
 
         Self {
             layers: state.layers.clone(),

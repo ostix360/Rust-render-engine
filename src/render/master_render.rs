@@ -59,6 +59,7 @@ impl MasterRenderer {
         (grid_renderer, point_renderer, field_renderer, projection)
     }
 
+    #[allow(dead_code)]
     /// Updates the projection matrix used by all render passes for the current tangent zoom
     /// blend.
     pub fn set_zoom_mix(&mut self, mix: f64) {

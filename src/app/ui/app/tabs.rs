@@ -67,6 +67,8 @@ impl ControlApp {
         egui::CollapsingHeader::new(theme::section_heading("Tangent view"))
             .default_open(true)
             .show(ui, |ui| {
+                Self::tangent_mode_hint(ui);
+                ui.add_space(4.0);
                 ui.label(
                     egui::RichText::new("Local patch size in geometric tangent mode").color(MUTED),
                 );
@@ -159,6 +161,8 @@ impl ControlApp {
         egui::CollapsingHeader::new(theme::section_heading("Tangent arrows"))
             .default_open(true)
             .show(ui, |ui| {
+                Self::tangent_mode_hint(ui);
+                ui.add_space(4.0);
                 ui.label(egui::RichText::new("Arrow size in geometric tangent mode").color(MUTED));
                 ui.add(
                     egui::Slider::new(&mut data.geometric_arrow_scale, 0.1..=1.5)
@@ -173,6 +177,42 @@ impl ControlApp {
                     .color(MUTED),
                 );
             });
+    }
+
+    fn tangent_mode_hint(ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Tangent modes").color(MUTED));
+            Self::help_dot(ui, |ui| {
+                ui.set_max_width(320.0);
+                ui.label(
+                    egui::RichText::new("Tangent-space navigation")
+                        .color(TEXT)
+                        .strong(),
+                );
+                ui.add_space(4.0);
+                ui.label(
+                    egui::RichText::new(
+                        "Hover a grid sample in the render view, then press T to enter the \
+                         geometric tangent space at that point.",
+                    )
+                    .color(MUTED),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Press Ctrl+T over a sample to enter the dual tangent-space view for \
+                         covector/form values.",
+                    )
+                    .color(MUTED),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Press the same shortcut again to return to the world view. Applying \
+                         new equations while inside tangent mode is deferred until the view exits.",
+                    )
+                    .color(MUTED),
+                );
+            });
+        });
     }
 
     fn render_em_tab(ui: &mut egui::Ui, data: &mut GridUiState) {

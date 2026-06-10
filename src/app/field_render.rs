@@ -4,7 +4,7 @@ mod em_cache;
 #[cfg(test)]
 mod tests;
 
-pub use em_cache::{CachedVectorLayer, EmRenderCache};
+pub use em_cache::EmRenderCache;
 
 use crate::app::field_runtime::RuntimeField;
 use crate::app::tangent_space::TangentSpace;
